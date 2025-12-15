@@ -7,7 +7,6 @@ readme = "README.md"
 keywords = ["Robotics", "ROS2"]
 categories = ["science::robotics"]
 repository.workspace = true
-homepage.workspace = true
 edition.workspace = true
 authors.workspace = true
 

@@ -5,8 +5,7 @@ resolver = "2"
 [workspace.package]
 edition = "2021"
 authors = ["Nadhmi JAZI <nadhmi.eljazi@gmail.com>"]
-repository = "https://github.com/jazi007/safe-drive-rs"
-homepage = "https://github.com/jazi007/safe-drive-rs"
+repository = "https://github.com/jazi007/oxidros"
 license-file = "LICENSE"
 
 [workspace.dependencies]

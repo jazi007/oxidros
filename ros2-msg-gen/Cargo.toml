@@ -9,7 +9,6 @@ categories = ["science::robotics"]
 edition.workspace = true
 authors.workspace = true
 repository.workspace = true
-homepage.workspace = true
 
 [dependencies]
 nom = "8"
