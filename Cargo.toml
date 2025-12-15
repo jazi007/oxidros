@@ -1,0 +1,14 @@
+[workspace]
+members = ["safe_drive", "safe_drive_msg"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+authors = ["Nadhmi JAZI <nadhmi.eljazi@gmail.com>"]
+repository = "https://github.com/jazi007/safe-drive-rs"
+homepage = "https://github.com/jazi007/safe-drive-rs"
+license-file = "LICENSE"
+
+[workspace.dependencies]
+num-traits = "0.2"
+futures = "0.3"

@@ -1,0 +1,22 @@
+[package]
+name = "safe_drive_msg_v2"
+version = "0.2.6"
+description = "A transpiler from ROS2's message types to Rust's types."
+license-file = "LICENSE"
+readme = "README.md"
+keywords = ["ROS2", "robotics"]
+categories = ["science::robotics"]
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+nom = "7"
+convert_case = "0.6"
+checksumdir = "0.3"
+t4_idl_parser = "0.1"
+num-bigint = "0.4"
+num-traits.workspace = true
