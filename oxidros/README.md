@@ -11,8 +11,6 @@ Original ROS2's executor (rclcpp) suffers from starvation.
 In contrast, the starvation freedom of our executor has been validated by not only dynamic analysis but also
 formal verification.
 
-See [specifications](https://github.com/tier4/safe_drive/tree/main/specifications).
-
 We specified and tested as follows.
 
 - Single Threaded Callback Execution
@@ -26,16 +24,10 @@ We specified and tested as follows.
   - Termination
   - Initialization is performed just once
 
-## Documents
-
-- [https://tier4.github.io/safe_drive/](https://tier4.github.io/safe_drive/)
-- [https://docs.rs/safe_drive/latest/safe_drive/](https://docs.rs/safe_drive/latest/safe_drive/)
-
 ## Supporting ROS2
 
-- [x] Jazzy, ([PR #25](https://github.com/tier4/safe_drive/pull/25))
+- [x] Jazzy
 - [x] Humble
-- [ ] Galactic (EOL)
 
 ## Supporting DDS
 
@@ -56,7 +48,6 @@ We specified and tested as follows.
 - [x] Timer
 - [x] Action (service + topic)
 - [x] Rust code generation from .msg and .srv files
-  - [safe_drive_msg](https://github.com/tier4/safe_drive_msg)
 - [x] Formal Specification
   - [x] Single threaded callback based executer
   - [x] Scheduling Core Algorithm
