@@ -69,14 +69,14 @@ impl Generator {
         let cksum_file = out_dir.join(modules).join("cksum");
         let cksum_msg = cksum.to_string();
 
-        if let Ok(mut f) = File::open(&cksum_file) {
-            let mut buf = String::new();
-            f.read_to_string(&mut buf)?;
+        // if let Ok(mut f) = File::open(&cksum_file) {
+        //     let mut buf = String::new();
+        //     f.read_to_string(&mut buf)?;
 
-            if buf == cksum_msg {
-                return Ok(()); // already generated and it is the latest
-            }
-        }
+        //     if buf == cksum_msg {
+        //         return Ok(()); // already generated and it is the latest
+        //     }
+        // }
 
         self.generate_recursive(out_dir, in_dir, modules)?;
         self.generate_module(out_dir, modules)?;
