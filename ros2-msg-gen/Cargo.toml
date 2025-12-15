@@ -1,6 +1,6 @@
 [package]
 name = "ros2-msg-gen"
-version = "0.2.6"
+version = "0.2.7"
 description = "A transpiler from ROS2's message types to Rust's types."
 license-file = "LICENSE"
 readme = "README.md"

@@ -325,6 +325,7 @@ impl<const N: usize> RosString<N> {
         Self::assign_string(&mut self.0, s)
     }
 
+    #[allow(clippy::unnecessary_cast)]
     pub fn as_slice(&self) -> &[std::os::raw::c_char] {
         if self.0.data.is_null() {
             &[]
@@ -334,6 +335,7 @@ impl<const N: usize> RosString<N> {
         }
     }
 
+    #[allow(clippy::unnecessary_cast)]
     pub fn as_slice_mut(&mut self) -> &mut [std::os::raw::c_char] {
         if self.0.data.is_null() {
             &mut []
@@ -407,6 +409,7 @@ impl<const STRLEN: usize, const SEQLEN: usize> RosStringSeq<STRLEN, SEQLEN> {
         Self(msg)
     }
 
+    #[allow(clippy::unnecessary_cast)]
     pub fn as_slice(&self) -> &[RosString<STRLEN>] {
         if self.0.data.is_null() {
             &[]

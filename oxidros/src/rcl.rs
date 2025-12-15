@@ -985,6 +985,7 @@ impl MTSafeFn {
         })
     }
 
+    #[allow(clippy::useless_conversion)]
     pub fn rcl_publish_serialized_message(
         publisher: *const rcl_publisher_t,
         data: &[u8],
