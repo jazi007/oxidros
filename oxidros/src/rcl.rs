@@ -873,6 +873,7 @@ impl MTUnsafeFn {
         Ok(params_map)
     }
 
+    #[cfg(feature = "jazzy")]
     pub fn rcl_service_configure_service_introspection(
         &self,
         service: *mut rcl_service_t,
@@ -991,8 +992,14 @@ impl MTSafeFn {
     ) -> RCLResult<()> {
         let ros_message = rcl_serialized_message_t {
             buffer: data.as_ptr() as *mut u8,
-            buffer_length: data.len(),
-            buffer_capacity: data.len(),
+            buffer_length: data
+                .len()
+                .try_into()
+                .map_err(|_| RCLError::InvalidArgument)?,
+            buffer_capacity: data
+                .len()
+                .try_into()
+                .map_err(|_| RCLError::InvalidArgument)?,
             allocator: unsafe { self::rcutils_get_default_allocator() },
         };
         ret_val_to_err(unsafe {

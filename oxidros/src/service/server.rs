@@ -89,10 +89,12 @@
 //! ```
 
 use super::Header;
+#[cfg(feature = "jazzy")]
+use crate::msg::interfaces::rosgraph_msgs::msg::Clock;
 use crate::{
     error::{DynError, RCLError, RCLResult},
     get_allocator, is_halt,
-    msg::{interfaces::rosgraph_msgs::msg::Clock, ServiceMsg},
+    msg::ServiceMsg,
     node::Node,
     qos::Profile,
     rcl::{self, rmw_request_id_t},
@@ -172,6 +174,7 @@ impl<T: ServiceMsg> Server<T> {
         })
     }
 
+    #[cfg(feature = "jazzy")]
     pub fn configure_introspection(
         &self,
         clock: &mut Clock,
