@@ -31,17 +31,17 @@ pub enum SafeDrive<'a> {
 /// # Example
 ///
 /// ```
-/// use safe_drive_msg_v2;
+/// use ros2_msg_gen;
 /// use std::path::Path;
 ///
 /// let dependencies = ["std_msgs", "std_srvs"];
-/// safe_drive_msg_v2::depends(&Path::new("/tmp/output_dir"), &dependencies, safe_drive_msg_v2::SafeDrive::Version("0.1"));
+/// ros2_msg_gen::depends(&Path::new("/tmp/output_dir"), &dependencies, ros2_msg_gen::SafeDrive::Version("0.1"));
 /// ```
 pub fn depends(outdir: &Path, libs: &[&str], safe_drive: SafeDrive) -> Result<(), DynError> {
     let ament_paths = std::env::var("AMENT_PREFIX_PATH")?;
     let mut ament_paths: Vec<_> = ament_paths
         .split(SEP)
-        .filter(|&p| p.len() > 0)
+        .filter(|&p| !p.is_empty())
         .map(|p| std::path::Path::new(p).join("share"))
         .collect();
     if cfg!(target_os = "windows") {
@@ -49,7 +49,7 @@ pub fn depends(outdir: &Path, libs: &[&str], safe_drive: SafeDrive) -> Result<()
         if let Ok(cmake_paths) = cmake_paths_env {
             let cmake_paths = cmake_paths
                 .split(SEP)
-                .filter(|&p| p.len() > 0)
+                .filter(|&p| !p.is_empty())
                 .map(|p| std::path::Path::new(p).join("share"));
             ament_paths.extend(cmake_paths);
         }

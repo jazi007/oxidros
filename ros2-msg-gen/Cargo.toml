@@ -1,5 +1,5 @@
 [package]
-name = "safe_drive_msg_v2"
+name = "ros2-msg-gen"
 version = "0.2.6"
 description = "A transpiler from ROS2's message types to Rust's types."
 license-file = "LICENSE"
@@ -11,11 +11,9 @@ authors.workspace = true
 repository.workspace = true
 homepage.workspace = true
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-nom = "7"
-convert_case = "0.6"
+nom = "8"
+convert_case = "0.10"
 checksumdir = "0.3"
 t4_idl_parser = "0.1"
 num-bigint = "0.4"
