@@ -7,7 +7,6 @@ use crate::{
     DynError, SafeDrive,
 };
 use convert_case::{Case, Casing};
-use nom::{error::convert_error, Finish};
 use num_bigint::BigInt;
 use num_traits::Zero;
 use std::{
@@ -777,10 +776,10 @@ safe_drive = {safe_drive_dep}
         let contents = read_file(path)?;
 
         // Parse.
-        let exprs = match parser::parse_msg(&contents).finish() {
+        let exprs = match parser::parse_msg(&contents) {
             Ok((_, exprs)) => exprs,
             Err(e) => {
-                eprintln!("{}", convert_error(contents.as_str(), e));
+                eprintln!("Parse error: {:?}", e);
                 let msg = format!("failed to parse: {}", path.display());
                 return Err(msg.into());
             }
@@ -818,10 +817,10 @@ safe_drive = {safe_drive_dep}
         let contents = read_file(path)?;
 
         // Parse.
-        let (exprs_req, exprs_resp) = match parser::parse_srv(&contents).finish() {
+        let (exprs_req, exprs_resp) = match parser::parse_srv(&contents) {
             Ok((_, exprs)) => exprs,
             Err(e) => {
-                eprintln!("{}", convert_error(contents.as_str(), e));
+                eprintln!("Parse error: {:?}", e);
                 let msg = format!("failed to parse: {}", path.display());
                 return Err(msg.into());
             }

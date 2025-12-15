@@ -40,19 +40,18 @@ use nom::{
         complete::{
             alpha1, anychar, line_ending, not_line_ending, one_of, satisfy, space0, space1,
         },
-        is_alphanumeric,
     },
     combinator::peek,
-    error::VerboseError,
     multi::{many0, many1, separated_list1},
     number,
     sequence::{delimited, preceded},
-    IResult,
+    IResult, Parser,
 };
 use std::fmt::Display;
 
-type PResult<'a, OUT> = IResult<&'a str, OUT, VerboseError<&'a str>>;
+type PResult<'a, OUT> = IResult<&'a str, OUT, nom::error::Error<&'a str>>;
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum Expr {
     Variable {
@@ -66,6 +65,7 @@ pub enum Expr {
     Eof,
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum ValueType {
     Const(Value),
@@ -187,7 +187,7 @@ pub fn parse_srv(mut input: &str) -> PResult<'_, (Vec<Expr>, Vec<Expr>)> {
 /// ```
 fn parse_expr(input: &str) -> PResult<'_, Expr> {
     let (input, _) = space0(input)?;
-    alt((parse_empty, parse_comment, parse_variable))(input)
+    alt((parse_empty, parse_comment, parse_variable)).parse(input)
 }
 
 /// ```text
@@ -201,7 +201,7 @@ fn parse_variable(input: &str) -> PResult<'_, Expr> {
     let (input, _) = space1(input)?;
 
     // parse mutable or immutable variables
-    let (input, (var_name, value)) = alt((parse_immutable_var, parse_mutable_var))(input)?;
+    let (input, (var_name, value)) = alt((parse_immutable_var, parse_mutable_var)).parse(input)?;
 
     // skip whitespaces
     let (input, _) = space0(input)?;
@@ -340,10 +340,10 @@ fn parse_string_type(input: &str) -> PResult<'_, TypeName> {
 /// ```
 fn parse_identifier(input: &str) -> PResult<'_, String> {
     // (_|[a..zA..Z]+)
-    let (input, head) = alt((tag("_"), alpha1))(input)?;
+    let (input, head) = alt((tag("_"), alpha1)).parse(input)?;
 
     // [a..zA..Z0..9_]*
-    let (input, tail) = many0(satisfy(|c| is_alphanumeric(c as u8) || c == '_'))(input)?;
+    let (input, tail) = many0(satisfy(|c: char| c.is_alphanumeric() || c == '_')).parse(input)?;
 
     let tail: String = tail.iter().collect();
     Ok((input, head.to_string() + &tail))
@@ -354,12 +354,13 @@ fn parse_identifier(input: &str) -> PResult<'_, String> {
 /// ```
 fn parse_capital_identifier(input: &str) -> PResult<'_, String> {
     // (_|[A..Z]+)
-    let (input, head) = satisfy(|c: char| c.is_ascii_uppercase() || c == '_')(input)?;
+    let (input, head) = satisfy(|c: char| c.is_ascii_uppercase() || c == '_').parse(input)?;
 
     // ([A..Z0..9]|_)*
     let (input, tail) = many0(satisfy(|c: char| {
-        ('A'..='Z').contains(&c) || c.is_ascii_digit() || c == '_'
-    }))(input)?;
+        c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_'
+    }))
+    .parse(input)?;
 
     let tail: String = tail.iter().collect();
     Ok((input, format!("{head}{tail}")))
@@ -394,7 +395,7 @@ fn parse_empty(input: &str) -> PResult<'_, Expr> {
 }
 
 fn peek_tag<'a>(c: &'static str, input: &'a str) -> PResult<'a, &'a str> {
-    peek(tag(c))(input)
+    peek(tag(c)).parse(input)
 }
 
 /// ```text
@@ -411,7 +412,8 @@ fn parse_value(input: &str) -> PResult<'_, Value> {
         parse_array,
         parse_string,
         parse_raw_string,
-    ))(input)
+    ))
+    .parse(input)
 }
 
 /// ```text
@@ -442,7 +444,7 @@ fn parse_num(input: &str) -> PResult<'_, Value> {
 /// $Bool = true | false
 /// ```
 fn parse_bool(input: &str) -> PResult<'_, Value> {
-    let (input, val) = alt((tag("true"), tag("false")))(input)?;
+    let (input, val) = alt((tag("true"), tag("false"))).parse(input)?;
     if val == "true" {
         Ok((input, Value::Bool(true)))
     } else {
@@ -456,7 +458,7 @@ fn parse_bool(input: &str) -> PResult<'_, Value> {
 /// ```
 fn parse_array(input: &str) -> PResult<'_, Value> {
     let p = delimited(space0, parse_value, space0);
-    let (input, val) = delimited(tag("["), separated_list1(tag(","), p), tag("]"))(input)?;
+    let (input, val) = delimited(tag("["), separated_list1(tag(","), p), tag("]")).parse(input)?;
     Ok((input, Value::Array(val)))
 }
 
@@ -466,7 +468,7 @@ fn parse_array(input: &str) -> PResult<'_, Value> {
 /// ```
 fn parse_array_info(input: &str) -> PResult<'_, ArrayInfo> {
     fn is_array(input: &str) -> PResult<'_, ()> {
-        let (input, _) = peek(preceded(space0, tag("[")))(input)?;
+        let (input, _) = peek(preceded(space0, tag("["))).parse(input)?;
         Ok((input, ()))
     }
 
@@ -516,7 +518,8 @@ fn parse_string(input: &str) -> PResult<'_, Value> {
         match c {
             c if c == quote => return Ok((input, Value::String(val))),
             '\\' => {
-                let (next, c) = alt((one_of("rnt\\"), character::complete::char(quote)))(input)?;
+                let (next, c) =
+                    alt((one_of("rnt\\"), character::complete::char(quote))).parse(input)?;
                 input = next;
 
                 match c {
@@ -549,7 +552,7 @@ fn parse_string(input: &str) -> PResult<'_, Value> {
 }
 
 fn parse_raw_string(input: &str) -> PResult<'_, Value> {
-    let (input, result) = many1(satisfy(|c| c != '\r' && c != '\n'))(input)?;
+    let (input, result) = many1(satisfy(|c| c != '\r' && c != '\n')).parse(input)?;
     let result = result.iter().fold(String::new(), |s, c| match c {
         '\\' => format!("{s}\\\\"),
         '"' => format!("{s}\\\""),
