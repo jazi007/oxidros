@@ -991,7 +991,7 @@ impl MTSafeFn {
             buffer: data.as_ptr() as *mut u8,
             buffer_length: data.len(),
             buffer_capacity: data.len(),
-            allocator: unsafe { self::rcutils_get_default_allocator() }
+            allocator: unsafe { self::rcutils_get_default_allocator() },
         };
         ret_val_to_err(unsafe {
             self::rcl_publish_serialized_message(publisher, (&ros_message) as *const _, allocation)

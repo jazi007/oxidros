@@ -167,11 +167,7 @@ fn select(
             }
         }
 
-        if selector
-            .wait()
-            .is_err()
-            && signal_handler::is_halt()
-        {
+        if selector.wait().is_err() && signal_handler::is_halt() {
             for (_, h) in selector.subscriptions.iter_mut() {
                 if let Some(handler) = &mut h.handler {
                     (*handler)();
