@@ -166,6 +166,7 @@ impl Profile {
 }
 
 impl From<&rcl::rmw_qos_profile_t> for Profile {
+    #[allow(clippy::useless_conversion)]
     fn from(qos: &rcl::rmw_qos_profile_t) -> Self {
         Self {
             history: FromPrimitive::from_u32(qos.history).unwrap_or(HistoryPolicy::Unknown),

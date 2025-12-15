@@ -45,7 +45,7 @@ async fn assert_status(client: Client<MyAction>, expected: GoalStatus) -> Client
     match async_std::future::timeout(Duration::from_secs(3), recv).await {
         Ok(Ok((c, status_array))) => {
             let list = status_array.status_list.as_slice();
-            assert!(list.len() > 0);
+            assert!(!list.is_empty());
             let status = list.last().unwrap().status;
             assert_eq!(status, expected as i8);
             c

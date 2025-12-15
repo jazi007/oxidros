@@ -62,6 +62,6 @@ fn test_client_wait() -> Result<(), DynError> {
             println!("retry later");
             Ok(())
         }
-        RecvResult::Err(e) => Err(e.into()),
+        RecvResult::Err(e) => Err(e),
     }
 }

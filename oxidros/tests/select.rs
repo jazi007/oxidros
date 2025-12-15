@@ -76,7 +76,7 @@ fn pub_thread(node: Arc<Node>, topic_name: &str, dur: Duration, init: i64) {
     // publish messages
     for i in 0..COUNT {
         thread::sleep(dur);
-        let n = init + i as i64;
+        let n = init + i;
         let msg = Num { num: n };
         publisher.send(&msg).unwrap(); // send message
     }

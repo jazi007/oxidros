@@ -98,6 +98,7 @@ pub struct Publisher<T> {
 }
 
 impl<T: TypeSupport> Publisher<T> {
+    #[allow(clippy::arc_with_non_send_sync)]
     pub(crate) fn new(
         node: Arc<Node>,
         topic_name: &str,
@@ -132,6 +133,7 @@ impl<T: TypeSupport> Publisher<T> {
         })
     }
 
+    #[allow(clippy::arc_with_non_send_sync)]
     pub(crate) fn new_disable_loaned_message(
         node: Arc<Node>,
         topic_name: &str,

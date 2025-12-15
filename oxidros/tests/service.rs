@@ -64,6 +64,6 @@ fn test_service() -> Result<(), DynError> {
             println!("should retry");
             Ok(())
         }
-        RecvResult::Err(e) => Err(e.into()),
+        RecvResult::Err(e) => Err(e),
     }
 }

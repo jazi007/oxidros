@@ -4,7 +4,6 @@ use futures::try_join;
 use parking_lot::Mutex;
 use pin_project::{pin_project, pinned_drop};
 use std::future::Future;
-use std::task::Context;
 use std::{
     collections::BTreeMap, ffi::CString, mem::MaybeUninit, pin::Pin, sync::Arc, task::Poll,
     time::Duration,
@@ -560,7 +559,7 @@ impl<T: ActionMsg> ServerCancelSend<T> {
         } else {
             let mut empty = vec![];
             response.msg.goals_canceling = bindgen_action_msgs__msg__GoalInfo__Sequence {
-                data: empty.as_mut_ptr() as *mut _ as *mut bindgen_action_msgs__msg__GoalInfo,
+                data: empty.as_mut_ptr() as *mut _,
                 size: 0,
                 capacity: 0,
             };
@@ -807,42 +806,6 @@ impl<T: ActionMsg> Clone for Server<T> {
             data: self.data.clone(),
             results: self.results.clone(),
             handles: self.handles.clone(),
-        }
-    }
-}
-
-struct CombinedFuture {
-    goal_future: Pin<Box<dyn Future<Output = Result<(), DynError>> + Send>>,
-    cancel_future: Pin<Box<dyn Future<Output = Result<(), DynError>> + Send>>,
-    result_future: Pin<Box<dyn Future<Output = Result<(), DynError>> + Send>>,
-}
-
-impl Future for CombinedFuture {
-    type Output = Result<(), DynError>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.get_mut();
-
-        let goal_poll = this.goal_future.as_mut().poll(cx);
-        let cancel_poll = this.cancel_future.as_mut().poll(cx);
-        let result_poll = this.result_future.as_mut().poll(cx);
-
-        if let Poll::Ready(Err(e)) = goal_poll {
-            return Poll::Ready(Err(e));
-        }
-
-        if let Poll::Ready(Err(e)) = cancel_poll {
-            return Poll::Ready(Err(e));
-        }
-
-        if let Poll::Ready(Err(e)) = result_poll {
-            return Poll::Ready(Err(e));
-        }
-
-        if goal_poll.is_ready() && cancel_poll.is_ready() && result_poll.is_ready() {
-            Poll::Ready(Ok(()))
-        } else {
-            Poll::Pending
         }
     }
 }

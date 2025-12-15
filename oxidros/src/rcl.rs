@@ -15,6 +15,7 @@
 #![allow(improper_ctypes)]
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::too_many_arguments)]
+#![allow(clashing_extern_declarations)]
 
 use num_traits::FromPrimitive;
 use regex::Regex;
@@ -806,6 +807,7 @@ impl MTUnsafeFn {
     }
 
     /// This implementation is based on [rclcpp rclcpp::parameter_map_from](https://github.com/ros2/rclcpp/blob/rolling/rclcpp/src/rclcpp/parameter_map.cpp)
+    #[allow(clippy::useless_conversion)]
     pub fn parameter_map(
         &mut self,
         node_fqn: &str,

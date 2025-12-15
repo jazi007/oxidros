@@ -29,6 +29,7 @@ pub(crate) struct GuardCondition {
 }
 
 impl GuardCondition {
+    #[allow(clippy::arc_with_non_send_sync)]
     pub(crate) fn new(context: Arc<Context>) -> RCLResult<Self> {
         let mut guard_condition = rcl::MTSafeFn::rcl_get_zero_initialized_guard_condition();
         let allocator = get_allocator();

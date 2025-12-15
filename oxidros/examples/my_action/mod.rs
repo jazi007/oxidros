@@ -1,5 +1,5 @@
 // Copied from tests/common/action_msg/action/my_action.rs
-#![allow(dead_code)]
+#![allow(dead_code, non_camel_case_types)]
 
 use oxidros::{
     msg::{

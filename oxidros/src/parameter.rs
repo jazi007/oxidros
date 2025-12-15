@@ -815,6 +815,7 @@ impl From<&Value> for ParameterValue {
 }
 
 impl From<&rcl_variant_t> for Value {
+    #[allow(clippy::useless_conversion)]
     fn from(var: &rcl_variant_t) -> Self {
         if !var.bool_value.is_null() {
             Value::Bool(unsafe { *var.bool_value })

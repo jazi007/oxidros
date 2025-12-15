@@ -52,7 +52,7 @@ async fn main() -> Result<(), DynError> {
     client = match async_std::future::timeout(Duration::from_secs(3), recv).await {
         Ok(Ok((c, status))) => {
             println!("client: status received: {:?}", status.status_list);
-            if status.status_list.as_slice().len() > 0 {
+            if !status.status_list.as_slice().is_empty() {
                 let s = status.status_list.as_slice().last().unwrap();
                 println!("client: last status: {:?}", GoalStatus::from(s.status));
             }
@@ -88,7 +88,7 @@ async fn main() -> Result<(), DynError> {
     client = match async_std::future::timeout(Duration::from_secs(3), recv).await {
         Ok(Ok((c, status))) => {
             println!("client: status received: {:?}", status.status_list);
-            if status.status_list.as_slice().len() > 0 {
+            if !status.status_list.as_slice().is_empty() {
                 let s = status.status_list.as_slice().last().unwrap();
                 println!("client: last status: {:?}", GoalStatus::from(s.status));
             }
