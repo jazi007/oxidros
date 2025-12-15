@@ -5,7 +5,7 @@
 //! ## Single Threaded Execution
 //!
 //! ```
-//! use safe_drive::{context::Context, msg::common_interfaces::std_srvs};
+//! use safe_drive_v2::{context::Context, msg::common_interfaces::std_srvs};
 //! use std::time::Duration;
 //!
 //! // Create a context.
@@ -45,7 +45,7 @@
 //! ## Multi Threaded Execution
 //!
 //! ```
-//! use safe_drive::{
+//! use safe_drive_v2::{
 //!     context::Context, logger::Logger, msg::common_interfaces::std_srvs, pr_error,
 //!     service::server::Server,
 //! };
@@ -218,7 +218,7 @@ impl<T: ServiceMsg> Server<T> {
     /// # Example
     ///
     /// ```
-    /// use safe_drive::{
+    /// use safe_drive_v2::{
     ///     logger::Logger, msg::common_interfaces::std_srvs, pr_error, pr_info, service::server::Server,
     ///     RecvResult,
     /// };
@@ -292,7 +292,7 @@ impl<T: ServiceMsg> Server<T> {
     /// # Example
     ///
     /// ```
-    /// use safe_drive::{
+    /// use safe_drive_v2::{
     ///     logger::Logger, msg::common_interfaces::std_srvs, pr_error, pr_info, service::server::Server,
     /// };
     ///
@@ -358,7 +358,7 @@ impl<T: ServiceMsg> ServerSend<T> {
     /// # Example
     ///
     /// ```
-    /// use safe_drive::{
+    /// use safe_drive_v2::{
     ///     logger::Logger, msg::common_interfaces::std_srvs, pr_error, service::server::Server,
     /// };
     ///

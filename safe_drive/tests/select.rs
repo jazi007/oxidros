@@ -1,7 +1,7 @@
 pub mod common;
 
 use common::msgs::example_msg::msg::Num;
-use safe_drive::node::Node;
+use safe_drive_v2::node::Node;
 use std::{cell::Cell, error::Error, rc::Rc, sync::Arc, thread, time::Duration};
 
 const TOPIC_NAME_1: &str = "test_select_1";
@@ -14,7 +14,7 @@ const COUNT: i64 = 5;
 #[test]
 fn test_select_subscriptions() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
     // create a context
-    let ctx = safe_drive::context::Context::new()?;
+    let ctx = safe_drive_v2::context::Context::new()?;
 
     // create nodes
     let node_pub1 = ctx.create_node("test_select_pub1_node", None, Default::default())?;
@@ -85,7 +85,7 @@ fn pub_thread(node: Arc<Node>, topic_name: &str, dur: Duration, init: i64) {
 #[test]
 fn test_callback() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
     // create a context
-    let ctx = safe_drive::context::Context::new()?;
+    let ctx = safe_drive_v2::context::Context::new()?;
 
     // create nodes
     let node_pub = ctx.create_node("test_callback_pub_node", None, Default::default())?;

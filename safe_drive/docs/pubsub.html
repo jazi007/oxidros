@@ -277,7 +277,7 @@ and subscribers and publishers are created by the node.</p>
 The following is a code of my_talker.
 You should also understand what this code is doing.</p>
 <p><code>pubsub/src/my_talker/src/main.rs</code></p>
-<pre><pre class="playground"><code class="language-rust">use safe_drive::{
+<pre><pre class="playground"><code class="language-rust">use safe_drive_v2::{
     context::Context, error::DynError, logger::Logger, pr_info
 };
 use std::time::Duration;
@@ -445,7 +445,7 @@ safe_drive_version = "0.3"
 we have to prepare a callback function of the subscriber.
 This is the main difference from <code>my_talker</code>.</p>
 <p><code>pubsub/src/my_listener/src/main.rs</code></p>
-<pre><pre class="playground"><code class="language-rust">use safe_drive::{
+<pre><pre class="playground"><code class="language-rust">use safe_drive_v2::{
     context::Context, error::DynError, logger::Logger, pr_info,
 };
 

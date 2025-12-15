@@ -5,7 +5,7 @@
 //! ## Wait update by callback
 //!
 //! ```
-//! use safe_drive::{
+//! use safe_drive_v2::{
 //!     context::Context,
 //!     logger::Logger,
 //!     parameter::{ParameterServer, Value, Parameter, Descriptor},
@@ -84,7 +84,7 @@
 //! ## Asynchronous wait
 //!
 //! ```
-//! use safe_drive::{
+//! use safe_drive_v2::{
 //!     context::Context,
 //!     error::DynError,
 //!     logger::Logger,
@@ -210,7 +210,7 @@ use std::{
 /// # Example
 ///
 /// ```
-/// use safe_drive::{
+/// use safe_drive_v2::{
 ///     context::Context,
 ///     parameter::{ParameterServer, Value, Parameter, Descriptor},
 /// };
@@ -273,7 +273,7 @@ pub struct ParameterServer {
 /// # Example
 ///
 /// ```
-/// use safe_drive::{helper::Contains, parameter::IntegerRange};
+/// use safe_drive_v2::{helper::Contains, parameter::IntegerRange};
 /// let range = IntegerRange { min: -5, max: 10, step: 3 };
 /// assert!(range.contains(-5));
 /// assert!(range.contains(-2));
@@ -315,7 +315,7 @@ impl From<&IntegerRange> for rcl_interfaces::msg::IntegerRange {
 /// # Example
 ///
 /// ```
-/// use safe_drive::{helper::Contains, parameter::FloatingPointRange};
+/// use safe_drive_v2::{helper::Contains, parameter::FloatingPointRange};
 /// let range = FloatingPointRange { min: -5.0, max: 10.0, step: 3.0 };
 /// assert!(range.contains(-5.0));
 /// assert!(range.contains(-2.0));
@@ -371,7 +371,7 @@ pub struct Descriptor {
 /// # Example
 ///
 /// ```
-/// use safe_drive::{error::DynError, parameter::{Parameters, Parameter, Value}};
+/// use safe_drive_v2::{error::DynError, parameter::{Parameters, Parameter, Value}};
 ///
 /// fn get_param<'a>(params: &'a Parameters, name: &str) -> Option<&'a Parameter>
 /// {

@@ -4,7 +4,7 @@
 //! # Example
 //!
 //! ```
-//! use safe_drive::context::Context;
+//! use safe_drive_v2::context::Context;
 //!
 //! // Create a context.
 //! let ctx = Context::new().unwrap();
@@ -110,7 +110,7 @@ impl Node {
     /// # Example
     ///
     /// ```
-    /// use safe_drive::{msg::common_interfaces::std_msgs, node::Node, topic::publisher::Publisher};
+    /// use safe_drive_v2::{msg::common_interfaces::std_msgs, node::Node, topic::publisher::Publisher};
     /// use std::sync::Arc;
     ///
     /// fn create_new_publisher(node: Arc<Node>) -> Publisher<std_msgs::msg::Bool> {
@@ -136,7 +136,7 @@ impl Node {
     /// # Example
     ///
     /// ```
-    /// use safe_drive::{msg::common_interfaces::std_msgs, node::Node, topic::publisher::Publisher};
+    /// use safe_drive_v2::{msg::common_interfaces::std_msgs, node::Node, topic::publisher::Publisher};
     /// use std::sync::Arc;
     ///
     /// fn create_publisher_disable_loaned_message(node: Arc<Node>) -> Publisher<std_msgs::msg::Bool> {
@@ -160,7 +160,7 @@ impl Node {
     /// # Example
     ///
     /// ```
-    /// use safe_drive::{msg::common_interfaces::std_msgs, node::Node, topic::subscriber::Subscriber};
+    /// use safe_drive_v2::{msg::common_interfaces::std_msgs, node::Node, topic::subscriber::Subscriber};
     /// use std::sync::Arc;
     ///
     /// fn create_new_subscriber(node: Arc<Node>) -> Subscriber<std_msgs::msg::Bool> {
@@ -184,7 +184,7 @@ impl Node {
     /// # Example
     ///
     /// ```
-    /// use safe_drive::{msg::common_interfaces::std_msgs, node::Node, topic::subscriber::Subscriber};
+    /// use safe_drive_v2::{msg::common_interfaces::std_msgs, node::Node, topic::subscriber::Subscriber};
     /// use std::sync::Arc;
     ///
     /// fn create_subscriber_disable_loaned_message(node: Arc<Node>) -> Subscriber<std_msgs::msg::Bool> {
@@ -208,7 +208,7 @@ impl Node {
     /// # Example
     ///
     /// ```
-    /// use safe_drive::{msg::common_interfaces::std_srvs, node::Node, service::server::Server};
+    /// use safe_drive_v2::{msg::common_interfaces::std_srvs, node::Node, service::server::Server};
     /// use std::sync::Arc;
     ///
     /// fn create_new_server(node: Arc<Node>) -> Server<std_srvs::srv::Empty> {
@@ -232,7 +232,7 @@ impl Node {
     /// # Example
     ///
     /// ```
-    /// use safe_drive::{msg::common_interfaces::std_srvs, node::Node, service::client::Client};
+    /// use safe_drive_v2::{msg::common_interfaces::std_srvs, node::Node, service::client::Client};
     /// use std::sync::Arc;
     ///
     /// fn create_new_client(node: Arc<Node>) -> Client<std_srvs::srv::Empty> {

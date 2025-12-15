@@ -36,7 +36,7 @@ The important method is `Selector::add_wall_timer()` which takes
 a name, a duration, and a callback function.
 
 ```rust
-use safe_drive::{
+use safe_drive_v2::{
     context::Context, error::DynError, logger::Logger, msg::common_interfaces::std_msgs, pr_info,
 };
 use std::{rc::Rc, time::Duration};
@@ -126,7 +126,7 @@ but one-shot timer is invoked only once.
 A one-shot can be set by the `Selector::add_timer()` method as follows.
 
 ```rust
-use safe_drive::{context::Context, error::DynError, logger::Logger, pr_info};
+use safe_drive_v2::{context::Context, error::DynError, logger::Logger, pr_info};
 use std::{cell::RefCell, collections::VecDeque, rc::Rc, time::Duration};
 
 pub fn main() -> Result<(), DynError> {

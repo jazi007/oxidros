@@ -5,7 +5,7 @@
 //! # Example
 //!
 //! ```
-//! use safe_drive::allocator::ALLOCATOR;
+//! use safe_drive_v2::allocator::ALLOCATOR;
 //! use std::alloc::{GlobalAlloc, Layout, System};
 //!
 //! static mut MY_ALLOCATOR: memac::Allocator<memac::buddy::Buddy32M> = memac::Allocator::new();

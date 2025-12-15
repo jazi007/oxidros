@@ -3,7 +3,7 @@ pub mod common;
 #[allow(unused_imports)]
 use async_std::{future, prelude::*};
 use common::msgs::example_msg::msg::Num;
-use safe_drive::{
+use safe_drive_v2::{
     context::Context,
     topic::{
         publisher::Publisher,

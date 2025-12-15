@@ -16,7 +16,7 @@
 //! ## Single Threaded Execution
 //!
 //! ```
-//! use safe_drive::{
+//! use safe_drive_v2::{
 //!     context::Context, logger::Logger, msg::common_interfaces::std_msgs, pr_error, pr_info,
 //!     RecvResult,
 //! };
@@ -56,7 +56,7 @@
 //! ```
 //! #[allow(unused_imports)]
 //! use async_std::{future, prelude::*};
-//! use safe_drive::{
+//! use safe_drive_v2::{
 //!     context::Context, logger::Logger, msg::common_interfaces::std_msgs, pr_info, pr_warn,
 //!     topic::subscriber::Subscriber,
 //! };
@@ -107,7 +107,7 @@
 //! ## Default QoS Profile
 //!
 //! ```
-//! use safe_drive::{
+//! use safe_drive_v2::{
 //!     context::Context,
 //!     msg::common_interfaces::std_msgs,
 //!     qos::policy::HistoryPolicy,
@@ -128,7 +128,7 @@
 //! ## Specifying QoS Profile
 //!
 //! ```
-//! use safe_drive::{
+//! use safe_drive_v2::{
 //!     context::Context,
 //!     msg::common_interfaces::std_msgs,
 //!     qos::{policy::HistoryPolicy, Profile},
@@ -311,7 +311,7 @@ impl<T: TypeSupport> Subscriber<T> {
     /// # Example
     ///
     /// ```
-    /// use safe_drive::{
+    /// use safe_drive_v2::{
     ///     logger::Logger, msg::common_interfaces::std_msgs, pr_error, pr_info,
     ///     topic::subscriber::Subscriber, RecvResult,
     /// };
@@ -367,7 +367,7 @@ impl<T: TypeSupport> Subscriber<T> {
     /// ```
     /// #[allow(unused_imports)]
     /// use async_std::{future, prelude::*};
-    /// use safe_drive::{
+    /// use safe_drive_v2::{
     ///     logger::Logger, msg::common_interfaces::std_msgs, pr_info, pr_warn,
     ///     topic::subscriber::Subscriber,
     /// };

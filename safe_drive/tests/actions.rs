@@ -1,7 +1,7 @@
 pub mod common;
 
 use common::action_msg::action::my_action::*;
-use safe_drive::{
+use safe_drive_v2::{
     action::{
         client::Client,
         handle::GoalHandle,
@@ -35,7 +35,7 @@ fn create_client(
     node: &str,
     action: &str,
 ) -> Result<Client<MyAction>, DynError> {
-    let options = safe_drive::node::NodeOptions::default();
+    let options = safe_drive_v2::node::NodeOptions::default();
     let node_client = ctx.create_node(node, None, options)?;
     Client::new(node_client, action, None).map_err(|e| e.into())
 }

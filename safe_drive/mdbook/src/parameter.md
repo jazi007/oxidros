@@ -58,7 +58,7 @@ The following table shows files we use in this chapter.
 Before explaining handlers,
 let's see types of parameters.
 
-The type of parameter value is defined by `safe_drive::parameter::Value` as follows.
+The type of parameter value is defined by `safe_drive_v2::parameter::Value` as follows.
 
 ```rust
 pub enum Value {
@@ -78,7 +78,7 @@ pub enum Value {
 This means that `i64` is valid,
 but `i8`, `i32`, and other user defined types are invalid.
 
-A parameter is associated with a descriptor of `safe_drive::parameter::Descriptor` as follows.
+A parameter is associated with a descriptor of `safe_drive_v2::parameter::Descriptor` as follows.
 
 ```rust
 pub struct Descriptor {
@@ -91,7 +91,7 @@ pub struct Descriptor {
 }
 ```
 
-So, a parameter and parameters can be represented by `safe_drive::parameter::{Parameter, Parameters}` as follows.
+So, a parameter and parameters can be represented by `safe_drive_v2::parameter::{Parameter, Parameters}` as follows.
 
 ```rust
 pub struct Parameter {
@@ -103,7 +103,7 @@ pub struct Parameters { /* omitted private fields */ }
 ```
 
 and a parameter server can be represented by
-`safe_drive::parameter::ParameterServer` as follows.
+`safe_drive_v2::parameter::ParameterServer` as follows.
 
 ```rust
 pub struct ParameterServer {
@@ -142,7 +142,7 @@ safe_drive = "0.4"
 This sets 2 parameters up and waits updating.
 
 ```rust
-use safe_drive::{
+use safe_drive_v2::{
     context::Context,
     error::DynError,
     logger::Logger,
@@ -361,7 +361,7 @@ tokio = { version = "1", features = ["full"] }
 This sets 2 parameters up and waits updating.
 
 ```rust
-use safe_drive::{
+use safe_drive_v2::{
     context::Context,
     error::DynError,
     logger::Logger,

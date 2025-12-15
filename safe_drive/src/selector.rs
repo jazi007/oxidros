@@ -5,7 +5,7 @@
 //! # Example
 //!
 //! ```
-//! use safe_drive::{
+//! use safe_drive_v2::{
 //!     context::Context, logger::Logger, msg::common_interfaces::std_msgs, pr_info,
 //! };
 //! use std::time::Duration;
@@ -170,7 +170,7 @@ struct EntitySize {
 /// # Example
 ///
 /// ```
-/// use safe_drive::context::Context;
+/// use safe_drive_v2::context::Context;
 ///
 /// let ctx = Context::new().unwrap();
 /// let mut selector = ctx.create_selector(); // Create a new selector.
@@ -304,7 +304,7 @@ impl Selector {
     /// # Example
     ///
     /// ```
-    /// use safe_drive::{msg::common_interfaces::std_msgs, node::Node, selector::Selector, topic::subscriber::TakenMsg};
+    /// use safe_drive_v2::{msg::common_interfaces::std_msgs, node::Node, selector::Selector, topic::subscriber::TakenMsg};
     /// use std::sync::Arc;
     ///
     /// fn add_new_subscriber(selector: &mut Selector, node: Arc<Node>) {
@@ -433,7 +433,7 @@ impl Selector {
     /// # Example
     ///
     /// ```
-    /// use safe_drive::{msg::{common_interfaces::std_srvs, ServiceMsg}, node::Node, selector::Selector};
+    /// use safe_drive_v2::{msg::{common_interfaces::std_srvs, ServiceMsg}, node::Node, selector::Selector};
     /// use std::sync::Arc;
     ///
     /// fn add_new_server(selector: &mut Selector, node: Arc<Node>) {
@@ -568,7 +568,7 @@ impl Selector {
     /// # Example
     /// ```ignore
     /// # // Ignoring this code block since common module is not available in doc tests.
-    /// # use safe_drive::{selector::Selector, action::server::Server, msg::ActionMsg};
+    /// # use safe_drive_v2::{selector::Selector, action::server::Server, msg::ActionMsg};
     /// # use common::msgs::example_msg::action::*;
     ///
     /// fn add_action_server(selector: &mut Selector, server: Server<MyAction>) {
@@ -892,7 +892,7 @@ impl Selector {
     /// # Example
     ///
     /// ```
-    /// use safe_drive::selector::Selector;
+    /// use safe_drive_v2::selector::Selector;
     /// use std::time::Duration;
     ///
     /// fn add_new_timer(selector: &mut Selector) {
@@ -926,7 +926,7 @@ impl Selector {
     /// # Example
     ///
     /// ```
-    /// use safe_drive::selector::Selector;
+    /// use safe_drive_v2::selector::Selector;
     /// use std::time::Duration;
     ///
     /// fn add_new_wall_timer(selector: &mut Selector) {
@@ -1016,7 +1016,7 @@ impl Selector {
     /// # Example
     ///
     /// ```
-    /// use safe_drive::{error::DynError, selector::Selector};
+    /// use safe_drive_v2::{error::DynError, selector::Selector};
     ///
     /// fn wait_events(selector: &mut Selector) -> Result<(), DynError> {
     ///     if selector.wait_timeout(std::time::Duration::from_millis(10))? {
@@ -1066,7 +1066,7 @@ impl Selector {
     /// # Example
     ///
     /// ```
-    /// use safe_drive::{error::DynError, selector::Selector};
+    /// use safe_drive_v2::{error::DynError, selector::Selector};
     ///
     /// fn wait_events(selector: &mut Selector) -> Result<(), DynError> {
     ///     // Add subscribers, servers, etc.

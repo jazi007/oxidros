@@ -4,7 +4,7 @@
 //! # Example
 //!
 //! ```
-//! use safe_drive::context::Context;
+//! use safe_drive_v2::context::Context;
 //!
 //! // Create a context.
 //! let ctx = Context::new().unwrap();
@@ -51,7 +51,7 @@ impl Context {
     /// # Example
     ///
     /// ```
-    /// use safe_drive::context::Context;
+    /// use safe_drive_v2::context::Context;
     ///
     /// // Create a context.
     /// let ctx = Context::new().unwrap();
@@ -100,7 +100,7 @@ impl Context {
     /// # Example
     ///
     /// ```
-    /// use safe_drive::context::Context;
+    /// use safe_drive_v2::context::Context;
     ///
     /// // Create a context.
     /// let ctx = Context::new().unwrap();
@@ -136,7 +136,7 @@ impl Context {
     /// # Example
     ///
     /// ```
-    /// use safe_drive::context::Context;
+    /// use safe_drive_v2::context::Context;
     ///
     /// // Create a context.
     /// let ctx = Context::new().unwrap();

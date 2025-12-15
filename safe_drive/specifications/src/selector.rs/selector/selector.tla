@@ -97,7 +97,7 @@ end procedure;
 
 \* execute a task
 \*
-\* safe_drive::selector::notify
+\* safe_drive_v2::selector::notify
 procedure notify(runnable)
 variables
     task;
@@ -115,7 +115,7 @@ end procedure;
 
 \* wait with timeout.
 \*
-\* safe_drive::selector::notify_timer
+\* safe_drive_v2::selector::notify_timer
 procedure notify_timer()
 variables
     head;
@@ -160,7 +160,7 @@ begin
         return;
 end procedure;
 
-\* safe_drive::selector::wait_timer
+\* safe_drive_v2::selector::wait_timer
 procedure wait_timer()
 begin
     BeginWaitTimer:
@@ -170,7 +170,7 @@ begin
         return;
 end procedure;
 
-\* safe_drive::selector::wait
+\* safe_drive_v2::selector::wait
 procedure wait()
 begin
     BeginWait:

@@ -1,7 +1,7 @@
 // Copied from tests/common/action_msg/action/my_action.rs
 #![allow(dead_code)]
 
-use safe_drive::{
+use safe_drive_v2::{
     msg::{
         builtin_interfaces::UnsafeTime, unique_identifier_msgs, ActionGoal, ActionMsg,
         ActionResult, GetUUID, GoalResponse, ResultResponse, TypeSupport,

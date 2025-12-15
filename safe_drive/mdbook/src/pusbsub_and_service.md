@@ -15,7 +15,7 @@ We only show Rust code of a publisher as follows.
 Other files can be found in [Source code](https://github.com/tier4/safe_drive_tutorial/tree/main/pubsubsrv).
 
 ```rust
-use safe_drive::{
+use safe_drive_v2::{
     context::Context,
     error::DynError,
     logger::Logger,

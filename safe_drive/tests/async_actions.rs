@@ -2,7 +2,7 @@ pub mod common;
 
 use common::action_msg::action::my_action::*;
 use futures::Future;
-use safe_drive::{
+use safe_drive_v2::{
     self,
     action::{
         client::{Client, ClientGoalRecv, ClientResultRecv},

@@ -195,7 +195,7 @@ safe_drive = "0.4"
 <p>The following code is an example using a wall-timer.
 The important method is <code>Selector::add_wall_timer()</code> which takes
 a name, a duration, and a callback function.</p>
-<pre><pre class="playground"><code class="language-rust">use safe_drive::{
+<pre><pre class="playground"><code class="language-rust">use safe_drive_v2::{
     context::Context, error::DynError, logger::Logger, msg::common_interfaces::std_msgs, pr_info,
 };
 use std::{rc::Rc, time::Duration};
@@ -277,7 +277,7 @@ When executing this, transmission and reception will be confirmed as follows.</p
 <p>A wall-timer is invoked periodically,
 but one-shot timer is invoked only once.
 A one-shot can be set by the <code>Selector::add_timer()</code> method as follows.</p>
-<pre><pre class="playground"><code class="language-rust">use safe_drive::{context::Context, error::DynError, logger::Logger, pr_info};
+<pre><pre class="playground"><code class="language-rust">use safe_drive_v2::{context::Context, error::DynError, logger::Logger, pr_info};
 use std::{cell::RefCell, collections::VecDeque, rc::Rc, time::Duration};
 
 pub fn main() -&gt; Result&lt;(), DynError&gt; {

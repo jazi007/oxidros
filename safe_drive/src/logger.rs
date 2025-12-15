@@ -5,7 +5,7 @@
 //! ## Basics
 //!
 //! ```
-//! use safe_drive::{logger::Logger, pr_debug, pr_error, pr_fatal, pr_info, pr_warn};
+//! use safe_drive_v2::{logger::Logger, pr_debug, pr_error, pr_fatal, pr_info, pr_warn};
 //!
 //! let logger = Logger::new("my_logger");
 //! let some_value = 100;
@@ -21,7 +21,7 @@
 //!
 //! ```
 //! use std::{rc::Rc, time::Duration};
-//! use safe_drive::{context::Context, logger::Logger, pr_error, pr_info};
+//! use safe_drive_v2::{context::Context, logger::Logger, pr_error, pr_info};
 //!
 //! let ctx = Context::new().unwrap();
 //! let mut selector = ctx.create_selector().unwrap();
@@ -47,7 +47,7 @@
 //! ## Multi Threaded
 //!
 //! ```
-//! use safe_drive::{logger::Logger, pr_info, pr_warn};
+//! use safe_drive_v2::{logger::Logger, pr_info, pr_warn};
 //! use std::sync::Arc;
 //!
 //! let logger = Logger::new("my_logger");
@@ -91,7 +91,7 @@ macro_rules! function {
 macro_rules! pr_info {
     ($logger:expr, $($arg:tt)*) => {{
         let res = format!($($arg)*);
-        let _ = $logger.write_info(&res, safe_drive::function!(), file!(), line!() as u64);
+        let _ = $logger.write_info(&res, safe_drive_v2::function!(), file!(), line!() as u64);
     }}
 }
 
@@ -108,7 +108,7 @@ pub(crate) use pr_info_in;
 macro_rules! pr_warn {
     ($logger:expr, $($arg:tt)*) => {{
         let res = format!($($arg)*);
-        let _ = $logger.write_warn(&res, safe_drive::function!(), file!(), line!() as u64);
+        let _ = $logger.write_warn(&res, safe_drive_v2::function!(), file!(), line!() as u64);
     }}
 }
 
@@ -117,7 +117,7 @@ macro_rules! pr_warn {
 macro_rules! pr_error {
     ($logger:expr, $($arg:tt)*) => {{
         let res = format!($($arg)*);
-        let _ = $logger.write_error(&res, safe_drive::function!(), file!(), line!() as u64);
+        let _ = $logger.write_error(&res, safe_drive_v2::function!(), file!(), line!() as u64);
     }}
 }
 
@@ -134,7 +134,7 @@ pub(crate) use pr_error_in;
 macro_rules! pr_fatal {
     ($logger:expr, $($arg:tt)*) => {{
         let res = format!($($arg)*);
-        let _ = $logger.write_fatal(&res, safe_drive::function!(), file!(), line!() as u64);
+        let _ = $logger.write_fatal(&res, safe_drive_v2::function!(), file!(), line!() as u64);
     }}
 }
 
@@ -157,7 +157,7 @@ pub(crate) use pr_fatal_in;
 macro_rules! pr_debug {
     ($logger:expr, $($arg:tt)*) => {{
         let res = format!($($arg)*);
-        let _ = $logger.write_debug(&res, safe_drive::function!(), file!(), line!() as u64);
+        let _ = $logger.write_debug(&res, safe_drive_v2::function!(), file!(), line!() as u64);
     }}
 }
 

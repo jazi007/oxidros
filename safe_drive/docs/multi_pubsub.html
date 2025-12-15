@@ -262,7 +262,7 @@ One is send a message every 500ms,
 and another is send a message every 250ms.
 The code of the <code>publishers</code> is as follows.</p>
 <p><code>mt_pubsub/src/publishers/src/main.rs</code></p>
-<pre><pre class="playground"><code class="language-rust">use safe_drive::{context::Context, error::DynError};
+<pre><pre class="playground"><code class="language-rust">use safe_drive_v2::{context::Context, error::DynError};
 use std::time::Duration;
 
 #[async_std::main]
@@ -324,7 +324,7 @@ Calling blocking functions should be avoided in asynchronous tasks.</p>
 <p>Then, let's implement the <code>subscribers</code>.
 The main function is almost same as previous one.</p>
 <p><code>mt_pubsub/src/subscribers/src/main</code></p>
-<pre><pre class="playground"><code class="language-rust">use safe_drive::{
+<pre><pre class="playground"><code class="language-rust">use safe_drive_v2::{
     context::Context, error::DynError, logger::Logger, pr_info, topic::subscriber::Subscriber,
 };
 
@@ -368,7 +368,7 @@ Timeout can be implemented as follows.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use async_std::future::timeout;
-use safe_drive::pr_warn;
+use safe_drive_v2::pr_warn;
 use std::time::Duration;
 async fn receiver(mut subscriber: Subscriber&lt;std_msgs::msg::String&gt;) -&gt; Result&lt;(), DynError&gt; {
     let logger = Logger::new(subscriber.get_topic_name());

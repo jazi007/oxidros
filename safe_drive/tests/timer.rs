@@ -1,4 +1,4 @@
-use safe_drive::{context::Context, msg::common_interfaces::std_msgs};
+use safe_drive_v2::{context::Context, msg::common_interfaces::std_msgs};
 use std::{error::Error, time::Duration};
 
 #[test]

@@ -342,7 +342,7 @@ and subscribers and publishers are created by the node.</p>
 The following is a code of my_talker.
 You should also understand what this code is doing.</p>
 <p><code>pubsub/src/my_talker/src/main.rs</code></p>
-<pre><pre class="playground"><code class="language-rust">use safe_drive::{
+<pre><pre class="playground"><code class="language-rust">use safe_drive_v2::{
     context::Context, error::DynError, logger::Logger, pr_info
 };
 use std::time::Duration;
@@ -510,7 +510,7 @@ safe_drive_version = "0.3"
 we have to prepare a callback function of the subscriber.
 This is the main difference from <code>my_talker</code>.</p>
 <p><code>pubsub/src/my_listener/src/main.rs</code></p>
-<pre><pre class="playground"><code class="language-rust">use safe_drive::{
+<pre><pre class="playground"><code class="language-rust">use safe_drive_v2::{
     context::Context, error::DynError, logger::Logger, pr_info,
 };
 
@@ -650,7 +650,7 @@ safe_drive = "0.4"
 <p>The following code is an example using a wall-timer.
 The important method is <code>Selector::add_wall_timer()</code> which takes
 a name, a duration, and a callback function.</p>
-<pre><pre class="playground"><code class="language-rust">use safe_drive::{
+<pre><pre class="playground"><code class="language-rust">use safe_drive_v2::{
     context::Context, error::DynError, logger::Logger, msg::common_interfaces::std_msgs, pr_info,
 };
 use std::{rc::Rc, time::Duration};
@@ -732,7 +732,7 @@ When executing this, transmission and reception will be confirmed as follows.</p
 <p>A wall-timer is invoked periodically,
 but one-shot timer is invoked only once.
 A one-shot can be set by the <code>Selector::add_timer()</code> method as follows.</p>
-<pre><pre class="playground"><code class="language-rust">use safe_drive::{context::Context, error::DynError, logger::Logger, pr_info};
+<pre><pre class="playground"><code class="language-rust">use safe_drive_v2::{context::Context, error::DynError, logger::Logger, pr_info};
 use std::{cell::RefCell, collections::VecDeque, rc::Rc, time::Duration};
 
 pub fn main() -&gt; Result&lt;(), DynError&gt; {
@@ -900,7 +900,7 @@ One is send a message every 500ms,
 and another is send a message every 250ms.
 The code of the <code>publishers</code> is as follows.</p>
 <p><code>mt_pubsub/src/publishers/src/main.rs</code></p>
-<pre><pre class="playground"><code class="language-rust">use safe_drive::{context::Context, error::DynError};
+<pre><pre class="playground"><code class="language-rust">use safe_drive_v2::{context::Context, error::DynError};
 use std::time::Duration;
 
 #[async_std::main]
@@ -962,7 +962,7 @@ Calling blocking functions should be avoided in asynchronous tasks.</p>
 <p>Then, let's implement the <code>subscribers</code>.
 The main function is almost same as previous one.</p>
 <p><code>mt_pubsub/src/subscribers/src/main</code></p>
-<pre><pre class="playground"><code class="language-rust">use safe_drive::{
+<pre><pre class="playground"><code class="language-rust">use safe_drive_v2::{
     context::Context, error::DynError, logger::Logger, pr_info, topic::subscriber::Subscriber,
 };
 
@@ -1006,7 +1006,7 @@ Timeout can be implemented as follows.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use async_std::future::timeout;
-use safe_drive::pr_warn;
+use safe_drive_v2::pr_warn;
 use std::time::Duration;
 async fn receiver(mut subscriber: Subscriber&lt;std_msgs::msg::String&gt;) -&gt; Result&lt;(), DynError&gt; {
     let logger = Logger::new(subscriber.get_topic_name());
@@ -1161,15 +1161,15 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 <tr><td>uint64</td><td>u64</td></tr>
 <tr><td>float32</td><td>f32</td></tr>
 <tr><td>float64</td><td>f64</td></tr>
-<tr><td>string</td><td>safe_drive::msg::RosString</td></tr>
+<tr><td>string</td><td>safe_drive_v2::msg::RosString</td></tr>
 </tbody></table>
 </div>
 <h3 id="generated-types"><a class="header" href="#generated-types">Generated Types</a></h3>
 <p>Array types are generated as follows.</p>
 <div class="table-wrapper"><table><thead><tr><th>ROS2</th><th>Rust</th></tr></thead><tbody>
 <tr><td>int32[5]</td><td>[i32; 5]</td></tr>
-<tr><td>int32[]</td><td>safe_drive::msg::I32Seq&lt;0&gt;</td></tr>
-<tr><td>int32[&lt;=5]</td><td>safe_drive::msg::I32Seq&lt;5&gt;</td></tr>
+<tr><td>int32[]</td><td>safe_drive_v2::msg::I32Seq&lt;0&gt;</td></tr>
+<tr><td>int32[&lt;=5]</td><td>safe_drive_v2::msg::I32Seq&lt;5&gt;</td></tr>
 </tbody></table>
 </div>
 <p><code>0</code> of <code>I32Seq&lt;0&gt;</code> indicates unbounded, and <code>5</code> of <code>I32Seq&lt;5&gt;</code> indicates less than or equal to 5.
@@ -1225,9 +1225,9 @@ $ colcon build --cargo-args --release
 #[derive(Debug)]
 pub struct MyMsg {
     pub integer_value: i32,
-    pub unbounded_integer_array: safe_drive::msg::I32Seq&lt;0&gt;,
+    pub unbounded_integer_array: safe_drive_v2::msg::I32Seq&lt;0&gt;,
     pub five_integers_array: [i32; 5],
-    pub up_to_five_integers_array: safe_drive::msg::I32Seq&lt;5&gt;,
+    pub up_to_five_integers_array: safe_drive_v2::msg::I32Seq&lt;5&gt;,
 }
 <span class="boring">}</span></code></pre></pre>
 <p><code>/tmp/safe_drive_tutorial/msgtest/my_interfaces/src/msg/my_msgs.rs</code></p>
@@ -1243,7 +1243,7 @@ pub struct MyMsgs {
 <h3 id="edit-talkersrcmainrs"><a class="header" href="#edit-talkersrcmainrs">Edit <code>talker/src/main.rs</code></a></h3>
 <p>If you want to know how to implement a subscriber or a publisher, please see <a href="./pubsub.html">a tutorial of Pub/Sub</a>. This section describes how to handle a messages generated by <code>ros2msg_to_rs</code>.</p>
 <p><code>msgtest/src/talker/src/main.rs</code></p>
-<pre><pre class="playground"><code class="language-rust">use safe_drive::{
+<pre><pre class="playground"><code class="language-rust">use safe_drive_v2::{
     context::Context,
     error::DynError,
     logger::Logger,
@@ -1375,7 +1375,7 @@ safe_drive_version = "0.3"
 <p>The listener can also be implemented straightforwardly as follows.</p>
 <p><code>msgtest/src/listener/src/main.rs</code></p>
 <pre><pre class="playground"><code class="language-rust">use my_interfaces;
-use safe_drive::{context::Context, error::DynError, logger::Logger, pr_info};
+use safe_drive_v2::{context::Context, error::DynError, logger::Logger, pr_info};
 
 fn main() -&gt; Result&lt;(), DynError&gt; {
     // Create a context.
@@ -1458,7 +1458,7 @@ $ ros2 run talker talker
 <h2 id="string-type"><a class="header" href="#string-type">String Type</a></h2>
 <p>Arrays of string are bit different from arrays of primitive types.
 <code>string</code> is unbounded string, and <code>string&lt;=5</code> is bounded string whose length is up to 5.
-So, there are arrays for unbounded and bounded strings as follows; <code>msg</code> is <code>safe_drive::msg</code>.</p>
+So, there are arrays for unbounded and bounded strings as follows; <code>msg</code> is <code>safe_drive_v2::msg</code>.</p>
 <div class="table-wrapper"><table><thead><tr><th>ROS</th><th>Rust</th></tr></thead><tbody>
 <tr><td>string</td><td>msg::RosString&lt;0&gt;</td></tr>
 <tr><td>string[]</td><td>msg::StringSeq&lt;0, 0&gt;</td></tr>
@@ -1489,14 +1489,14 @@ string&lt;=10[&lt;=3] bounded_array_bounded_str
 </span>#[repr(C)]
 #[derive(Debug)]
 pub struct MyMsgStr {
-    pub message: safe_drive::msg::RosString&lt;0&gt;,
-    pub static_array_str: [safe_drive::msg::RosString&lt;0&gt;; 2],
-    pub dynamic_array_str: safe_drive::msg::RosStringSeq&lt;0, 0&gt;,
-    pub bounded_array_str: safe_drive::msg::RosStringSeq&lt;0, 3&gt;,
-    pub bounded_str: safe_drive::msg::RosString&lt;10&gt;,
-    pub static_array_bounded_str: [safe_drive::msg::RosString&lt;10&gt;; 2],
-    pub dynamic_array_bounded_str: safe_drive::msg::RosStringSeq&lt;10, 0&gt;,
-    pub bounded_array_bounded_str: safe_drive::msg::RosStringSeq&lt;10, 3&gt;,
+    pub message: safe_drive_v2::msg::RosString&lt;0&gt;,
+    pub static_array_str: [safe_drive_v2::msg::RosString&lt;0&gt;; 2],
+    pub dynamic_array_str: safe_drive_v2::msg::RosStringSeq&lt;0, 0&gt;,
+    pub bounded_array_str: safe_drive_v2::msg::RosStringSeq&lt;0, 3&gt;,
+    pub bounded_str: safe_drive_v2::msg::RosString&lt;10&gt;,
+    pub static_array_bounded_str: [safe_drive_v2::msg::RosString&lt;10&gt;; 2],
+    pub dynamic_array_bounded_str: safe_drive_v2::msg::RosStringSeq&lt;10, 0&gt;,
+    pub bounded_array_bounded_str: safe_drive_v2::msg::RosStringSeq&lt;10, 3&gt;,
 }
 <span class="boring">}</span></code></pre></pre>
 <p>To access to elements of string arrays,
@@ -1701,7 +1701,7 @@ pub struct AddTwoInts_Response {
 <span class="boring">}</span></code></pre></pre>
 <h3 id="edit-serversrcmainrs"><a class="header" href="#edit-serversrcmainrs">Edit <code>server/src/main.rs</code></a></h3>
 <p>You have to create a server by <code>create_server()</code> method and register a callback function to a selector as follows.</p>
-<pre><pre class="playground"><code class="language-rust">use safe_drive::{context::Context, error::DynError, logger::Logger, pr_error, qos::Profile};
+<pre><pre class="playground"><code class="language-rust">use safe_drive_v2::{context::Context, error::DynError, logger::Logger, pr_error, qos::Profile};
 use srvmsg::srv::{AddTwoInts, AddTwoInts_Response};
 
 fn main() -&gt; Result&lt;(), DynError&gt; {
@@ -1799,7 +1799,7 @@ safe_drive_version = "0.3"
 <p>We recommend to use async/await to implement a client,
 because a client wait a response, but when the response is replied is unpredictable.
 In this tutorial, we use <a href="https://tokio.rs/">Tokio</a>, which is the most popular asynchronous library of Rust.</p>
-<pre><pre class="playground"><code class="language-rust">use safe_drive::{
+<pre><pre class="playground"><code class="language-rust">use safe_drive_v2::{
     context::Context, error::DynError, logger::Logger, pr_error, pr_info, pr_warn, qos::Profile,
 };
 use srvmsg::srv::{AddTwoInts, AddTwoInts_Request};
@@ -1929,7 +1929,7 @@ members = ["param_server", "async_param_server"]
 <h2 id="type-of-parameter"><a class="header" href="#type-of-parameter">Type of Parameter</a></h2>
 <p>Before explaining handlers,
 let's see types of parameters.</p>
-<p>The type of parameter value is defined by <code>safe_drive::parameter::Value</code> as follows.</p>
+<p>The type of parameter value is defined by <code>safe_drive_v2::parameter::Value</code> as follows.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub enum Value {
@@ -1947,7 +1947,7 @@ let's see types of parameters.</p>
 <span class="boring">}</span></code></pre></pre>
 <p>This means that <code>i64</code> is valid,
 but <code>i8</code>, <code>i32</code>, and other user defined types are invalid.</p>
-<p>A parameter is associated with a descriptor of <code>safe_drive::parameter::Descriptor</code> as follows.</p>
+<p>A parameter is associated with a descriptor of <code>safe_drive_v2::parameter::Descriptor</code> as follows.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct Descriptor {
@@ -1959,7 +1959,7 @@ but <code>i8</code>, <code>i32</code>, and other user defined types are invalid.
     pub integer_range: Option&lt;IntegerRange&gt;,
 }
 <span class="boring">}</span></code></pre></pre>
-<p>So, a parameter and parameters can be represented by <code>safe_drive::parameter::{Parameter, Parameters}</code> as follows.</p>
+<p>So, a parameter and parameters can be represented by <code>safe_drive_v2::parameter::{Parameter, Parameters}</code> as follows.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct Parameter {
@@ -1970,7 +1970,7 @@ but <code>i8</code>, <code>i32</code>, and other user defined types are invalid.
 pub struct Parameters { /* omitted private fields */ }
 <span class="boring">}</span></code></pre></pre>
 <p>and a parameter server can be represented by
-<code>safe_drive::parameter::ParameterServer</code> as follows.</p>
+<code>safe_drive_v2::parameter::ParameterServer</code> as follows.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct ParameterServer {
@@ -1996,7 +1996,7 @@ safe_drive = "0.4"
 <h3 id="edit-param_serversrcmainrs"><a class="header" href="#edit-param_serversrcmainrs">Edit <code>param_server/src/main.rs</code></a></h3>
 <p><code>param_server</code> can be implemented as follows.
 This sets 2 parameters up and waits updating.</p>
-<pre><pre class="playground"><code class="language-rust">use safe_drive::{
+<pre><pre class="playground"><code class="language-rust">use safe_drive_v2::{
     context::Context,
     error::DynError,
     logger::Logger,
@@ -2187,7 +2187,7 @@ tokio = { version = "1", features = ["full"] }
 <h3 id="edit-async_param_serversrcmainrs"><a class="header" href="#edit-async_param_serversrcmainrs">Edit <code>async_param_server/src/main.rs</code></a></h3>
 <p><code>async_param_server</code> can be implemented as follows.
 This sets 2 parameters up and waits updating.</p>
-<pre><pre class="playground"><code class="language-rust">use safe_drive::{
+<pre><pre class="playground"><code class="language-rust">use safe_drive_v2::{
     context::Context,
     error::DynError,
     logger::Logger,
@@ -2295,7 +2295,7 @@ safe_drive = "0.4"
 <p><code>main.rs</code> can be implemented as follows,
 but almost every lines are same as shown before.</p>
 <p><code>main.rs</code></p>
-<pre><pre class="playground"><code class="language-rust">use safe_drive::{context::Context, msg::common_interfaces::std_msgs};
+<pre><pre class="playground"><code class="language-rust">use safe_drive_v2::{context::Context, msg::common_interfaces::std_msgs};
 use std::{error::Error, time::Duration};
 
 const TOPIC_NAME: &amp;str = "pubsub_loaned";
@@ -2394,7 +2394,7 @@ We use 2 selectors for a callback function and accessing a server,
 and <code>recv_timeout()</code> to receive a response from the server.</p>
 <p>We only show Rust code of a publisher as follows.
 Other files can be found in <a href="https://github.com/tier4/safe_drive_tutorial/tree/main/pubsubsrv">Source code</a>.</p>
-<pre><pre class="playground"><code class="language-rust">use safe_drive::{
+<pre><pre class="playground"><code class="language-rust">use safe_drive_v2::{
     context::Context,
     error::DynError,
     logger::Logger,

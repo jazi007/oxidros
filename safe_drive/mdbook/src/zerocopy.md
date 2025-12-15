@@ -38,7 +38,7 @@ but almost every lines are same as shown before.
 `main.rs`
 
 ```rust
-use safe_drive::{context::Context, msg::common_interfaces::std_msgs};
+use safe_drive_v2::{context::Context, msg::common_interfaces::std_msgs};
 use std::{error::Error, time::Duration};
 
 const TOPIC_NAME: &str = "pubsub_loaned";

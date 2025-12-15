@@ -117,7 +117,7 @@ The code of the `publishers` is as follows.
 `mt_pubsub/src/publishers/src/main.rs`
 
 ```rust
-use safe_drive::{context::Context, error::DynError};
+use safe_drive_v2::{context::Context, error::DynError};
 use std::time::Duration;
 
 #[async_std::main]
@@ -187,7 +187,7 @@ The main function is almost same as previous one.
 `mt_pubsub/src/subscribers/src/main`
 
 ```rust
-use safe_drive::{
+use safe_drive_v2::{
     context::Context, error::DynError, logger::Logger, pr_info, topic::subscriber::Subscriber,
 };
 
@@ -235,7 +235,7 @@ Timeout can be implemented as follows.
 
 ```rust
 use async_std::future::timeout;
-use safe_drive::pr_warn;
+use safe_drive_v2::pr_warn;
 use std::time::Duration;
 async fn receiver(mut subscriber: Subscriber<std_msgs::msg::String>) -> Result<(), DynError> {
     let logger = Logger::new(subscriber.get_topic_name());

@@ -1,7 +1,7 @@
 pub mod common;
 
 use common::msgs::example_msg::msg::Num;
-use safe_drive::{context::Context, RecvResult};
+use safe_drive_v2::{context::Context, RecvResult};
 use std::error::Error;
 
 #[test]

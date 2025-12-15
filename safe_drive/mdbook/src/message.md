@@ -155,7 +155,7 @@ Primitive types are translated into Rust's types as follows.
 | uint64  | u64                        |
 | float32 | f32                        |
 | float64 | f64                        |
-| string  | safe_drive::msg::RosString |
+| string  | safe_drive_v2::msg::RosString |
 
 ### Generated Types
 
@@ -164,8 +164,8 @@ Array types are generated as follows.
 | ROS2       | Rust                       |
 |------------|----------------------------|
 | int32[5]   | [i32; 5]                   |
-| int32[]    | safe_drive::msg::I32Seq<0> |
-| int32[<=5] | safe_drive::msg::I32Seq<5> |
+| int32[]    | safe_drive_v2::msg::I32Seq<0> |
+| int32[<=5] | safe_drive_v2::msg::I32Seq<5> |
 
 `0` of `I32Seq<0>` indicates unbounded, and `5` of `I32Seq<5>` indicates less than or equal to 5.
 So, `MyMsg` and `MyMsgs` are generated as follows.
@@ -238,9 +238,9 @@ Then, you can find Rust's files as follows.
 #[derive(Debug)]
 pub struct MyMsg {
     pub integer_value: i32,
-    pub unbounded_integer_array: safe_drive::msg::I32Seq<0>,
+    pub unbounded_integer_array: safe_drive_v2::msg::I32Seq<0>,
     pub five_integers_array: [i32; 5],
-    pub up_to_five_integers_array: safe_drive::msg::I32Seq<5>,
+    pub up_to_five_integers_array: safe_drive_v2::msg::I32Seq<5>,
 }
 ```
 
@@ -262,7 +262,7 @@ If you want to know how to implement a subscriber or a publisher, please see [a 
 `msgtest/src/talker/src/main.rs`
 
 ```rust
-use safe_drive::{
+use safe_drive_v2::{
     context::Context,
     error::DynError,
     logger::Logger,
@@ -415,7 +415,7 @@ The listener can also be implemented straightforwardly as follows.
 
 ```rust
 use my_interfaces;
-use safe_drive::{context::Context, error::DynError, logger::Logger, pr_info};
+use safe_drive_v2::{context::Context, error::DynError, logger::Logger, pr_info};
 
 fn main() -> Result<(), DynError> {
     // Create a context.
@@ -516,7 +516,7 @@ Nicely done! Now, we can define new types and handle the types in Rust.
 
 Arrays of string are bit different from arrays of primitive types.
 `string` is unbounded string, and `string<=5` is bounded string whose length is up to 5.
-So, there are arrays for unbounded and bounded strings as follows; `msg` is `safe_drive::msg`.
+So, there are arrays for unbounded and bounded strings as follows; `msg` is `safe_drive_v2::msg`.
 
 | ROS             | Rust                    |
 |-----------------|-------------------------|
@@ -552,14 +552,14 @@ string<=10[<=3] bounded_array_bounded_str
 #[repr(C)]
 #[derive(Debug)]
 pub struct MyMsgStr {
-    pub message: safe_drive::msg::RosString<0>,
-    pub static_array_str: [safe_drive::msg::RosString<0>; 2],
-    pub dynamic_array_str: safe_drive::msg::RosStringSeq<0, 0>,
-    pub bounded_array_str: safe_drive::msg::RosStringSeq<0, 3>,
-    pub bounded_str: safe_drive::msg::RosString<10>,
-    pub static_array_bounded_str: [safe_drive::msg::RosString<10>; 2],
-    pub dynamic_array_bounded_str: safe_drive::msg::RosStringSeq<10, 0>,
-    pub bounded_array_bounded_str: safe_drive::msg::RosStringSeq<10, 3>,
+    pub message: safe_drive_v2::msg::RosString<0>,
+    pub static_array_str: [safe_drive_v2::msg::RosString<0>; 2],
+    pub dynamic_array_str: safe_drive_v2::msg::RosStringSeq<0, 0>,
+    pub bounded_array_str: safe_drive_v2::msg::RosStringSeq<0, 3>,
+    pub bounded_str: safe_drive_v2::msg::RosString<10>,
+    pub static_array_bounded_str: [safe_drive_v2::msg::RosString<10>; 2],
+    pub dynamic_array_bounded_str: safe_drive_v2::msg::RosStringSeq<10, 0>,
+    pub bounded_array_bounded_str: safe_drive_v2::msg::RosStringSeq<10, 3>,
 }
 ```
 

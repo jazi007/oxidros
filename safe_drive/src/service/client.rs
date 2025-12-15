@@ -6,7 +6,7 @@
 //! # Example
 //!
 //! ```
-//! use safe_drive::{
+//! use safe_drive_v2::{
 //!     context::Context, logger::Logger, msg::common_interfaces::std_srvs, pr_error, pr_info,
 //!     pr_warn, service::client::Client,
 //! };
@@ -132,7 +132,7 @@ impl<T: ServiceMsg> Client<T> {
     /// # Example
     ///
     /// ```
-    /// use safe_drive::{
+    /// use safe_drive_v2::{
     ///     logger::Logger, msg::common_interfaces::std_srvs, pr_error, pr_info, pr_warn, service::client::Client,
     /// };
     /// use std::time::Duration;
@@ -177,7 +177,7 @@ impl<T: ServiceMsg> Client<T> {
     /// # Example
     ///
     /// ```
-    /// use safe_drive::{
+    /// use safe_drive_v2::{
     ///     logger::Logger, msg::common_interfaces::std_srvs, pr_error, pr_info, pr_warn, service::client::Client,
     /// };
     /// use std::time::Duration;
@@ -288,7 +288,7 @@ impl<T: ServiceMsg> ClientRecv<T> {
     /// # Example
     ///
     /// ```
-    /// use safe_drive::{
+    /// use safe_drive_v2::{
     ///     logger::Logger, msg::common_interfaces::std_srvs, pr_error, pr_info, pr_warn, service::client::Client,
     /// };
     /// use std::time::Duration;
@@ -334,7 +334,7 @@ impl<T: ServiceMsg> ClientRecv<T> {
     /// # Example
     ///
     /// ```
-    /// use safe_drive::{
+    /// use safe_drive_v2::{
     ///     error::DynError,
     ///     logger::Logger,
     ///     msg::common_interfaces::{std_msgs, std_srvs},

@@ -61,7 +61,7 @@
 //! This code is an example of Pub/Sub.
 //!
 //! ```
-//! use safe_drive::{
+//! use safe_drive_v2::{
 //!     context::Context, logger::Logger, msg::common_interfaces::std_msgs, pr_info,
 //! };
 //! use std::time::Duration;
@@ -135,7 +135,7 @@
 //! You can use other runtime such as `tokio`.
 //!
 //! ```
-//! use safe_drive::{
+//! use safe_drive_v2::{
 //!     context::Context,
 //!     error::DynError,
 //!     logger::Logger,

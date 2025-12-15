@@ -3,7 +3,7 @@ pub mod common;
 #[allow(unused_imports)]
 use async_std::{future, prelude::*};
 use common::msgs::example_msg::srv::{AddThreeInts, AddThreeIntsRequest, AddThreeIntsResponse};
-use safe_drive::{
+use safe_drive_v2::{
     context::Context,
     error::DynError,
     logger::Logger,

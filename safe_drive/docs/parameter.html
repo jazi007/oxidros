@@ -214,7 +214,7 @@ members = ["param_server", "async_param_server"]
 <h2 id="type-of-parameter"><a class="header" href="#type-of-parameter">Type of Parameter</a></h2>
 <p>Before explaining handlers,
 let's see types of parameters.</p>
-<p>The type of parameter value is defined by <code>safe_drive::parameter::Value</code> as follows.</p>
+<p>The type of parameter value is defined by <code>safe_drive_v2::parameter::Value</code> as follows.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub enum Value {
@@ -232,7 +232,7 @@ let's see types of parameters.</p>
 <span class="boring">}</span></code></pre></pre>
 <p>This means that <code>i64</code> is valid,
 but <code>i8</code>, <code>i32</code>, and other user defined types are invalid.</p>
-<p>A parameter is associated with a descriptor of <code>safe_drive::parameter::Descriptor</code> as follows.</p>
+<p>A parameter is associated with a descriptor of <code>safe_drive_v2::parameter::Descriptor</code> as follows.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct Descriptor {
@@ -244,7 +244,7 @@ but <code>i8</code>, <code>i32</code>, and other user defined types are invalid.
     pub integer_range: Option&lt;IntegerRange&gt;,
 }
 <span class="boring">}</span></code></pre></pre>
-<p>So, a parameter and parameters can be represented by <code>safe_drive::parameter::{Parameter, Parameters}</code> as follows.</p>
+<p>So, a parameter and parameters can be represented by <code>safe_drive_v2::parameter::{Parameter, Parameters}</code> as follows.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct Parameter {
@@ -255,7 +255,7 @@ but <code>i8</code>, <code>i32</code>, and other user defined types are invalid.
 pub struct Parameters { /* omitted private fields */ }
 <span class="boring">}</span></code></pre></pre>
 <p>and a parameter server can be represented by
-<code>safe_drive::parameter::ParameterServer</code> as follows.</p>
+<code>safe_drive_v2::parameter::ParameterServer</code> as follows.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct ParameterServer {
@@ -281,7 +281,7 @@ safe_drive = "0.4"
 <h3 id="edit-param_serversrcmainrs"><a class="header" href="#edit-param_serversrcmainrs">Edit <code>param_server/src/main.rs</code></a></h3>
 <p><code>param_server</code> can be implemented as follows.
 This sets 2 parameters up and waits updating.</p>
-<pre><pre class="playground"><code class="language-rust">use safe_drive::{
+<pre><pre class="playground"><code class="language-rust">use safe_drive_v2::{
     context::Context,
     error::DynError,
     logger::Logger,
@@ -472,7 +472,7 @@ tokio = { version = "1", features = ["full"] }
 <h3 id="edit-async_param_serversrcmainrs"><a class="header" href="#edit-async_param_serversrcmainrs">Edit <code>async_param_server/src/main.rs</code></a></h3>
 <p><code>async_param_server</code> can be implemented as follows.
 This sets 2 parameters up and waits updating.</p>
-<pre><pre class="playground"><code class="language-rust">use safe_drive::{
+<pre><pre class="playground"><code class="language-rust">use safe_drive_v2::{
     context::Context,
     error::DynError,
     logger::Logger,

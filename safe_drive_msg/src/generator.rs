@@ -390,7 +390,7 @@ safe_drive = {safe_drive_dep}
         self.idl_struct(lines, struct_def, lib);
         lines.push_back(gen_impl_for_struct(lib, "msg", &struct_def.id));
 
-        lines.push_front("use safe_drive::{msg::TypeSupport, rcl::{self, size_t}};".into());
+        lines.push_front("use safe_drive_v2::{msg::TypeSupport, rcl::{self, size_t}};".into());
     }
 
     fn generate_idl_srv(
@@ -410,7 +410,7 @@ safe_drive = {safe_drive_dep}
 
         if *idl_type == IDLType::NoType {
             lines.push_front(
-                "use safe_drive::{msg::{ServiceMsg, TypeSupport}, rcl::{self, size_t}};"
+                "use safe_drive_v2::{msg::{ServiceMsg, TypeSupport}, rcl::{self, size_t}};"
                     .to_string(),
             );
             lines.push_back(gen_impl_service_msg(lib, "srv", type_str));
@@ -457,7 +457,7 @@ safe_drive = {safe_drive_dep}
 
         if *idl_type == IDLType::NoType {
             lines.push_front(
-                "use safe_drive::{msg::{ActionMsg, ActionGoal, ActionResult, GetUUID, GoalResponse, ResultResponse, TypeSupport, builtin_interfaces::UnsafeTime, unique_identifier_msgs}, rcl::{self, size_t}};"
+                "use safe_drive_v2::{msg::{ActionMsg, ActionGoal, ActionResult, GetUUID, GoalResponse, ResultResponse, TypeSupport, builtin_interfaces::UnsafeTime, unique_identifier_msgs}, rcl::{self, size_t}};"
                     .to_string(),
             );
             lines.push_back(gen_impl_action_msg(lib, type_str));
@@ -596,7 +596,7 @@ safe_drive = {safe_drive_dep}
     fn idl_member(&mut self, lines: &mut VecDeque<String>, member: &Member, lib: &str) {
         let type_str = self.idl_type_spec(&member.type_spec, lib);
         let type_str = if type_str == "string" {
-            "safe_drive::msg::RosString<0>".to_string()
+            "safe_drive_v2::msg::RosString<0>".to_string()
         } else {
             type_str
         };
@@ -667,45 +667,45 @@ safe_drive = {safe_drive_dep}
     fn idl_seq_type(&mut self, type_spec: &TypeSpec, size: &BigInt, lib: &str) -> String {
         match type_spec {
             TypeSpec::PrimitiveType(PrimitiveType::Boolean) => {
-                format!("safe_drive::msg::BoolSeq<{size}>")
+                format!("safe_drive_v2::msg::BoolSeq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Int8)
             | TypeSpec::PrimitiveType(PrimitiveType::Char) => {
-                format!("safe_drive::msg::I8Seq<{size}>")
+                format!("safe_drive_v2::msg::I8Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Int16)
             | TypeSpec::PrimitiveType(PrimitiveType::Short) => {
-                format!("safe_drive::msg::I16Seq<{size}>")
+                format!("safe_drive_v2::msg::I16Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Int32)
             | TypeSpec::PrimitiveType(PrimitiveType::Long) => {
-                format!("safe_drive::msg::I32Seq<{size}>")
+                format!("safe_drive_v2::msg::I32Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Int64)
             | TypeSpec::PrimitiveType(PrimitiveType::LongLong) => {
-                format!("safe_drive::msg::I64Seq<{size}>")
+                format!("safe_drive_v2::msg::I64Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Uint8)
             | TypeSpec::PrimitiveType(PrimitiveType::Octet) => {
-                format!("safe_drive::msg::U8Seq<{size}>")
+                format!("safe_drive_v2::msg::U8Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Uint16)
             | TypeSpec::PrimitiveType(PrimitiveType::UnsignedShort) => {
-                format!("safe_drive::msg::U16Seq<{size}>")
+                format!("safe_drive_v2::msg::U16Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Uint32)
             | TypeSpec::PrimitiveType(PrimitiveType::UnsignedLong) => {
-                format!("safe_drive::msg::U32Seq<{size}>")
+                format!("safe_drive_v2::msg::U32Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Uint64)
             | TypeSpec::PrimitiveType(PrimitiveType::UnsignedLongLong) => {
-                format!("safe_drive::msg::U64Seq<{size}>")
+                format!("safe_drive_v2::msg::U64Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Float) => {
-                format!("safe_drive::msg::F32Seq<{size}>")
+                format!("safe_drive_v2::msg::F32Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Double) => {
-                format!("safe_drive::msg::F64Seq<{size}>")
+                format!("safe_drive_v2::msg::F64Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::LongDouble) => unimplemented!(),
             TypeSpec::PrimitiveType(PrimitiveType::WChar) => unimplemented!(),
@@ -713,7 +713,7 @@ safe_drive = {safe_drive_dep}
             TypeSpec::ScopedName(name) => {
                 let type_str = self.idl_scoped_name(name, lib);
                 if type_str == "string" {
-                    format!("safe_drive::msg::RosStringSeq<0, {size}>")
+                    format!("safe_drive_v2::msg::RosStringSeq<0, {size}>")
                 } else {
                     format!("{type_str}Seq<{size}>")
                 }
@@ -797,7 +797,7 @@ safe_drive = {safe_drive_dep}
         self.generate_exprs(&exprs, &mut lines, lib, &rs_type_name, MsgType::Msg);
 
         lines.push_back(gen_impl_for_msg(lib, &rs_type_name).into());
-        lines.push_front("use safe_drive::{msg::TypeSupport, rcl::{self, size_t}};".into());
+        lines.push_front("use safe_drive_v2::{msg::TypeSupport, rcl::{self, size_t}};".into());
 
         // Create a directory.
         let out_dir = out_lib_dir.join(lib).join("src").join("msg");
@@ -853,7 +853,7 @@ safe_drive = {safe_drive_dep}
 
         lines.push_back(gen_impl_for_srv(lib, &rs_type_name).into());
         lines.push_front(
-            "use safe_drive::{msg::{ServiceMsg, TypeSupport}, rcl::{self, size_t}};".into(),
+            "use safe_drive_v2::{msg::{ServiceMsg, TypeSupport}, rcl::{self, size_t}};".into(),
         );
 
         // Create a directory.
@@ -931,30 +931,30 @@ safe_drive = {safe_drive_dep}
                 array_info,
             } => match array_info {
                 ArrayInfo::NotArray => {
-                    format!("{var_name}: safe_drive::msg::RosString<{str_len}>")
+                    format!("{var_name}: safe_drive_v2::msg::RosString<{str_len}>")
                 }
                 ArrayInfo::Dynamic => {
-                    format!("{var_name}: safe_drive::msg::RosStringSeq<{str_len}, 0>")
+                    format!("{var_name}: safe_drive_v2::msg::RosStringSeq<{str_len}, 0>")
                 }
                 ArrayInfo::Limited(size) => {
-                    format!("{var_name}: safe_drive::msg::RosStringSeq<{str_len}, {size}>")
+                    format!("{var_name}: safe_drive_v2::msg::RosStringSeq<{str_len}, {size}>")
                 }
                 ArrayInfo::Static(size) => {
-                    format!("{var_name}: [safe_drive::msg::RosString<{str_len}>; {size}]")
+                    format!("{var_name}: [safe_drive_v2::msg::RosString<{str_len}>; {size}]")
                 }
             },
             TypeName::String(array_info) => match array_info {
                 ArrayInfo::NotArray => {
-                    format!("{var_name}: safe_drive::msg::RosString<0>")
+                    format!("{var_name}: safe_drive_v2::msg::RosString<0>")
                 }
                 ArrayInfo::Dynamic => {
-                    format!("{var_name}: safe_drive::msg::RosStringSeq<0, 0>")
+                    format!("{var_name}: safe_drive_v2::msg::RosStringSeq<0, 0>")
                 }
                 ArrayInfo::Limited(size) => {
-                    format!("{var_name}: safe_drive::msg::RosStringSeq<0, {size}>")
+                    format!("{var_name}: safe_drive_v2::msg::RosStringSeq<0, {size}>")
                 }
                 ArrayInfo::Static(size) => {
-                    format!("{var_name}: [safe_drive::msg::RosString<0>; {size}]")
+                    format!("{var_name}: [safe_drive_v2::msg::RosString<0>; {size}]")
                 }
             },
         }
@@ -1049,12 +1049,12 @@ fn idl_string_type(string_type: &StringType) -> String {
     match string_type {
         StringType::Sized(expr) => {
             if let ConstValue::Integer(n) = eval(expr) {
-                format!("safe_drive::msg::RosString<{n}>")
+                format!("safe_drive_v2::msg::RosString<{n}>")
             } else {
                 panic!("not a integer number")
             }
         }
-        StringType::UnlimitedSize => "safe_drive::msg::RosString<0>".to_string(),
+        StringType::UnlimitedSize => "safe_drive_v2::msg::RosString<0>".to_string(),
     }
 }
 
@@ -1062,12 +1062,12 @@ fn idl_string_type_seq(string_type: &StringType, size: &BigInt) -> String {
     match string_type {
         StringType::Sized(expr) => {
             if let ConstValue::Integer(n) = eval(expr) {
-                format!("safe_drive::msg::RosStringSeq<{n}, {size}>")
+                format!("safe_drive_v2::msg::RosStringSeq<{n}, {size}>")
             } else {
                 panic!("not a integer number")
             }
         }
-        StringType::UnlimitedSize => format!("safe_drive::msg::RosStringSeq<0, {size}>"),
+        StringType::UnlimitedSize => format!("safe_drive_v2::msg::RosStringSeq<0, {size}>"),
     }
 }
 
@@ -1118,17 +1118,17 @@ fn gen_seq_type(scope: &str, type_str: &str, size: usize) -> String {
     let module_name = type_str.to_case(Case::Snake);
     let module_name = mangle_mod(&module_name);
     match type_str {
-        "bool" => format!("safe_drive::msg::BoolSeq<{size}>"),
-        "byte" | "uint8" => format!("safe_drive::msg::I8Seq<{size}>"),
-        "int16" => format!("safe_drive::msg::I16Seq<{size}>"),
-        "int32" => format!("safe_drive::msg::I32Seq<{size}>"),
-        "int64" => format!("safe_drive::msg::I64Seq<{size}>"),
-        "char" | "int8" => format!("safe_drive::msg::U8Seq<{size}>"),
-        "uint16" => format!("safe_drive::msg::U16Seq<{size}>"),
-        "uint32" => format!("safe_drive::msg::U32Seq<{size}>"),
-        "uint64" => format!("safe_drive::msg::U64Seq<{size}>"),
-        "float32" => format!("safe_drive::msg::F32Seq<{size}>"),
-        "float64" => format!("safe_drive::msg::F64Seq<{size}>"),
+        "bool" => format!("safe_drive_v2::msg::BoolSeq<{size}>"),
+        "byte" | "uint8" => format!("safe_drive_v2::msg::I8Seq<{size}>"),
+        "int16" => format!("safe_drive_v2::msg::I16Seq<{size}>"),
+        "int32" => format!("safe_drive_v2::msg::I32Seq<{size}>"),
+        "int64" => format!("safe_drive_v2::msg::I64Seq<{size}>"),
+        "char" | "int8" => format!("safe_drive_v2::msg::U8Seq<{size}>"),
+        "uint16" => format!("safe_drive_v2::msg::U16Seq<{size}>"),
+        "uint32" => format!("safe_drive_v2::msg::U32Seq<{size}>"),
+        "uint64" => format!("safe_drive_v2::msg::U64Seq<{size}>"),
+        "float32" => format!("safe_drive_v2::msg::F32Seq<{size}>"),
+        "float64" => format!("safe_drive_v2::msg::F64Seq<{size}>"),
         _ => format!("{scope}::msg::{module_name}::{type_str}Seq<{size}>"),
     }
 }

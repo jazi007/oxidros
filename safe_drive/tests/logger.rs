@@ -1,4 +1,4 @@
-use safe_drive::{logger::Logger, *};
+use safe_drive_v2::{logger::Logger, *};
 
 #[test]
 fn test_logger_macro() {

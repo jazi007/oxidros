@@ -12,7 +12,7 @@ pub mod msgs;
 
 use msgs::example_msg::{msg::Num, srv::AddThreeInts};
 
-use safe_drive::{
+use safe_drive_v2::{
     self,
     error::{DynError, RCLResult},
     msg::{ServiceMsg, TypeSupport},

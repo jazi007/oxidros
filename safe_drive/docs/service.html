@@ -321,7 +321,7 @@ pub struct AddTwoInts_Response {
 <span class="boring">}</span></code></pre></pre>
 <h3 id="edit-serversrcmainrs"><a class="header" href="#edit-serversrcmainrs">Edit <code>server/src/main.rs</code></a></h3>
 <p>You have to create a server by <code>create_server()</code> method and register a callback function to a selector as follows.</p>
-<pre><pre class="playground"><code class="language-rust">use safe_drive::{context::Context, error::DynError, logger::Logger, pr_error, qos::Profile};
+<pre><pre class="playground"><code class="language-rust">use safe_drive_v2::{context::Context, error::DynError, logger::Logger, pr_error, qos::Profile};
 use srvmsg::srv::{AddTwoInts, AddTwoInts_Response};
 
 fn main() -&gt; Result&lt;(), DynError&gt; {
@@ -419,7 +419,7 @@ safe_drive_version = "0.3"
 <p>We recommend to use async/await to implement a client,
 because a client wait a response, but when the response is replied is unpredictable.
 In this tutorial, we use <a href="https://tokio.rs/">Tokio</a>, which is the most popular asynchronous library of Rust.</p>
-<pre><pre class="playground"><code class="language-rust">use safe_drive::{
+<pre><pre class="playground"><code class="language-rust">use safe_drive_v2::{
     context::Context, error::DynError, logger::Logger, pr_error, pr_info, pr_warn, qos::Profile,
 };
 use srvmsg::srv::{AddTwoInts, AddTwoInts_Request};

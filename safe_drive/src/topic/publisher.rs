@@ -7,7 +7,7 @@
 //! ## Default QoS Profile
 //!
 //! ```
-//! use safe_drive::{context::Context, msg::common_interfaces::std_msgs};
+//! use safe_drive_v2::{context::Context, msg::common_interfaces::std_msgs};
 //!
 //! let ctx = Context::new().unwrap();
 //! let node_pub = ctx
@@ -28,7 +28,7 @@
 //! ## Specifying QoS Profile
 //!
 //! ```
-//! use safe_drive::{context::Context, msg::common_interfaces::std_msgs, qos::{Profile, policy::HistoryPolicy}};
+//! use safe_drive_v2::{context::Context, msg::common_interfaces::std_msgs, qos::{Profile, policy::HistoryPolicy}};
 //!
 //! let ctx = Context::new().unwrap();
 //! let node_pub = ctx
@@ -69,7 +69,7 @@ use parking_lot::Mutex;
 /// # Example
 ///
 /// ```
-/// use safe_drive::{context::Context, msg::common_interfaces::std_msgs};
+/// use safe_drive_v2::{context::Context, msg::common_interfaces::std_msgs};
 ///
 /// let ctx = Context::new().unwrap();
 /// let node_pub = ctx
@@ -185,7 +185,7 @@ impl<T: TypeSupport> Publisher<T> {
     /// # Example
     ///
     /// ```
-    /// use safe_drive::{context::Context, msg::common_interfaces::std_msgs};
+    /// use safe_drive_v2::{context::Context, msg::common_interfaces::std_msgs};
     ///
     /// let ctx = Context::new().unwrap();
     /// let node = ctx

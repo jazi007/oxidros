@@ -140,7 +140,7 @@ You should also understand what this code is doing.
 `pubsub/src/my_talker/src/main.rs`
 
 ```rust
-use safe_drive::{
+use safe_drive_v2::{
     context::Context, error::DynError, logger::Logger, pr_info
 };
 use std::time::Duration;
@@ -341,7 +341,7 @@ This is the main difference from `my_talker`.
 `pubsub/src/my_listener/src/main.rs`
 
 ```rust
-use safe_drive::{
+use safe_drive_v2::{
     context::Context, error::DynError, logger::Logger, pr_info,
 };
 
