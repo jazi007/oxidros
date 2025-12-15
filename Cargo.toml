@@ -1,5 +1,5 @@
 [workspace]
-members = ["safe_drive", "ros2-msg-gen"]
+members = ["oxidros", "ros2-msg-gen", "examples/ros2msg_example"]
 resolver = "2"
 
 [workspace.package]

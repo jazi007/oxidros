@@ -4,7 +4,7 @@ use crate::{
         preprocessor::preprocess,
     },
     parser::{self, ArrayInfo, Expr, TypeName, ValueType},
-    DynError, SafeDrive,
+    DynError,
 };
 use convert_case::{Case, Casing};
 use num_bigint::BigInt;
@@ -22,13 +22,12 @@ use t4_idl_parser::expr::{
     TypeDcl, TypeSpec, Typedef, TypedefType,
 };
 
-#[derive(Debug, Clone)]
-pub struct Generator<'a> {
+#[derive(Debug, Clone, Default)]
+pub struct Generator {
     msgs: BTreeSet<String>,
     srvs: BTreeSet<String>,
     actions: BTreeSet<String>,
     pub(crate) dependencies: BTreeSet<String>,
-    safe_drive: SafeDrive<'a>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,32 +38,26 @@ enum IDLType {
     NoType,
 }
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
-
-fn to_slash(path: &str) -> Cow<'_, str> {
-    if cfg!(target_os = "windows") {
-        Cow::Owned(path.replace(std::path::MAIN_SEPARATOR, "/"))
-    } else {
-        Cow::Borrowed(path)
-    }
-}
-
-impl<'a> Generator<'a> {
-    pub fn new(safe_drive: SafeDrive<'a>) -> Self {
+impl Generator {
+    pub const fn new() -> Self {
         Self {
-            msgs: Default::default(),
-            srvs: Default::default(),
-            actions: Default::default(),
-            dependencies: Default::default(),
-            safe_drive,
+            msgs: BTreeSet::new(),
+            srvs: BTreeSet::new(),
+            actions: BTreeSet::new(),
+            dependencies: BTreeSet::new(),
         }
     }
 
-    pub fn generate(&mut self, out_dir: &Path, in_dir: &Path, lib: &str) -> Result<(), DynError> {
+    pub fn generate(
+        &mut self,
+        out_dir: &Path,
+        in_dir: &Path,
+        modules: &str,
+    ) -> Result<(), DynError> {
         // Read checksum.
         let cksum = checksumdir::checksumdir(in_dir.to_str().unwrap())?;
-        let cksum_file = out_dir.join(lib).join("cksum");
-        let cksum_msg = format!("{VERSION}\n{:?}\n{cksum}", self.safe_drive);
+        let cksum_file = out_dir.join(modules).join("cksum");
+        let cksum_msg = cksum.to_string();
 
         if let Ok(mut f) = File::open(&cksum_file) {
             let mut buf = String::new();
@@ -75,8 +68,8 @@ impl<'a> Generator<'a> {
             }
         }
 
-        self.generate_recursive(out_dir, in_dir, lib)?;
-        self.generate_crate(out_dir, lib)?;
+        self.generate_recursive(out_dir, in_dir, modules)?;
+        self.generate_module(out_dir, modules)?;
 
         // Write checksum.
         if let Ok(mut f) = File::create(cksum_file) {
@@ -86,21 +79,20 @@ impl<'a> Generator<'a> {
         Ok(())
     }
 
-    fn generate_crate(&self, out_dir: &Path, lib: &str) -> Result<(), DynError> {
+    fn generate_module(&self, out_dir: &Path, module: &str) -> Result<(), DynError> {
         if self.msgs.is_empty() && self.srvs.is_empty() && self.actions.is_empty() {
             return Ok(());
         }
-
-        // lib.rs, msg.rs
-        let src_dir = out_dir.join(lib).join("src");
-        let mut lib_file = File::create(src_dir.join("lib.rs")).unwrap();
+        let mod_dir = out_dir.join(module);
+        std::fs::create_dir_all(&mod_dir).unwrap();
+        let mut mod_file = File::create(mod_dir.join("mod.rs")).unwrap();
 
         if !self.msgs.is_empty() {
-            lib_file.write_all("#[allow(non_camel_case_types)]\n".as_bytes())?;
-            lib_file.write_all("#[allow(non_snake_case)]\n".as_bytes())?;
-            lib_file.write_fmt(format_args!("pub mod msg;\n"))?;
+            mod_file.write_all("#[allow(non_camel_case_types)]\n".as_bytes())?;
+            mod_file.write_all("#[allow(non_snake_case)]\n".as_bytes())?;
+            mod_file.write_fmt(format_args!("pub mod msg;\n"))?;
 
-            let mut msg_file = File::create(src_dir.join("msg.rs"))?;
+            let mut msg_file = File::create(mod_dir.join("msg.rs"))?;
             for msg in self.msgs.iter() {
                 msg_file.write_fmt(format_args!("pub mod {msg};\n"))?;
                 msg_file.write_fmt(format_args!("pub use {msg}::*;\n\n"))?;
@@ -108,11 +100,11 @@ impl<'a> Generator<'a> {
         }
 
         if !self.srvs.is_empty() {
-            lib_file.write_all("#[allow(non_camel_case_types)]\n".as_bytes())?;
-            lib_file.write_all("#[allow(non_snake_case)]\n".as_bytes())?;
-            lib_file.write_fmt(format_args!("pub mod srv;\n"))?;
+            mod_file.write_all("#[allow(non_camel_case_types)]\n".as_bytes())?;
+            mod_file.write_all("#[allow(non_snake_case)]\n".as_bytes())?;
+            mod_file.write_fmt(format_args!("pub mod srv;\n"))?;
 
-            let mut srv_file = File::create(src_dir.join("srv.rs"))?;
+            let mut srv_file = File::create(mod_dir.join("srv.rs"))?;
             for srv in self.srvs.iter() {
                 srv_file.write_fmt(format_args!("pub mod {srv};\n"))?;
                 srv_file.write_fmt(format_args!("pub use {srv}::*;\n\n"))?;
@@ -120,112 +112,53 @@ impl<'a> Generator<'a> {
         }
 
         if !self.actions.is_empty() {
-            lib_file.write_all("#[allow(non_camel_case_types)]\n".as_bytes())?;
-            lib_file.write_all("#[allow(non_snake_case)]\n".as_bytes())?;
-            lib_file.write_fmt(format_args!("pub mod action;\n"))?;
+            mod_file.write_all("#[allow(non_camel_case_types)]\n".as_bytes())?;
+            mod_file.write_all("#[allow(non_snake_case)]\n".as_bytes())?;
+            mod_file.write_fmt(format_args!("pub mod action;\n"))?;
 
-            let mut action_file = File::create(src_dir.join("action.rs"))?;
+            let mut action_file = File::create(mod_dir.join("action.rs"))?;
             for action in self.actions.iter() {
                 action_file.write_fmt(format_args!("pub mod {action};\n"))?;
                 action_file.write_fmt(format_args!("pub use {action}::*;\n\n"))?;
             }
         }
-
-        // Cargo.toml
-        self.generate_cargo_toml(out_dir, lib)?;
-
-        // build.rs
-        self.generate_build_rs(out_dir, lib)?;
-
+        self.emit(module)?;
         Ok(())
     }
 
-    fn generate_build_rs(&self, out_dir: &Path, lib: &str) -> Result<(), DynError> {
-        let mut build_rs = File::create(out_dir.join(lib).join("build.rs"))?;
+    fn emit(&self, lib: &str) -> Result<(), DynError> {
         if cfg!(target_os = "windows") {
-            build_rs.write_fmt(format_args!(
-                r#"fn main() {{
-    println!("cargo:rustc-link-lib={lib}__rosidl_typesupport_c");
-    println!("cargo:rustc-link-lib={lib}__rosidl_generator_c");
+            println!("cargo:rustc-link-lib={lib}__rosidl_typesupport_c");
+            println!("cargo:rustc-link-lib={lib}__rosidl_generator_c");
 
-    if let Some(e) = std::env::var_os("AMENT_PREFIX_PATH") {{
-        let env = e.to_str().unwrap();
-        for path in env.split(';') {{
-            let p = std::path::Path::new(path).join("Lib");
-            if p.exists() {{
-                println!("cargo:rustc-link-search={{}}", p.as_path().to_str().unwrap());
-            }}
-        }}
-    }}
-    if let Some(e) = std::env::var_os("CMAKE_PREFIX_PATH") {{
-        let env = e.to_str().unwrap();
-        for path in env.split(';') {{
-            let p = std::path::Path::new(path).join("lib");
-            if p.exists() {{
-                println!("cargo:rustc-link-search={{}}", p.as_path().to_str().unwrap());
-            }}
-        }}
-    }}
-}}
-"#
-            ))?;
-        } else {
-            build_rs.write_fmt(format_args!(
-                r#"fn main() {{
-    println!("cargo:rustc-link-lib={lib}__rosidl_typesupport_c");
-    println!("cargo:rustc-link-lib={lib}__rosidl_generator_c");
-
-    if let Some(e) = std::env::var_os("AMENT_PREFIX_PATH") {{
-        let env = e.to_str().unwrap();
-        for path in env.split(':') {{
-            println!("cargo:rustc-link-search={{path}}/lib");
-        }}
-    }}
-}}
-"#
-            ))?;
-        }
-        Ok(())
-    }
-
-    fn generate_cargo_toml(&self, out_dir: &Path, lib: &str) -> Result<(), DynError> {
-        let ros2ver = std::env::var("ROS_DISTRO")?;
-
-        let safe_drive_dep = match &self.safe_drive {
-            SafeDrive::Path(s) => {
-                format!(
-                    "{{ path = \"{}\", default-features = false, features = [\"{ros2ver}\"] }}",
-                    to_slash(s).as_ref()
-                )
+            if let Some(e) = std::env::var_os("AMENT_PREFIX_PATH") {
+                let env = e.to_str().unwrap();
+                for path in env.split(';') {
+                    let p = std::path::Path::new(path).join("Lib");
+                    if p.exists() {
+                        println!("cargo:rustc-link-search={}", p.as_path().to_str().unwrap());
+                    }
+                }
             }
-            SafeDrive::Version(s) => format!(
-                "{{ version = \"{s}\", default-features = false, features = [\"{ros2ver}\"] }}"
-            ),
-        };
-
-        let mut cargo_toml = File::create(out_dir.join(lib).join("Cargo.toml"))?;
-        cargo_toml.write_fmt(format_args!(
-            r#"[package]
-name = "{lib}"
-version = "0.2.1"
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-safe_drive = {safe_drive_dep}
-"#,
-        ))?;
-
-        for dependency in self.dependencies.iter() {
-            let path = out_dir.join(dependency);
-            cargo_toml.write_fmt(format_args!(
-                r#"{dependency} = {{ path = "{}" }}
-"#,
-                to_slash(path.to_str().unwrap()).as_ref()
-            ))?;
+            if let Some(e) = std::env::var_os("CMAKE_PREFIX_PATH") {
+                let env = e.to_str().unwrap();
+                for path in env.split(';') {
+                    let p = std::path::Path::new(path).join("lib");
+                    if p.exists() {
+                        println!("cargo:rustc-link-search={}", p.as_path().to_str().unwrap());
+                    }
+                }
+            }
+        } else {
+            println!("cargo:rustc-link-lib={lib}__rosidl_typesupport_c");
+            println!("cargo:rustc-link-lib={lib}__rosidl_generator_c");
+            if let Some(e) = std::env::var_os("AMENT_PREFIX_PATH") {
+                let env = e.to_str().unwrap();
+                for path in env.split(':') {
+                    println!("cargo:rustc-link-search={path}/lib");
+                }
+            }
         }
-
         Ok(())
     }
 
@@ -320,7 +253,7 @@ safe_drive = {safe_drive_dep}
                 self.msgs.insert(rs_module.into());
 
                 // Create directories.
-                let out_dir = out_lib_dir.join(lib).join("src").join("msg");
+                let out_dir = out_lib_dir.join(lib).join("msg");
                 std::fs::create_dir_all(&out_dir)?;
 
                 // Path to the file.
@@ -330,7 +263,7 @@ safe_drive = {safe_drive_dep}
                 self.srvs.insert(rs_module.into());
 
                 // Create directories.
-                let out_dir = out_lib_dir.join(lib).join("src").join("srv");
+                let out_dir = out_lib_dir.join(lib).join("srv");
                 std::fs::create_dir_all(&out_dir)?;
 
                 // Path to the file.
@@ -340,7 +273,7 @@ safe_drive = {safe_drive_dep}
                 self.actions.insert(rs_module.into());
 
                 // Create directories.
-                let out_dir = out_lib_dir.join(lib).join("src").join("action");
+                let out_dir = out_lib_dir.join(lib).join("action");
                 std::fs::create_dir_all(&out_dir)?;
 
                 // Path to the file.
@@ -389,7 +322,7 @@ safe_drive = {safe_drive_dep}
         self.idl_struct(lines, struct_def, lib);
         lines.push_back(gen_impl_for_struct(lib, "msg", &struct_def.id));
 
-        lines.push_front("use safe_drive_v2::{msg::TypeSupport, rcl::{self, size_t}};".into());
+        lines.push_front("use oxidros::{msg::TypeSupport, rcl::{self, size_t}};".into());
     }
 
     fn generate_idl_srv(
@@ -409,8 +342,7 @@ safe_drive = {safe_drive_dep}
 
         if *idl_type == IDLType::NoType {
             lines.push_front(
-                "use safe_drive_v2::{msg::{ServiceMsg, TypeSupport}, rcl::{self, size_t}};"
-                    .to_string(),
+                "use oxidros::{msg::{ServiceMsg, TypeSupport}, rcl::{self, size_t}};".to_string(),
             );
             lines.push_back(gen_impl_service_msg(lib, "srv", type_str));
         }
@@ -456,7 +388,7 @@ safe_drive = {safe_drive_dep}
 
         if *idl_type == IDLType::NoType {
             lines.push_front(
-                "use safe_drive_v2::{msg::{ActionMsg, ActionGoal, ActionResult, GetUUID, GoalResponse, ResultResponse, TypeSupport, builtin_interfaces::UnsafeTime, unique_identifier_msgs}, rcl::{self, size_t}};"
+                "use oxidros::{msg::{ActionMsg, ActionGoal, ActionResult, GetUUID, GoalResponse, ResultResponse, TypeSupport, builtin_interfaces::UnsafeTime, unique_identifier_msgs}, rcl::{self, size_t}};"
                     .to_string(),
             );
             lines.push_back(gen_impl_action_msg(lib, type_str));
@@ -595,7 +527,7 @@ safe_drive = {safe_drive_dep}
     fn idl_member(&mut self, lines: &mut VecDeque<String>, member: &Member, lib: &str) {
         let type_str = self.idl_type_spec(&member.type_spec, lib);
         let type_str = if type_str == "string" {
-            "safe_drive_v2::msg::RosString<0>".to_string()
+            "oxidros::msg::RosString<0>".to_string()
         } else {
             type_str
         };
@@ -666,45 +598,45 @@ safe_drive = {safe_drive_dep}
     fn idl_seq_type(&mut self, type_spec: &TypeSpec, size: &BigInt, lib: &str) -> String {
         match type_spec {
             TypeSpec::PrimitiveType(PrimitiveType::Boolean) => {
-                format!("safe_drive_v2::msg::BoolSeq<{size}>")
+                format!("oxidros::msg::BoolSeq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Int8)
             | TypeSpec::PrimitiveType(PrimitiveType::Char) => {
-                format!("safe_drive_v2::msg::I8Seq<{size}>")
+                format!("oxidros::msg::I8Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Int16)
             | TypeSpec::PrimitiveType(PrimitiveType::Short) => {
-                format!("safe_drive_v2::msg::I16Seq<{size}>")
+                format!("oxidros::msg::I16Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Int32)
             | TypeSpec::PrimitiveType(PrimitiveType::Long) => {
-                format!("safe_drive_v2::msg::I32Seq<{size}>")
+                format!("oxidros::msg::I32Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Int64)
             | TypeSpec::PrimitiveType(PrimitiveType::LongLong) => {
-                format!("safe_drive_v2::msg::I64Seq<{size}>")
+                format!("oxidros::msg::I64Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Uint8)
             | TypeSpec::PrimitiveType(PrimitiveType::Octet) => {
-                format!("safe_drive_v2::msg::U8Seq<{size}>")
+                format!("oxidros::msg::U8Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Uint16)
             | TypeSpec::PrimitiveType(PrimitiveType::UnsignedShort) => {
-                format!("safe_drive_v2::msg::U16Seq<{size}>")
+                format!("oxidros::msg::U16Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Uint32)
             | TypeSpec::PrimitiveType(PrimitiveType::UnsignedLong) => {
-                format!("safe_drive_v2::msg::U32Seq<{size}>")
+                format!("oxidros::msg::U32Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Uint64)
             | TypeSpec::PrimitiveType(PrimitiveType::UnsignedLongLong) => {
-                format!("safe_drive_v2::msg::U64Seq<{size}>")
+                format!("oxidros::msg::U64Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Float) => {
-                format!("safe_drive_v2::msg::F32Seq<{size}>")
+                format!("oxidros::msg::F32Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Double) => {
-                format!("safe_drive_v2::msg::F64Seq<{size}>")
+                format!("oxidros::msg::F64Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::LongDouble) => unimplemented!(),
             TypeSpec::PrimitiveType(PrimitiveType::WChar) => unimplemented!(),
@@ -712,7 +644,7 @@ safe_drive = {safe_drive_dep}
             TypeSpec::ScopedName(name) => {
                 let type_str = self.idl_scoped_name(name, lib);
                 if type_str == "string" {
-                    format!("safe_drive_v2::msg::RosStringSeq<0, {size}>")
+                    format!("oxidros::msg::RosStringSeq<0, {size}>")
                 } else {
                     format!("{type_str}Seq<{size}>")
                 }
@@ -759,12 +691,12 @@ safe_drive = {safe_drive_dep}
                     v[0].clone()
                 } else if v[0] == lib {
                     let tail = mangle_vec(&v[1..]);
-                    format!("crate::{tail}")
+                    format!("super::super::{tail}")
                 } else {
                     let module_name = mangle_mod(&v[0]);
                     self.dependencies.insert(module_name.to_string());
                     let tail = mangle_vec(&v[1..]);
-                    format!("{module_name}::{tail}")
+                    format!("super::super::super::{module_name}::{tail}")
                 }
             }
             ScopedName::Relative(v) => mangle_vec(v),
@@ -796,10 +728,10 @@ safe_drive = {safe_drive_dep}
         self.generate_exprs(&exprs, &mut lines, lib, &rs_type_name, MsgType::Msg);
 
         lines.push_back(gen_impl_for_msg(lib, &rs_type_name).into());
-        lines.push_front("use safe_drive_v2::{msg::TypeSupport, rcl::{self, size_t}};".into());
+        lines.push_front("use oxidros::{msg::TypeSupport, rcl::{self, size_t}};".into());
 
         // Create a directory.
-        let out_dir = out_lib_dir.join(lib).join("src").join("msg");
+        let out_dir = out_lib_dir.join(lib).join("msg");
         std::fs::create_dir_all(&out_dir)?;
 
         // Write.
@@ -852,11 +784,11 @@ safe_drive = {safe_drive_dep}
 
         lines.push_back(gen_impl_for_srv(lib, &rs_type_name).into());
         lines.push_front(
-            "use safe_drive_v2::{msg::{ServiceMsg, TypeSupport}, rcl::{self, size_t}};".into(),
+            "use oxidros::{msg::{ServiceMsg, TypeSupport}, rcl::{self, size_t}};".into(),
         );
 
         // Create a directory.
-        let out_dir = out_lib_dir.join(lib).join("src").join("srv");
+        let out_dir = out_lib_dir.join(lib).join("srv");
         std::fs::create_dir_all(&out_dir)?;
 
         // Write.
@@ -879,11 +811,11 @@ safe_drive = {safe_drive_dep}
                     format!("{var_name}: {}", gen_type(type_name.as_str()))
                 }
                 ArrayInfo::Dynamic => {
-                    let type_name = gen_seq_type("crate", type_name, 0);
+                    let type_name = gen_seq_type("super::super", type_name, 0);
                     format!("{var_name}: {type_name}")
                 }
                 ArrayInfo::Limited(size) => {
-                    let type_name = gen_seq_type("crate", type_name, *size);
+                    let type_name = gen_seq_type("super::super", type_name, *size);
                     format!("{var_name}: {type_name}")
                 }
                 ArrayInfo::Static(size) => {
@@ -897,11 +829,11 @@ safe_drive = {safe_drive_dep}
                 array_info,
             } => {
                 let scope = if scope == lib {
-                    "crate".into()
+                    "super::super".into()
                 } else {
                     let s = mangle_mod(scope);
                     self.dependencies.insert(s.to_string());
-                    s
+                    format!("super::super::super::{s}")
                 };
 
                 match array_info {
@@ -930,30 +862,30 @@ safe_drive = {safe_drive_dep}
                 array_info,
             } => match array_info {
                 ArrayInfo::NotArray => {
-                    format!("{var_name}: safe_drive_v2::msg::RosString<{str_len}>")
+                    format!("{var_name}: oxidros::msg::RosString<{str_len}>")
                 }
                 ArrayInfo::Dynamic => {
-                    format!("{var_name}: safe_drive_v2::msg::RosStringSeq<{str_len}, 0>")
+                    format!("{var_name}: oxidros::msg::RosStringSeq<{str_len}, 0>")
                 }
                 ArrayInfo::Limited(size) => {
-                    format!("{var_name}: safe_drive_v2::msg::RosStringSeq<{str_len}, {size}>")
+                    format!("{var_name}: oxidros::msg::RosStringSeq<{str_len}, {size}>")
                 }
                 ArrayInfo::Static(size) => {
-                    format!("{var_name}: [safe_drive_v2::msg::RosString<{str_len}>; {size}]")
+                    format!("{var_name}: [oxidros::msg::RosString<{str_len}>; {size}]")
                 }
             },
             TypeName::String(array_info) => match array_info {
                 ArrayInfo::NotArray => {
-                    format!("{var_name}: safe_drive_v2::msg::RosString<0>")
+                    format!("{var_name}: oxidros::msg::RosString<0>")
                 }
                 ArrayInfo::Dynamic => {
-                    format!("{var_name}: safe_drive_v2::msg::RosStringSeq<0, 0>")
+                    format!("{var_name}: oxidros::msg::RosStringSeq<0, 0>")
                 }
                 ArrayInfo::Limited(size) => {
-                    format!("{var_name}: safe_drive_v2::msg::RosStringSeq<0, {size}>")
+                    format!("{var_name}: oxidros::msg::RosStringSeq<0, {size}>")
                 }
                 ArrayInfo::Static(size) => {
-                    format!("{var_name}: [safe_drive_v2::msg::RosString<0>; {size}]")
+                    format!("{var_name}: [oxidros::msg::RosString<0>; {size}]")
                 }
             },
         }
@@ -1048,12 +980,12 @@ fn idl_string_type(string_type: &StringType) -> String {
     match string_type {
         StringType::Sized(expr) => {
             if let ConstValue::Integer(n) = eval(expr) {
-                format!("safe_drive_v2::msg::RosString<{n}>")
+                format!("oxidros::msg::RosString<{n}>")
             } else {
                 panic!("not a integer number")
             }
         }
-        StringType::UnlimitedSize => "safe_drive_v2::msg::RosString<0>".to_string(),
+        StringType::UnlimitedSize => "oxidros::msg::RosString<0>".to_string(),
     }
 }
 
@@ -1061,12 +993,12 @@ fn idl_string_type_seq(string_type: &StringType, size: &BigInt) -> String {
     match string_type {
         StringType::Sized(expr) => {
             if let ConstValue::Integer(n) = eval(expr) {
-                format!("safe_drive_v2::msg::RosStringSeq<{n}, {size}>")
+                format!("oxidros::msg::RosStringSeq<{n}, {size}>")
             } else {
                 panic!("not a integer number")
             }
         }
-        StringType::UnlimitedSize => format!("safe_drive_v2::msg::RosStringSeq<0, {size}>"),
+        StringType::UnlimitedSize => format!("oxidros::msg::RosStringSeq<0, {size}>"),
     }
 }
 
@@ -1117,17 +1049,17 @@ fn gen_seq_type(scope: &str, type_str: &str, size: usize) -> String {
     let module_name = type_str.to_case(Case::Snake);
     let module_name = mangle_mod(&module_name);
     match type_str {
-        "bool" => format!("safe_drive_v2::msg::BoolSeq<{size}>"),
-        "byte" | "uint8" => format!("safe_drive_v2::msg::I8Seq<{size}>"),
-        "int16" => format!("safe_drive_v2::msg::I16Seq<{size}>"),
-        "int32" => format!("safe_drive_v2::msg::I32Seq<{size}>"),
-        "int64" => format!("safe_drive_v2::msg::I64Seq<{size}>"),
-        "char" | "int8" => format!("safe_drive_v2::msg::U8Seq<{size}>"),
-        "uint16" => format!("safe_drive_v2::msg::U16Seq<{size}>"),
-        "uint32" => format!("safe_drive_v2::msg::U32Seq<{size}>"),
-        "uint64" => format!("safe_drive_v2::msg::U64Seq<{size}>"),
-        "float32" => format!("safe_drive_v2::msg::F32Seq<{size}>"),
-        "float64" => format!("safe_drive_v2::msg::F64Seq<{size}>"),
+        "bool" => format!("oxidros::msg::BoolSeq<{size}>"),
+        "byte" | "uint8" => format!("oxidros::msg::I8Seq<{size}>"),
+        "int16" => format!("oxidros::msg::I16Seq<{size}>"),
+        "int32" => format!("oxidros::msg::I32Seq<{size}>"),
+        "int64" => format!("oxidros::msg::I64Seq<{size}>"),
+        "char" | "int8" => format!("oxidros::msg::U8Seq<{size}>"),
+        "uint16" => format!("oxidros::msg::U16Seq<{size}>"),
+        "uint32" => format!("oxidros::msg::U32Seq<{size}>"),
+        "uint64" => format!("oxidros::msg::U64Seq<{size}>"),
+        "float32" => format!("oxidros::msg::F32Seq<{size}>"),
+        "float64" => format!("oxidros::msg::F64Seq<{size}>"),
         _ => format!("{scope}::msg::{module_name}::{type_str}Seq<{size}>"),
     }
 }
@@ -1148,7 +1080,7 @@ fn gen_type(type_str: &str) -> Cow<'_, str> {
         _ => {
             let mod_file = type_str.to_case(Case::Snake);
             let mod_file = mangle_mod(&mod_file);
-            format!("crate::msg::{mod_file}::{type_str}").into()
+            format!("super::super::msg::{mod_file}::{type_str}").into()
         }
     }
 }
@@ -1809,7 +1741,7 @@ module example_msg {
             f.write_all(input.as_bytes()).unwrap();
         }
 
-        let mut g = Generator::new(SafeDrive::Version("0.2"));
+        let mut g = Generator::new();
         g.generate_idl(Path::new("/tmp/safe_drive_msg"), idl_path, "example_msg")
             .unwrap();
     }
@@ -1846,7 +1778,7 @@ module example_msg {
             f.write_all(input.as_bytes()).unwrap();
         }
 
-        let mut g = Generator::new(SafeDrive::Version("0.2"));
+        let mut g = Generator::new();
         g.generate_idl(Path::new("/tmp/safe_drive_msg"), idl_path, "example_msg")
             .unwrap();
     }
@@ -1982,7 +1914,7 @@ module example_msg {
             f.write_all(input.as_bytes()).unwrap();
         }
 
-        let mut g = Generator::new(SafeDrive::Version("0.2"));
+        let mut g = Generator::new();
         g.generate_idl(Path::new("/tmp/safe_drive_msg"), idl_path, "example_msg")
             .unwrap();
     }

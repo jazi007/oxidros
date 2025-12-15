@@ -766,6 +766,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2839e79665f131bdb5782e51f2c6c9599c133c6098982a54c794358bf432529c"
 
 [[package]]
+name = "oxidros"
+version = "0.4.5"
+dependencies = [
+ "async-std",
+ "crossbeam-channel",
+ "futures",
+ "libc",
+ "memac",
+ "num-derive",
+ "num-traits",
+ "once_cell",
+ "parking_lot",
+ "pin-project",
+ "rand",
+ "regex",
+ "serde",
+ "serde_json",
+ "signal-hook",
+]
+
+[[package]]
 name = "parking"
 version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -964,6 +985,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ros2msg_example"
+version = "0.1.0"
+dependencies = [
+ "oxidros",
+ "ros2-msg-gen",
+]
+
+[[package]]
 name = "rustix"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -987,27 +1016,6 @@ name = "ryu"
 version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
-
-[[package]]
-name = "safe_drive_v2"
-version = "0.4.5"
-dependencies = [
- "async-std",
- "crossbeam-channel",
- "futures",
- "libc",
- "memac",
- "num-derive",
- "num-traits",
- "once_cell",
- "parking_lot",
- "pin-project",
- "rand",
- "regex",
- "serde",
- "serde_json",
- "signal-hook",
-]
 
 [[package]]
 name = "same-file"
