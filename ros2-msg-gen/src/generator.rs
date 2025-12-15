@@ -22,12 +22,13 @@ use t4_idl_parser::expr::{
     TypeDcl, TypeSpec, Typedef, TypedefType,
 };
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct Generator {
     msgs: BTreeSet<String>,
     srvs: BTreeSet<String>,
     actions: BTreeSet<String>,
     pub(crate) dependencies: BTreeSet<String>,
+    oxidros_prefix: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,12 +40,21 @@ enum IDLType {
 }
 
 impl Generator {
-    pub const fn new() -> Self {
+    pub fn new(oxidros_prefix: Option<&str>) -> Self {
         Self {
             msgs: BTreeSet::new(),
             srvs: BTreeSet::new(),
             actions: BTreeSet::new(),
             dependencies: BTreeSet::new(),
+            oxidros_prefix: oxidros_prefix.unwrap_or("").to_string(),
+        }
+    }
+
+    fn oxidros_path(&self) -> String {
+        if self.oxidros_prefix.is_empty() {
+            "oxidros".to_string()
+        } else {
+            format!("{}oxidros", self.oxidros_prefix)
         }
     }
 
@@ -127,9 +137,14 @@ impl Generator {
     }
 
     fn emit(&self, lib: &str) -> Result<(), DynError> {
+        // Re-run build if environment variables change
+        println!("cargo:rerun-if-env-changed=ROS_DISTRO");
+        println!("cargo:rerun-if-env-changed=AMENT_PREFIX_PATH");
+        println!("cargo:rustc-link-lib={lib}__rosidl_typesupport_c");
+        println!("cargo:rustc-link-lib={lib}__rosidl_generator_c");
+
         if cfg!(target_os = "windows") {
-            println!("cargo:rustc-link-lib={lib}__rosidl_typesupport_c");
-            println!("cargo:rustc-link-lib={lib}__rosidl_generator_c");
+            println!("cargo:rerun-if-env-changed=CMAKE_PREFIX_PATH");
 
             if let Some(e) = std::env::var_os("AMENT_PREFIX_PATH") {
                 let env = e.to_str().unwrap();
@@ -149,14 +164,10 @@ impl Generator {
                     }
                 }
             }
-        } else {
-            println!("cargo:rustc-link-lib={lib}__rosidl_typesupport_c");
-            println!("cargo:rustc-link-lib={lib}__rosidl_generator_c");
-            if let Some(e) = std::env::var_os("AMENT_PREFIX_PATH") {
-                let env = e.to_str().unwrap();
-                for path in env.split(':') {
-                    println!("cargo:rustc-link-search={path}/lib");
-                }
+        } else if let Some(e) = std::env::var_os("AMENT_PREFIX_PATH") {
+            let env = e.to_str().unwrap();
+            for path in env.split(':') {
+                println!("cargo:rustc-link-search={path}/lib");
             }
         }
         Ok(())
@@ -322,7 +333,10 @@ impl Generator {
         self.idl_struct(lines, struct_def, lib);
         lines.push_back(gen_impl_for_struct(lib, "msg", &struct_def.id));
 
-        lines.push_front("use oxidros::{msg::TypeSupport, rcl::{self, size_t}};".into());
+        lines.push_front(format!(
+            "use {}::{{msg::TypeSupport, rcl::{{self, size_t}}}};",
+            self.oxidros_path()
+        ));
     }
 
     fn generate_idl_srv(
@@ -341,9 +355,10 @@ impl Generator {
         };
 
         if *idl_type == IDLType::NoType {
-            lines.push_front(
-                "use oxidros::{msg::{ServiceMsg, TypeSupport}, rcl::{self, size_t}};".to_string(),
-            );
+            lines.push_front(format!(
+                "use {}::{{msg::{{ServiceMsg, TypeSupport}}, rcl::{{self, size_t}}}};",
+                self.oxidros_path()
+            ));
             lines.push_back(gen_impl_service_msg(lib, "srv", type_str));
         }
 
@@ -388,8 +403,7 @@ impl Generator {
 
         if *idl_type == IDLType::NoType {
             lines.push_front(
-                "use oxidros::{msg::{ActionMsg, ActionGoal, ActionResult, GetUUID, GoalResponse, ResultResponse, TypeSupport, builtin_interfaces::UnsafeTime, unique_identifier_msgs}, rcl::{self, size_t}};"
-                    .to_string(),
+                format!("use {}::{{msg::{{ActionMsg, ActionGoal, ActionResult, GetUUID, GoalResponse, ResultResponse, TypeSupport, builtin_interfaces::UnsafeTime, unique_identifier_msgs}}, rcl::{{self, size_t}}}};", self.oxidros_path()),
             );
             lines.push_back(gen_impl_action_msg(lib, type_str));
         }
@@ -728,7 +742,13 @@ impl Generator {
         self.generate_exprs(&exprs, &mut lines, lib, &rs_type_name, MsgType::Msg);
 
         lines.push_back(gen_impl_for_msg(lib, &rs_type_name).into());
-        lines.push_front("use oxidros::{msg::TypeSupport, rcl::{self, size_t}};".into());
+        lines.push_front(
+            format!(
+                "use {}::{{msg::TypeSupport, rcl::{{self, size_t}}}};",
+                self.oxidros_path()
+            )
+            .into(),
+        );
 
         // Create a directory.
         let out_dir = out_lib_dir.join(lib).join("msg");
@@ -784,7 +804,11 @@ impl Generator {
 
         lines.push_back(gen_impl_for_srv(lib, &rs_type_name).into());
         lines.push_front(
-            "use oxidros::{msg::{ServiceMsg, TypeSupport}, rcl::{self, size_t}};".into(),
+            format!(
+                "use {}::{{msg::{{ServiceMsg, TypeSupport}}, rcl::{{self, size_t}}}};",
+                self.oxidros_path()
+            )
+            .into(),
         );
 
         // Create a directory.
@@ -1741,7 +1765,7 @@ module example_msg {
             f.write_all(input.as_bytes()).unwrap();
         }
 
-        let mut g = Generator::new();
+        let mut g = Generator::new(None);
         g.generate_idl(Path::new("/tmp/safe_drive_msg"), idl_path, "example_msg")
             .unwrap();
     }
@@ -1778,7 +1802,7 @@ module example_msg {
             f.write_all(input.as_bytes()).unwrap();
         }
 
-        let mut g = Generator::new();
+        let mut g = Generator::new(None);
         g.generate_idl(Path::new("/tmp/safe_drive_msg"), idl_path, "example_msg")
             .unwrap();
     }
@@ -1914,7 +1938,7 @@ module example_msg {
             f.write_all(input.as_bytes()).unwrap();
         }
 
-        let mut g = Generator::new();
+        let mut g = Generator::new(None);
         g.generate_idl(Path::new("/tmp/safe_drive_msg"), idl_path, "example_msg")
             .unwrap();
     }

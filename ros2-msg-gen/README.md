@@ -5,7 +5,7 @@ use ros2_msg_gen;
 use std::path::Path;
 
 let dependencies = ["std_msgs", "std_srvs"];
-ros2_msg_gen::depends(&Path::new("/tmp/output_dir"), &dependencies);
+ros2_msg_gen::generate(&Path::new("/tmp/output_dir"), &dependencies);
 ```
 
 ## Limitation

@@ -31,9 +31,34 @@ const SEP: char = ':';
 /// use std::path::Path;
 ///
 /// let dependencies = ["std_msgs", "std_srvs"];
-/// ros2_msg_gen::depends(&Path::new("/tmp/output_dir"), &dependencies);
+/// ros2_msg_gen::generate(&Path::new("/tmp/output_dir"), &dependencies);
 /// ```
-pub fn depends(outdir: &Path, libs: &[&str]) -> Result<(), DynError> {
+pub fn generate(outdir: &Path, libs: &[&str]) -> Result<(), DynError> {
+    generate_with_prefix(outdir, libs, None)
+}
+
+/// Transpile ROS2's message types to Rust's types with optional oxidros prefix.
+///
+/// # Arguments
+/// * `outdir` - Output directory for generated code
+/// * `libs` - ROS2 packages to generate bindings for  
+/// * `oxidros_prefix` - Optional prefix for oxidros imports (e.g., Some("crate::") or None)
+///
+/// # Example
+///
+/// ```
+/// use ros2_msg_gen;
+/// use std::path::Path;
+///
+/// let dependencies = ["std_msgs", "std_srvs"];
+/// // Use crate::oxidros for generated code included in a crate
+/// ros2_msg_gen::generate_with_prefix(&Path::new("/tmp/output_dir"), &dependencies, Some("crate::"));
+/// ```
+pub fn generate_with_prefix(
+    outdir: &Path,
+    libs: &[&str],
+    oxidros_prefix: Option<&str>,
+) -> Result<(), DynError> {
     let ament_paths = std::env::var("AMENT_PREFIX_PATH")?;
     let mut ament_paths: Vec<_> = ament_paths
         .split(SEP)
@@ -53,7 +78,13 @@ pub fn depends(outdir: &Path, libs: &[&str]) -> Result<(), DynError> {
     let libs: BTreeSet<_> = libs.iter().map(|e| e.to_string()).collect();
     std::fs::create_dir_all(outdir)?;
     let mut generated_modules = BTreeSet::new();
-    generate_modules(outdir, &ament_paths, &libs, &mut generated_modules)?;
+    generate_modules(
+        outdir,
+        &ament_paths,
+        &libs,
+        &mut generated_modules,
+        oxidros_prefix,
+    )?;
     generate_root_mod(outdir, &generated_modules)?;
     Ok(())
 }
@@ -63,6 +94,7 @@ fn generate_modules(
     ament_paths: &Vec<PathBuf>,
     modules: &BTreeSet<String>,
     generated_modules: &mut BTreeSet<String>,
+    oxidros_prefix: Option<&str>,
 ) -> Result<(), DynError> {
     let modules: BTreeSet<_> = modules.iter().collect();
 
@@ -79,11 +111,17 @@ fn generate_modules(
             if resource.exists() {
                 let path = path.join(module);
                 if path.exists() {
-                    let mut gen = generator::Generator::new();
+                    let mut gen = generator::Generator::new(oxidros_prefix);
                     gen.generate(outdir, &path, module)?;
                     generated_modules.insert(module.to_string());
                     // Generate dependencies.
-                    generate_modules(outdir, ament_paths, &gen.dependencies, generated_modules)?;
+                    generate_modules(
+                        outdir,
+                        ament_paths,
+                        &gen.dependencies,
+                        generated_modules,
+                        oxidros_prefix,
+                    )?;
                     continue 'module;
                 } else {
                     eprintln!(
@@ -115,17 +153,17 @@ mod tests {
 
     #[test]
     fn std_msgs() {
-        depends(Path::new("/tmp/safe_drive_msg"), &["std_msgs"]).unwrap();
+        generate(Path::new("/tmp/safe_drive_msg"), &["std_msgs"]).unwrap();
     }
 
     #[test]
     fn std_srvs() {
-        depends(Path::new("/tmp/safe_drive_msg"), &["std_srvs"]).unwrap();
+        generate(Path::new("/tmp/safe_drive_msg"), &["std_srvs"]).unwrap();
     }
 
     #[test]
     fn action_tutorials_interfaces() {
-        depends(
+        generate(
             Path::new("/tmp/safe_drive_msg"),
             &["action_tutorials_interfaces"],
         )
