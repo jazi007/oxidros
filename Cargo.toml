@@ -1,5 +1,10 @@
 [workspace]
-members = ["oxidros", "ros2-msg-gen", "examples/ros2msg_example"]
+members = [
+    "oxidros",
+    "oxidros-wrapper",
+    "ros2-msg-gen",
+    "examples/ros2msg_example",
+]
 resolver = "2"
 
 [workspace.package]

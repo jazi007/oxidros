@@ -1,6 +1,6 @@
 //! # Transpiler from ROS2's message types to Rust's types.
 //!
-//! See https://github.com/ament/ament_cmake/blob/master/ament_cmake_core/doc/resource_index.md
+//! See [resource_index](https://github.com/ament/ament_cmake/blob/master/ament_cmake_core/doc/resource_index.md)
 
 pub(crate) mod generator;
 pub(crate) mod idl;

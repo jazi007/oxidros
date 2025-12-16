@@ -73,7 +73,7 @@ fn main() {
     if std::env::var_os("SAFE_DRIVE_TEST").is_some() {
         println!("cargo:rustc-link-lib=example_msg__rosidl_typesupport_c");
         println!("cargo:rustc-link-lib=example_msg__rosidl_generator_c");
-        println!("cargo:rustc-link-search=supplements/ros2/install/example_msg/lib");
+        println!("cargo:rustc-link-search=oxidros/supplements/ros2/install/example_msg/lib");
     }
 
     if let Some(e) = std::env::var_os("AMENT_PREFIX_PATH") {
