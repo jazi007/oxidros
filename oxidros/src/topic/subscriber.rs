@@ -240,7 +240,7 @@ impl<T: TypeSupport> Subscriber<T> {
             guard.rcl_subscription_init(
                 subscription.as_mut(),
                 node.as_ptr(),
-                T::type_support(),
+                T::type_support() as *const rcl::rosidl_message_type_support_t,
                 topic_name_c.as_ptr(),
                 options.as_ptr(),
             )?;
@@ -278,7 +278,7 @@ impl<T: TypeSupport> Subscriber<T> {
             guard.rcl_subscription_init(
                 subscription.as_mut(),
                 node.as_ptr(),
-                T::type_support(),
+                T::type_support() as *const rcl::rosidl_message_type_support_t,
                 topic_name_c.as_ptr(),
                 options.as_ptr(),
             )?;

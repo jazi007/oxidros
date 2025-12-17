@@ -257,6 +257,9 @@ use service::{
 };
 pub use signal_handler::is_halt;
 
+// Re-export oxidros_core so external crates can access traits without direct dependency
+pub use oxidros_core;
+
 /// A type of return values of some receive functions.
 #[derive(Debug)]
 pub enum RecvResult<T, U> {

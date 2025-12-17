@@ -173,10 +173,14 @@ use crate::{
                 SetParametersResult, SetParametersResultSeq,
             },
             srv::{
-                DescribeParameters, DescribeParametersResponse, GetParameterTypes,
-                GetParameterTypesResponse, GetParameters, GetParametersResponse, ListParameters,
-                ListParametersResponse, SetParameters, SetParametersAtomically,
-                SetParametersAtomicallyResponse, SetParametersResponse,
+                describe_parameters::{DescribeParameters, DescribeParameters_Response},
+                get_parameter_types::{GetParameterTypes, GetParameterTypes_Response},
+                get_parameters::{GetParameters, GetParameters_Response},
+                list_parameters::{ListParameters, ListParameters_Response},
+                set_parameters::{SetParameters, SetParameters_Response},
+                set_parameters_atomically::{
+                    SetParametersAtomically, SetParametersAtomically_Response,
+                },
             },
         },
         BoolSeq, F64Seq, I64Seq, RosString, RosStringSeq, U8Seq,
@@ -684,7 +688,7 @@ impl Display for Value {
 
 impl From<&ParameterValue> for Value {
     fn from(var: &ParameterValue) -> Self {
-        match var.type_ {
+        match var.r#type {
             1 => Value::Bool(var.bool_value),
             2 => Value::I64(var.integer_value),
             3 => Value::F64(var.double_value),
@@ -727,28 +731,28 @@ impl From<&Value> for ParameterValue {
         let logger = Logger::new("safe_drive");
 
         match var {
-            Value::NotSet => result.type_ = 0,
+            Value::NotSet => result.r#type = 0,
             Value::Bool(val) => {
-                result.type_ = 1;
+                result.r#type = 1;
                 result.bool_value = *val;
             }
             Value::I64(val) => {
-                result.type_ = 2;
+                result.r#type = 2;
                 result.integer_value = *val;
             }
             Value::F64(val) => {
-                result.type_ = 3;
+                result.r#type = 3;
                 result.double_value = *val;
             }
             Value::String(val) => {
-                result.type_ = 4;
+                result.r#type = 4;
                 result.string_value = RosString::new(val).unwrap_or_else(|| {
                     pr_fatal_in!(logger, "{}:{}: failed allocation", file!(), line!());
                     RosString::null()
                 });
             }
             Value::VecU8(val) => {
-                result.type_ = 5;
+                result.r#type = 5;
                 result.byte_array_value = U8Seq::new(val.len()).unwrap_or_else(|| {
                     pr_fatal_in!(logger, "{}:{}: failed allocation", file!(), line!());
                     U8Seq::null()
@@ -760,7 +764,7 @@ impl From<&Value> for ParameterValue {
                     .for_each(|(dst, src)| *dst = *src);
             }
             Value::VecBool(val) => {
-                result.type_ = 6;
+                result.r#type = 6;
                 result.bool_array_value = BoolSeq::new(val.len()).unwrap_or_else(|| {
                     pr_fatal_in!(logger, "{}:{}: failed allocation", file!(), line!());
                     BoolSeq::null()
@@ -772,7 +776,7 @@ impl From<&Value> for ParameterValue {
                     .for_each(|(dst, src)| *dst = *src);
             }
             Value::VecI64(val) => {
-                result.type_ = 7;
+                result.r#type = 7;
                 result.integer_array_value = I64Seq::new(val.len()).unwrap_or_else(|| {
                     pr_fatal_in!(logger, "{}:{}: failed allocation", file!(), line!());
                     I64Seq::null()
@@ -784,7 +788,7 @@ impl From<&Value> for ParameterValue {
                     .for_each(|(dst, src)| *dst = *src);
             }
             Value::VecF64(val) => {
-                result.type_ = 8;
+                result.r#type = 8;
                 result.double_array_value = F64Seq::new(val.len()).unwrap_or_else(|| {
                     pr_fatal_in!(logger, "{}:{}: failed allocation", file!(), line!());
                     F64Seq::null()
@@ -796,7 +800,7 @@ impl From<&Value> for ParameterValue {
                     .for_each(|(dst, src)| *dst = *src);
             }
             Value::VecString(val) => {
-                result.type_ = 9;
+                result.r#type = 9;
                 result.string_array_value = RosStringSeq::new(val.len()).unwrap_or_else(|| {
                     pr_fatal_in!(logger, "{}:{}: failed allocation", file!(), line!());
                     RosStringSeq::null()
@@ -976,7 +980,7 @@ fn add_srv_set(
             let mut results = if let Some(seq) = SetParametersResultSeq::new(req.parameters.len()) {
                 seq
             } else {
-                let response = SetParametersResponse::new().unwrap();
+                let response = SetParameters_Response::new().unwrap();
                 return response;
             };
 
@@ -1036,7 +1040,7 @@ fn add_srv_set(
                 );
             }
 
-            let mut response = SetParametersResponse::new().unwrap();
+            let mut response = SetParameters_Response::new().unwrap();
             response.results = results;
 
             response
@@ -1065,7 +1069,7 @@ fn add_srv_set_atomic(
             let mut results = if let Some(seq) = SetParametersResult::new() {
                 seq
             } else {
-                let response = SetParametersAtomicallyResponse::new().unwrap();
+                let response = SetParametersAtomically_Response::new().unwrap();
                 return response;
             };
 
@@ -1125,7 +1129,7 @@ fn add_srv_set_atomic(
                 );
             }
 
-            let mut response = SetParametersAtomicallyResponse::new().unwrap();
+            let mut response = SetParametersAtomically_Response::new().unwrap();
             response.result = results;
 
             response
@@ -1158,7 +1162,7 @@ fn add_srv_get(
                 }
             }
 
-            let mut response = GetParametersResponse::new().unwrap();
+            let mut response = GetParameters_Response::new().unwrap();
 
             if let Some(mut seq) = ParameterValueSeq::new(result.len()) {
                 seq.iter_mut()
@@ -1232,7 +1236,7 @@ fn add_srv_describe(
 
                     let result = ParameterDescriptor {
                         name: unwrap_or_continue!(RosString::new(&key)),
-                        type_: value.type_,
+                        r#type: value.r#type,
                         description,
                         additional_constraints,
                         read_only: param.descriptor.read_only,
@@ -1244,7 +1248,7 @@ fn add_srv_describe(
                 }
             }
 
-            let mut response = DescribeParametersResponse::new().unwrap();
+            let mut response = DescribeParameters_Response::new().unwrap();
             if let Some(mut seq) = ParameterDescriptorSeq::new(results.len()) {
                 seq.iter_mut()
                     .zip(results)
@@ -1279,13 +1283,13 @@ fn add_srv_get_types(
                 let key = name.to_string();
                 if let Some(param) = gurad.params.get(&key) {
                     let v: ParameterValue = (&param.value).into();
-                    types.push(v.type_);
+                    types.push(v.r#type);
                 } else {
                     types.push(0);
                 }
             }
 
-            let mut response = GetParameterTypesResponse::new().unwrap();
+            let mut response = GetParameterTypes_Response::new().unwrap();
             if let Some(mut seq) = U8Seq::new(types.len()) {
                 seq.iter_mut()
                     .zip(types.iter())
@@ -1370,7 +1374,7 @@ fn add_srv_list(
                 }
             }
 
-            let mut response = ListParametersResponse::new().unwrap();
+            let mut response = ListParameters_Response::new().unwrap();
             if let (Some(mut seq_names), Some(mut seq_prefixes)) = (
                 RosStringSeq::<0, 0>::new(result.len()),
                 RosStringSeq::<0, 0>::new(result_prefix.len()),

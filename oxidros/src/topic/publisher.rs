@@ -115,7 +115,7 @@ impl<T: TypeSupport> Publisher<T> {
             guard.rcl_publisher_init(
                 &mut publisher,
                 node.as_ptr(),
-                T::type_support(),
+                T::type_support() as *const rcl::rosidl_message_type_support_t,
                 topic_name_c.as_ptr(),
                 options.as_ptr(),
             )?;
@@ -151,7 +151,7 @@ impl<T: TypeSupport> Publisher<T> {
             guard.rcl_publisher_init(
                 &mut publisher,
                 node.as_ptr(),
-                T::type_support(),
+                T::type_support() as *const rcl::rosidl_message_type_support_t,
                 topic_name_c.as_ptr(),
                 options.as_ptr(),
             )?;

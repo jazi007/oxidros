@@ -115,7 +115,7 @@ impl<T: ServiceMsg> Client<T> {
         guard.rcl_client_init(
             &mut client,
             node.as_ptr(),
-            <T as ServiceMsg>::type_support(),
+            <T as ServiceMsg>::type_support() as *const rcl::rosidl_service_type_support_t,
             service_name.as_ptr(),
             &options,
         )?;

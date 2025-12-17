@@ -1,0 +1,25 @@
+[package]
+name = "oxidros-msg"
+version = "0.1.0"
+description = "Generated ROS2 message types for oxidros"
+license-file = "../LICENSE"
+readme = "README.md"
+keywords = ["Robotics", "ROS2", "Messages"]
+categories = ["science::robotics"]
+repository.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+oxidros-core = { path = "../oxidros-core" }
+
+[features]
+default = []
+jazzy = []
+iron = []
+humble = []
+galactic = []
+
+[build-dependencies]
+ros2-msg-gen = { path = "../ros2-msg-gen" }
+bindgen = "0.70"

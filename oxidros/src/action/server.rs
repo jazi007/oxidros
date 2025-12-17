@@ -1,6 +1,10 @@
 //! Action server.
 
 use futures::try_join;
+use oxidros_msg::interfaces::action_msgs::srv::CancelGoal_Response_Constants::{
+    ERROR_GOAL_TERMINATED, ERROR_NONE, ERROR_REJECTED, ERROR_UNKNOWN_GOAL_ID,
+};
+use oxidros_msg::interfaces::unique_identifier_msgs::msg::UUID;
 use parking_lot::Mutex;
 use pin_project::{pin_project, pinned_drop};
 use std::future::Future;
@@ -11,9 +15,6 @@ use std::{
 
 use crate::logger::{pr_error_in, Logger};
 use crate::msg::interfaces::action_msgs::msg::GoalInfoSeq;
-use crate::msg::interfaces::action_msgs::srv::{
-    ERROR_GOAL_TERMINATED, ERROR_NONE, ERROR_REJECTED, ERROR_UNKNOWN_GOAL_ID,
-};
 use crate::msg::GetUUID;
 use crate::PhantomUnsync;
 use crate::{
@@ -21,8 +22,8 @@ use crate::{
     error::{DynError, RCLActionError, RCLActionResult},
     get_allocator, is_halt,
     msg::{
-        builtin_interfaces::UnsafeTime, interfaces::action_msgs::msg::GoalInfo,
-        unique_identifier_msgs::msg::UUID, ActionGoal, ActionMsg, GoalResponse,
+        builtin_interfaces::UnsafeTime, interfaces::action_msgs::msg::GoalInfo, ActionGoal,
+        ActionMsg, GoalResponse,
     },
     node::Node,
     qos::Profile,
@@ -178,7 +179,7 @@ where
                 &mut server,
                 unsafe { node.as_ptr_mut() },
                 unsafe { clock.as_ptr_mut() },
-                T::type_support(),
+                T::type_support() as *const rcl::rosidl_action_type_support_t,
                 action_name.as_ptr(),
                 &options,
             )?;
@@ -280,7 +281,10 @@ where
                         goal_id: UUID {
                             uuid: g.goal_id.uuid,
                         },
-                        stamp: g.stamp,
+                        stamp: oxidros_msg::interfaces::builtin_interfaces::msg::Time {
+                            sec: g.stamp.sec,
+                            nanosec: g.stamp.nanosec,
+                        },
                     })
                     .collect::<Vec<_>>();
 
@@ -884,7 +888,10 @@ impl From<bindgen_action_msgs__msg__GoalInfo> for GoalInfo {
     fn from(value: bindgen_action_msgs__msg__GoalInfo) -> Self {
         Self {
             goal_id: value.goal_id.into(),
-            stamp: value.stamp.into(),
+            stamp: oxidros_msg::interfaces::builtin_interfaces::msg::Time {
+                sec: value.stamp.sec,
+                nanosec: value.stamp.nanosec,
+            },
         }
     }
 }

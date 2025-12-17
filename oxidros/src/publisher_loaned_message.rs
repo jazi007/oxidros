@@ -97,7 +97,11 @@ impl<T: TypeSupport> Loaned<T> {
     pub(crate) fn new(publisher: Arc<rcl::rcl_publisher_t>) -> RCLResult<Self> {
         let mut chunk = null_mut();
         let guard = rcl::MT_UNSAFE_FN.lock();
-        guard.rcl_borrow_loaned_message(publisher.as_ref(), T::type_support(), &mut chunk)?;
+        guard.rcl_borrow_loaned_message(
+            publisher.as_ref(),
+            T::type_support() as *const rcl::rosidl_message_type_support_t,
+            &mut chunk,
+        )?;
         Ok(Self {
             publisher,
             chunk: chunk as *mut T,

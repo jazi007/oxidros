@@ -161,7 +161,7 @@ impl<T: ServiceMsg> Server<T> {
             guard.rcl_service_init(
                 &mut service,
                 node.as_ptr(),
-                <T as ServiceMsg>::type_support(),
+                <T as ServiceMsg>::type_support() as *const rcl::rosidl_service_type_support_t,
                 service_name.as_ptr(),
                 &options,
             )?;
@@ -201,7 +201,7 @@ impl<T: ServiceMsg> Server<T> {
             &mut data.service,
             unsafe { data.node.as_ptr_mut() },
             clock as *mut Clock as *mut _,
-            <T as ServiceMsg>::type_support(),
+            <T as ServiceMsg>::type_support() as *const rcl::rosidl_service_type_support_t,
             pub_opts,
             rcl_introspection_state,
         )

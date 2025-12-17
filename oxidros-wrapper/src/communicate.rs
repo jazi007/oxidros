@@ -16,7 +16,6 @@ use crate::{
 pub trait Communicate: Send + Sync {
     /// Create a publisher
     fn new_publisher<T: TypeSupport>(&self, attributes: &Attributes) -> Result<Publisher<T>>;
-
     /// create a Subscriber
     fn new_subscriber<T: TypeSupport>(&self, attributes: &Attributes) -> Result<Subscriber<T>>;
     /// create an RPC Server

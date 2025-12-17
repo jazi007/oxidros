@@ -13,7 +13,7 @@ use crate::{
     msg::{
         interfaces::action_msgs::{
             msg::GoalStatusArray,
-            srv::{CancelGoalRequest, CancelGoalResponse},
+            srv::{CancelGoal_Request, CancelGoal_Response},
         },
         ActionMsg,
     },
@@ -98,7 +98,7 @@ where
             guard.rcl_action_client_init(
                 &mut client,
                 unsafe { node.as_ptr_mut() },
-                T::type_support(),
+                T::type_support() as *const rcl::rosidl_action_type_support_t,
                 action_name.as_ptr(),
                 &options,
             )?;
@@ -184,7 +184,7 @@ where
     /// Send a cancel request. Use the returned [`ClientCancelRecv<T>`] to receive the response.
     pub fn send_cancel_request(
         self,
-        request: &CancelGoalRequest,
+        request: &CancelGoal_Request,
     ) -> Result<ClientCancelRecv<T>, DynError> {
         let guard = rcl::MT_UNSAFE_FN.lock();
 
@@ -432,7 +432,7 @@ pub struct ClientCancelRecv<T> {
 impl<T: ActionMsg> ClientCancelRecv<T> {
     pub fn try_recv(
         self,
-    ) -> RecvResult<(Client<T>, CancelGoalResponse, rcl::rmw_request_id_t), Self> {
+    ) -> RecvResult<(Client<T>, CancelGoal_Response, rcl::rmw_request_id_t), Self> {
         match rcl_action_take_cancel_response(&self.inner.data.client) {
             Ok((response, header)) => {
                 if header.sequence_number == self.seq {
@@ -455,7 +455,7 @@ impl<T: ActionMsg> ClientCancelRecv<T> {
         self,
         t: Duration,
         selector: &mut Selector,
-    ) -> RecvResult<(Client<T>, CancelGoalResponse, rcl::rmw_request_id_t), Self> {
+    ) -> RecvResult<(Client<T>, CancelGoal_Response, rcl::rmw_request_id_t), Self> {
         selector.add_action_client(self.inner.data.clone(), None, None, None, None, None);
 
         match selector.wait_timeout(t) {
@@ -467,7 +467,7 @@ impl<T: ActionMsg> ClientCancelRecv<T> {
 
     pub async fn recv(
         self,
-    ) -> Result<(Client<T>, CancelGoalResponse, rcl::rmw_request_id_t), DynError> {
+    ) -> Result<(Client<T>, CancelGoal_Response, rcl::rmw_request_id_t), DynError> {
         AsyncCancelReceiver {
             client: self,
             is_waiting: false,
@@ -505,7 +505,7 @@ impl<T: ActionMsg> PinnedDrop for AsyncCancelReceiver<T> {
 }
 
 impl<T: ActionMsg> Future for AsyncCancelReceiver<T> {
-    type Output = Result<(Client<T>, CancelGoalResponse, rcl::rmw_request_id_t), DynError>;
+    type Output = Result<(Client<T>, CancelGoal_Response, rcl::rmw_request_id_t), DynError>;
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         if is_halt() {
@@ -896,11 +896,11 @@ where
 
 fn rcl_action_take_cancel_response(
     client: &rcl::rcl_action_client_t,
-) -> RCLActionResult<(CancelGoalResponse, rcl::rmw_request_id_t)> {
+) -> RCLActionResult<(CancelGoal_Response, rcl::rmw_request_id_t)> {
     let guard = rcl::MT_UNSAFE_FN.lock();
 
     let mut header: rcl::rmw_request_id_t = unsafe { MaybeUninit::zeroed().assume_init() };
-    let mut response: CancelGoalResponse = unsafe { MaybeUninit::zeroed().assume_init() };
+    let mut response: CancelGoal_Response = unsafe { MaybeUninit::zeroed().assume_init() };
     guard.rcl_action_take_cancel_response(
         client,
         &mut header,

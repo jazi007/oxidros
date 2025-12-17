@@ -46,8 +46,13 @@ impl Generator {
             srvs: BTreeSet::new(),
             actions: BTreeSet::new(),
             dependencies: BTreeSet::new(),
-            oxidros_prefix: oxidros_prefix.unwrap_or("").to_string(),
+            oxidros_prefix: oxidros_prefix.unwrap_or("oxidros::").to_string(),
         }
+    }
+
+    /// Get the prefix for oxidros imports (e.g., "crate::" or "oxidros::")
+    fn prefix(&self) -> &str {
+        &self.oxidros_prefix
     }
 
     fn oxidros_path(&self) -> String {
@@ -295,7 +300,9 @@ impl Generator {
 
         // Write.
         let mut f = File::create(out_file)?;
+        let prefix = self.prefix();
         for line in lines {
+            let line = line.replace("{prefix}", prefix);
             f.write_fmt(format_args!("{}\n", line))?;
         }
 
@@ -333,10 +340,10 @@ impl Generator {
         self.idl_struct(lines, struct_def, lib);
         lines.push_back(gen_impl_for_struct(lib, "msg", &struct_def.id));
 
-        lines.push_front(format!(
-            "use {}::{{msg::TypeSupport, rcl::{{self, size_t}}}};",
-            self.oxidros_path()
-        ));
+        lines.push_front(
+            "use {prefix}oxidros_core::TypeSupport;\n#[allow(unused_imports)]\nuse {prefix}{msg, rcl::{self, size_t}};"
+                .to_string(),
+        );
     }
 
     fn generate_idl_srv(
@@ -355,10 +362,9 @@ impl Generator {
         };
 
         if *idl_type == IDLType::NoType {
-            lines.push_front(format!(
-                "use {}::{{msg::{{ServiceMsg, TypeSupport}}, rcl::{{self, size_t}}}};",
-                self.oxidros_path()
-            ));
+            lines.push_front(
+                "use {prefix}oxidros_core::{ServiceMsg, TypeSupport};\n#[allow(unused_imports)]\nuse {prefix}{msg, rcl::{self, size_t}};".to_string()
+            );
             lines.push_back(gen_impl_service_msg(lib, "srv", type_str));
         }
 
@@ -403,7 +409,7 @@ impl Generator {
 
         if *idl_type == IDLType::NoType {
             lines.push_front(
-                format!("use {}::{{msg::{{ActionMsg, ActionGoal, ActionResult, GetUUID, GoalResponse, ResultResponse, TypeSupport, builtin_interfaces::UnsafeTime, unique_identifier_msgs}}, rcl::{{self, size_t}}}};", self.oxidros_path()),
+                "use {prefix}oxidros_core::{ActionMsg, ActionGoal, ActionResult, GetUUID, GoalResponse, ResultResponse, TypeSupport};\nuse {prefix}{msg, rcl::{self, size_t}, builtin_interfaces::UnsafeTime, unique_identifier_msgs};".to_string()
             );
             lines.push_back(gen_impl_action_msg(lib, type_str));
         }
@@ -541,7 +547,7 @@ impl Generator {
     fn idl_member(&mut self, lines: &mut VecDeque<String>, member: &Member, lib: &str) {
         let type_str = self.idl_type_spec(&member.type_spec, lib);
         let type_str = if type_str == "string" {
-            "oxidros::msg::RosString<0>".to_string()
+            "{prefix}msg::RosString<0>".to_string()
         } else {
             type_str
         };
@@ -612,45 +618,45 @@ impl Generator {
     fn idl_seq_type(&mut self, type_spec: &TypeSpec, size: &BigInt, lib: &str) -> String {
         match type_spec {
             TypeSpec::PrimitiveType(PrimitiveType::Boolean) => {
-                format!("oxidros::msg::BoolSeq<{size}>")
+                format!("{{prefix}}msg::BoolSeq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Int8)
             | TypeSpec::PrimitiveType(PrimitiveType::Char) => {
-                format!("oxidros::msg::I8Seq<{size}>")
+                format!("{{prefix}}msg::I8Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Int16)
             | TypeSpec::PrimitiveType(PrimitiveType::Short) => {
-                format!("oxidros::msg::I16Seq<{size}>")
+                format!("{{prefix}}msg::I16Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Int32)
             | TypeSpec::PrimitiveType(PrimitiveType::Long) => {
-                format!("oxidros::msg::I32Seq<{size}>")
+                format!("{{prefix}}msg::I32Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Int64)
             | TypeSpec::PrimitiveType(PrimitiveType::LongLong) => {
-                format!("oxidros::msg::I64Seq<{size}>")
+                format!("{{prefix}}msg::I64Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Uint8)
             | TypeSpec::PrimitiveType(PrimitiveType::Octet) => {
-                format!("oxidros::msg::U8Seq<{size}>")
+                format!("{{prefix}}msg::U8Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Uint16)
             | TypeSpec::PrimitiveType(PrimitiveType::UnsignedShort) => {
-                format!("oxidros::msg::U16Seq<{size}>")
+                format!("{{prefix}}msg::U16Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Uint32)
             | TypeSpec::PrimitiveType(PrimitiveType::UnsignedLong) => {
-                format!("oxidros::msg::U32Seq<{size}>")
+                format!("{{prefix}}msg::U32Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Uint64)
             | TypeSpec::PrimitiveType(PrimitiveType::UnsignedLongLong) => {
-                format!("oxidros::msg::U64Seq<{size}>")
+                format!("{{prefix}}msg::U64Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Float) => {
-                format!("oxidros::msg::F32Seq<{size}>")
+                format!("{{prefix}}msg::F32Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::Double) => {
-                format!("oxidros::msg::F64Seq<{size}>")
+                format!("{{prefix}}msg::F64Seq<{size}>")
             }
             TypeSpec::PrimitiveType(PrimitiveType::LongDouble) => unimplemented!(),
             TypeSpec::PrimitiveType(PrimitiveType::WChar) => unimplemented!(),
@@ -658,7 +664,7 @@ impl Generator {
             TypeSpec::ScopedName(name) => {
                 let type_str = self.idl_scoped_name(name, lib);
                 if type_str == "string" {
-                    format!("oxidros::msg::RosStringSeq<0, {size}>")
+                    format!("{{prefix}}msg::RosStringSeq<0, {size}>")
                 } else {
                     format!("{type_str}Seq<{size}>")
                 }
@@ -743,11 +749,8 @@ impl Generator {
 
         lines.push_back(gen_impl_for_msg(lib, &rs_type_name).into());
         lines.push_front(
-            format!(
-                "use {}::{{msg::TypeSupport, rcl::{{self, size_t}}}};",
-                self.oxidros_path()
-            )
-            .into(),
+            "use {prefix}oxidros_core::TypeSupport;\n#[allow(unused_imports)]\nuse {prefix}{msg, rcl::{self, size_t}};"
+                .into(),
         );
 
         // Create a directory.
@@ -757,7 +760,9 @@ impl Generator {
         // Write.
         let out_file = out_dir.join(rs_file);
         let mut f = File::create(out_file)?;
+        let prefix = self.prefix();
         for line in lines {
+            let line = line.replace("{prefix}", prefix);
             f.write_fmt(format_args!("{}\n", line))?;
         }
 
@@ -818,7 +823,9 @@ impl Generator {
         // Write.
         let out_file = out_dir.join(rs_file);
         let mut f = File::create(out_file)?;
+        let prefix = self.prefix();
         for line in lines {
+            let line = line.replace("{prefix}", prefix);
             f.write_fmt(format_args!("{}\n", line))?;
         }
 
@@ -886,30 +893,30 @@ impl Generator {
                 array_info,
             } => match array_info {
                 ArrayInfo::NotArray => {
-                    format!("{var_name}: oxidros::msg::RosString<{str_len}>")
+                    format!("{var_name}: {{prefix}}msg::RosString<{str_len}>")
                 }
                 ArrayInfo::Dynamic => {
-                    format!("{var_name}: oxidros::msg::RosStringSeq<{str_len}, 0>")
+                    format!("{var_name}: {{prefix}}msg::RosStringSeq<{str_len}, 0>")
                 }
                 ArrayInfo::Limited(size) => {
-                    format!("{var_name}: oxidros::msg::RosStringSeq<{str_len}, {size}>")
+                    format!("{var_name}: {{prefix}}msg::RosStringSeq<{str_len}, {size}>")
                 }
                 ArrayInfo::Static(size) => {
-                    format!("{var_name}: [oxidros::msg::RosString<{str_len}>; {size}]")
+                    format!("{var_name}: [{{prefix}}msg::RosString<{str_len}>; {size}]")
                 }
             },
             TypeName::String(array_info) => match array_info {
                 ArrayInfo::NotArray => {
-                    format!("{var_name}: oxidros::msg::RosString<0>")
+                    format!("{var_name}: {{prefix}}msg::RosString<0>")
                 }
                 ArrayInfo::Dynamic => {
-                    format!("{var_name}: oxidros::msg::RosStringSeq<0, 0>")
+                    format!("{var_name}: {{prefix}}msg::RosStringSeq<0, 0>")
                 }
                 ArrayInfo::Limited(size) => {
-                    format!("{var_name}: oxidros::msg::RosStringSeq<0, {size}>")
+                    format!("{var_name}: {{prefix}}msg::RosStringSeq<0, {size}>")
                 }
                 ArrayInfo::Static(size) => {
-                    format!("{var_name}: [oxidros::msg::RosString<0>; {size}]")
+                    format!("{var_name}: [{{prefix}}msg::RosString<0>; {size}]")
                 }
             },
         }
@@ -1004,12 +1011,12 @@ fn idl_string_type(string_type: &StringType) -> String {
     match string_type {
         StringType::Sized(expr) => {
             if let ConstValue::Integer(n) = eval(expr) {
-                format!("oxidros::msg::RosString<{n}>")
+                format!("crate::msg::RosString<{n}>")
             } else {
                 panic!("not a integer number")
             }
         }
-        StringType::UnlimitedSize => "oxidros::msg::RosString<0>".to_string(),
+        StringType::UnlimitedSize => "crate::msg::RosString<0>".to_string(),
     }
 }
 
@@ -1017,12 +1024,12 @@ fn idl_string_type_seq(string_type: &StringType, size: &BigInt) -> String {
     match string_type {
         StringType::Sized(expr) => {
             if let ConstValue::Integer(n) = eval(expr) {
-                format!("oxidros::msg::RosStringSeq<{n}, {size}>")
+                format!("crate::msg::RosStringSeq<{n}, {size}>")
             } else {
                 panic!("not a integer number")
             }
         }
-        StringType::UnlimitedSize => format!("oxidros::msg::RosStringSeq<0, {size}>"),
+        StringType::UnlimitedSize => format!("crate::msg::RosStringSeq<0, {size}>"),
     }
 }
 
@@ -1073,17 +1080,17 @@ fn gen_seq_type(scope: &str, type_str: &str, size: usize) -> String {
     let module_name = type_str.to_case(Case::Snake);
     let module_name = mangle_mod(&module_name);
     match type_str {
-        "bool" => format!("oxidros::msg::BoolSeq<{size}>"),
-        "byte" | "uint8" => format!("oxidros::msg::I8Seq<{size}>"),
-        "int16" => format!("oxidros::msg::I16Seq<{size}>"),
-        "int32" => format!("oxidros::msg::I32Seq<{size}>"),
-        "int64" => format!("oxidros::msg::I64Seq<{size}>"),
-        "char" | "int8" => format!("oxidros::msg::U8Seq<{size}>"),
-        "uint16" => format!("oxidros::msg::U16Seq<{size}>"),
-        "uint32" => format!("oxidros::msg::U32Seq<{size}>"),
-        "uint64" => format!("oxidros::msg::U64Seq<{size}>"),
-        "float32" => format!("oxidros::msg::F32Seq<{size}>"),
-        "float64" => format!("oxidros::msg::F64Seq<{size}>"),
+        "bool" => format!("crate::msg::BoolSeq<{size}>"),
+        "byte" | "uint8" => format!("crate::msg::I8Seq<{size}>"),
+        "int16" => format!("crate::msg::I16Seq<{size}>"),
+        "int32" => format!("crate::msg::I32Seq<{size}>"),
+        "int64" => format!("crate::msg::I64Seq<{size}>"),
+        "char" | "int8" => format!("crate::msg::U8Seq<{size}>"),
+        "uint16" => format!("crate::msg::U16Seq<{size}>"),
+        "uint32" => format!("crate::msg::U32Seq<{size}>"),
+        "uint64" => format!("crate::msg::U64Seq<{size}>"),
+        "float32" => format!("crate::msg::F32Seq<{size}>"),
+        "float64" => format!("crate::msg::F64Seq<{size}>"),
         _ => format!("{scope}::msg::{module_name}::{type_str}Seq<{size}>"),
     }
 }
@@ -1286,9 +1293,9 @@ pub struct {type_name};
 impl ServiceMsg for {type_name} {{
     type Request = {type_name}Request;
     type Response = {type_name}Response;
-    fn type_support() -> *const rcl::rosidl_service_type_support_t {{
+    fn type_support() -> *const std::ffi::c_void {{
         unsafe {{
-            rosidl_typesupport_c__get_service_type_support_handle__{module_name}__srv__{type_name}()
+            rosidl_typesupport_c__get_service_type_support_handle__{module_name}__srv__{type_name}() as *const std::ffi::c_void
         }}
     }}
 }}
@@ -1367,9 +1374,9 @@ extern \"C\" {{
 }}
 
 impl TypeSupport for {type_name} {{
-    fn type_support() -> *const rcl::rosidl_message_type_support_t {{
+    fn type_support() -> *const std::ffi::c_void {{
         unsafe {{
-            rosidl_typesupport_c__get_message_type_support_handle__{module_name_1st}__{module_name_2nd}__{type_name}()
+            rosidl_typesupport_c__get_message_type_support_handle__{module_name_1st}__{module_name_2nd}__{type_name}() as *const std::ffi::c_void
         }}
     }}
 }}
@@ -1509,9 +1516,9 @@ pub struct {type_name}_SendGoal;
 impl ActionGoal for {type_name}_SendGoal {{
     type Request = {type_name}_SendGoal_Request;
     type Response = {type_name}_SendGoal_Response;
-    fn type_support() -> *const rcl::rosidl_service_type_support_t {{
+    fn type_support() -> *const std::ffi::c_void {{
         unsafe {{
-            rosidl_typesupport_c__get_service_type_support_handle__{module_name}__{module_2nd}__{type_name}_SendGoal()
+            rosidl_typesupport_c__get_service_type_support_handle__{module_name}__{module_2nd}__{type_name}_SendGoal() as *const std::ffi::c_void
         }}
     }}
 }}
@@ -1555,9 +1562,9 @@ pub struct {type_name}_GetResult;
 impl ActionResult for {type_name}_GetResult {{
     type Request = {type_name}_GetResult_Request;
     type Response = {type_name}_GetResult_Response;
-    fn type_support() -> *const rcl::rosidl_service_type_support_t {{
+    fn type_support() -> *const std::ffi::c_void {{
         unsafe {{
-            rosidl_typesupport_c__get_service_type_support_handle__{module_name}__{module_2nd}__{type_name}_GetResult()
+            rosidl_typesupport_c__get_service_type_support_handle__{module_name}__{module_2nd}__{type_name}_GetResult() as *const std::ffi::c_void
         }}
     }}
 }}
@@ -1601,9 +1608,9 @@ pub struct {type_name};
 impl ServiceMsg for {type_name} {{
     type Request = {type_name}_Request;
     type Response = {type_name}_Response;
-    fn type_support() -> *const rcl::rosidl_service_type_support_t {{
+    fn type_support() -> *const std::ffi::c_void {{
         unsafe {{
-            rosidl_typesupport_c__get_service_type_support_handle__{module_name}__{module_2nd}__{type_name}()
+            rosidl_typesupport_c__get_service_type_support_handle__{module_name}__{module_2nd}__{type_name}() as *const std::ffi::c_void
         }}
     }}
 }}
