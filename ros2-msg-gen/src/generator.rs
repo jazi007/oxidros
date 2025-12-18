@@ -1257,9 +1257,9 @@ fn gen_impl_for_msg(module_name: &str, type_name: &str) -> String {
     // generate impl and struct of sequence
     format!(
         "impl TypeSupport for {type_name} {{
-    fn type_support() -> *const rcl::rosidl_message_type_support_t {{
+    fn type_support() -> *const std::ffi::c_void {{
         unsafe {{
-            rosidl_typesupport_c__get_message_type_support_handle__{module_name}__msg__{type_name}()
+            rosidl_typesupport_c__get_message_type_support_handle__{module_name}__msg__{type_name}() as *const _
         }}
     }}
 }}
@@ -1342,17 +1342,17 @@ extern \"C\" {{
 }}
 
 impl TypeSupport for {type_name}Request {{
-    fn type_support() -> *const rcl::rosidl_message_type_support_t {{
+    fn type_support() -> *const std::ffi::c_void {{
         unsafe {{
-            rosidl_typesupport_c__get_message_type_support_handle__{module_name}__srv__{type_name}_Request()
+            rosidl_typesupport_c__get_message_type_support_handle__{module_name}__srv__{type_name}_Request() as *const _
         }}
     }}
 }}
 
 impl TypeSupport for {type_name}Response {{
-    fn type_support() -> *const rcl::rosidl_message_type_support_t {{
+    fn type_support() -> *const std::ffi::c_void {{
         unsafe {{
-            rosidl_typesupport_c__get_message_type_support_handle__{module_name}__srv__{type_name}_Response()
+            rosidl_typesupport_c__get_message_type_support_handle__{module_name}__srv__{type_name}_Response() as *const _
         }}
     }}
 }}
@@ -1632,9 +1632,9 @@ impl ActionMsg for {type_name} {{
     type Goal = {type_name}_SendGoal;
     type Result = {type_name}_GetResult;
     type Feedback = {type_name}_FeedbackMessage;
-    fn type_support() -> *const rcl::rosidl_action_type_support_t {{
+    fn type_support() -> *const std::ffi::c_void {{
         unsafe {{
-            rosidl_typesupport_c__get_action_type_support_handle__{module_name}__action__{type_name}()
+            rosidl_typesupport_c__get_action_type_support_handle__{module_name}__action__{type_name}() as *const _
         }}
     }}
 

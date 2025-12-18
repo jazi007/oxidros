@@ -411,9 +411,7 @@ pub mod msg {
 // Re-export rcl types for generated code
 pub mod rcl {
     // Re-export C types from runtime_c
-    pub use crate::{
-        rosidl_action_type_support_t, rosidl_message_type_support_t, rosidl_service_type_support_t,
-    };
+    pub use crate::*;
 }
 
 // Re-export builtin_interfaces types
