@@ -449,13 +449,13 @@ impl<'a, T> Future for AsyncReceiver<'a, T> {
         match take::<T>(&s) {
             Ok(value) => {
                 #[cfg(feature = "rcl_stat")]
-                subscription.measure_latency(start);
+                s.measure_latency(start);
 
                 Poll::Ready(Ok(value))
             } // got
             Err(RCLError::SubscriptionTakeFailed) => {
                 #[cfg(feature = "rcl_stat")]
-                subscription.measure_latency(start);
+                s.measure_latency(start);
 
                 let mut guard = SELECTOR.lock();
                 let mut waker = Some(cx.waker().clone());
