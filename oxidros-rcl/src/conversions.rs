@@ -168,3 +168,29 @@ impl From<&oxidros_core::Profile> for crate::rmw_qos_profile_t {
         }
     }
 }
+
+impl From<crate::rcl_action_goal_event_t> for oxidros_core::action::GoalEvent {
+    fn from(value: crate::rcl_action_goal_event_t) -> Self {
+        use crate::rcl_action_goal_event_t::*;
+        match value {
+            GOAL_EVENT_EXECUTE => Self::Execute,
+            GOAL_EVENT_CANCEL_GOAL => Self::CancelGoal,
+            GOAL_EVENT_SUCCEED => Self::Succeed,
+            GOAL_EVENT_ABORT => Self::Abort,
+            GOAL_EVENT_CANCELED => Self::Canceled,
+            GOAL_EVENT_NUM_EVENTS => Self::NumEvents,
+        }
+    }
+}
+impl From<oxidros_core::action::GoalEvent> for crate::rcl_action_goal_event_t {
+    fn from(value: oxidros_core::action::GoalEvent) -> Self {
+        match value {
+            oxidros_core::action::GoalEvent::Execute => Self::GOAL_EVENT_EXECUTE,
+            oxidros_core::action::GoalEvent::CancelGoal => Self::GOAL_EVENT_CANCEL_GOAL,
+            oxidros_core::action::GoalEvent::Succeed => Self::GOAL_EVENT_SUCCEED,
+            oxidros_core::action::GoalEvent::Abort => Self::GOAL_EVENT_ABORT,
+            oxidros_core::action::GoalEvent::Canceled => Self::GOAL_EVENT_CANCELED,
+            oxidros_core::action::GoalEvent::NumEvents => Self::GOAL_EVENT_NUM_EVENTS,
+        }
+    }
+}

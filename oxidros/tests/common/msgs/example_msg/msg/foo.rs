@@ -46,8 +46,8 @@ impl Drop for Foo {
 #[derive(Debug)]
 struct FooSeqRaw {
     data: *mut Foo,
-    size: size_t,
-    capacity: size_t,
+    size: usize,
+    capacity: usize,
 }
 
 /// Sequence of Foo.
@@ -57,8 +57,8 @@ struct FooSeqRaw {
 #[derive(Debug)]
 pub struct FooSeq<const N: usize> {
     data: *mut Foo,
-    size: size_t,
-    capacity: size_t,
+    size: usize,
+    capacity: usize,
 }
 
 impl<const N: usize> FooSeq<N> {

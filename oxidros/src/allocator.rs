@@ -24,7 +24,7 @@
 //! }
 //! ```
 
-use crate::{helper::Contains, rcl::size_t};
+use crate::helper::Contains;
 use std::{
     alloc::{GlobalAlloc, Layout, System},
     mem::size_of,
@@ -110,7 +110,7 @@ unsafe impl GlobalAlloc for CustomAllocator {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn allocate(size: size_t, _state: *mut c_void) -> *mut c_void {
+pub unsafe extern "C" fn allocate(size: usize, _state: *mut c_void) -> *mut c_void {
     let layout =
         Layout::from_size_align(size as usize + size_of::<usize>(), size_of::<usize>()).unwrap();
     let result = ALLOCATOR.alloc(layout);
@@ -146,7 +146,7 @@ pub unsafe extern "C" fn deallocate(pointer: *mut c_void, _state: *mut c_void) {
 #[no_mangle]
 pub unsafe extern "C" fn reallocate(
     pointer: *mut c_void,
-    size: size_t,
+    size: usize,
     state: *mut c_void,
 ) -> *mut c_void {
     if pointer.is_null() {
@@ -177,8 +177,8 @@ pub unsafe extern "C" fn reallocate(
 
 #[no_mangle]
 pub unsafe extern "C" fn zero_allocate(
-    number_of_elements: size_t,
-    size_of_element: size_t,
+    number_of_elements: usize,
+    size_of_element: usize,
     _state: *mut c_void,
 ) -> *mut c_void {
     let size = (number_of_elements * size_of_element) as usize;

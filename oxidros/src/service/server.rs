@@ -131,6 +131,30 @@ pub enum RCLServiceIntrospection {
     RCLServiceIntrospectionContents,
 }
 
+#[cfg(any(feature = "iron", feature = "jazzy"))]
+impl From<rcl::rcl_service_introspection_state_t> for RCLServiceIntrospection {
+    fn from(value: rcl::rcl_service_introspection_state_t) -> Self {
+        use rcl::rcl_service_introspection_state_t::*;
+        match value {
+            RCL_SERVICE_INTROSPECTION_OFF => Self::RCLServiceIntrospectionOff,
+            RCL_SERVICE_INTROSPECTION_CONTENTS => Self::RCLServiceIntrospectionContents,
+            RCL_SERVICE_INTROSPECTION_METADATA => Self::RCLServiceIntrospectionMetadata,
+        }
+    }
+}
+#[cfg(any(feature = "iron", feature = "jazzy"))]
+impl From<RCLServiceIntrospection> for rcl::rcl_service_introspection_state_t {
+    fn from(value: RCLServiceIntrospection) -> Self {
+        use rcl::rcl_service_introspection_state_t::*;
+        use RCLServiceIntrospection::*;
+        match value {
+            RCLServiceIntrospectionOff => RCL_SERVICE_INTROSPECTION_OFF,
+            RCLServiceIntrospectionMetadata => RCL_SERVICE_INTROSPECTION_METADATA,
+            RCLServiceIntrospectionContents => RCL_SERVICE_INTROSPECTION_CONTENTS,
+        }
+    }
+}
+
 unsafe impl Sync for ServerData {}
 unsafe impl Send for ServerData {}
 
@@ -184,16 +208,6 @@ impl<T: ServiceMsg> Server<T> {
         let mut pub_opts = unsafe { rcl::rcl_publisher_get_default_options() };
         pub_opts.qos = (&qos).into();
 
-        let rcl_introspection_state = match introspection_state {
-            RCLServiceIntrospection::RCLServiceIntrospectionMetadata => {
-                rcl::RCL_SERVICE_INTROSPECTION_METADATA
-            }
-            RCLServiceIntrospection::RCLServiceIntrospectionContents => {
-                rcl::RCL_SERVICE_INTROSPECTION_CONTENTS
-            }
-            _ => rcl::RCL_SERVICE_INTROSPECTION_OFF,
-        };
-
         let mut data = self.data.lock();
         let guard = rcl::MT_UNSAFE_FN.lock();
 
@@ -203,7 +217,7 @@ impl<T: ServiceMsg> Server<T> {
             clock as *mut Clock as *mut _,
             <T as ServiceMsg>::type_support() as *const rcl::rosidl_service_type_support_t,
             pub_opts,
-            rcl_introspection_state,
+            introspection_state.into(),
         )
     }
 

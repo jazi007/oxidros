@@ -66,8 +66,8 @@ impl Drop for AddThreeIntsRequest {
 #[derive(Debug)]
 struct AddThreeIntsRequestSeqRaw {
     data: *mut AddThreeIntsRequest,
-    size: size_t,
-    capacity: size_t,
+    size: usize,
+    capacity: usize,
 }
 
 /// Sequence of AddThreeIntsRequest.
@@ -77,8 +77,8 @@ struct AddThreeIntsRequestSeqRaw {
 #[derive(Debug)]
 pub struct AddThreeIntsRequestSeq<const N: usize> {
     data: *mut AddThreeIntsRequest,
-    size: size_t,
-    capacity: size_t,
+    size: usize,
+    capacity: usize,
 }
 
 impl<const N: usize> AddThreeIntsRequestSeq<N> {
@@ -184,8 +184,8 @@ impl Drop for AddThreeIntsResponse {
 #[derive(Debug)]
 struct AddThreeIntsResponseSeqRaw {
     data: *mut AddThreeIntsResponse,
-    size: size_t,
-    capacity: size_t,
+    size: usize,
+    capacity: usize,
 }
 
 /// Sequence of AddThreeIntsResponse.
@@ -195,8 +195,8 @@ struct AddThreeIntsResponseSeqRaw {
 #[derive(Debug)]
 pub struct AddThreeIntsResponseSeq<const N: usize> {
     data: *mut AddThreeIntsResponse,
-    size: size_t,
-    capacity: size_t,
+    size: usize,
+    capacity: usize,
 }
 
 impl<const N: usize> AddThreeIntsResponseSeq<N> {

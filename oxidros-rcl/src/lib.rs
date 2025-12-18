@@ -20,11 +20,5 @@
 // Include the generated RCL bindings
 include!(concat!(env!("OUT_DIR"), "/rcl.rs"));
 
-#[cfg(any(feature = "humble", feature = "galactic"))]
-pub type size_t = self::size_t;
-
-#[cfg(any(feature = "iron", feature = "jazzy"))]
-pub type size_t = usize;
-
 // Type conversions
 mod conversions;

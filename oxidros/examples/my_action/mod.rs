@@ -21,9 +21,10 @@ impl ActionMsg for MyAction {
     type Goal = MyAction_SendGoal;
     type Result = MyAction_GetResult;
     type Feedback = MyAction_FeedbackMessage;
-    fn type_support() -> *const rcl::rosidl_action_type_support_t {
+    fn type_support() -> *const std::ffi::c_void {
         unsafe {
             rosidl_typesupport_c__get_action_type_support_handle__example_msg__action__MyAction()
+                as *const _
         }
     }
 
@@ -119,9 +120,9 @@ extern "C" {
 }
 
 impl TypeSupport for MyAction_Goal {
-    fn type_support() -> *const rcl::rosidl_message_type_support_t {
+    fn type_support() -> *const std::ffi::c_void {
         unsafe {
-            rosidl_typesupport_c__get_message_type_support_handle__example_msg__action__MyAction_Goal()
+            rosidl_typesupport_c__get_message_type_support_handle__example_msg__action__MyAction_Goal() as *const _
         }
     }
 }
@@ -290,9 +291,9 @@ extern "C" {
 }
 
 impl TypeSupport for MyAction_SendGoal_Request {
-    fn type_support() -> *const rcl::rosidl_message_type_support_t {
+    fn type_support() -> *const std::ffi::c_void {
         unsafe {
-            rosidl_typesupport_c__get_message_type_support_handle__example_msg__action__MyAction_SendGoal_Request()
+            rosidl_typesupport_c__get_message_type_support_handle__example_msg__action__MyAction_SendGoal_Request() as *const _
         }
     }
 }

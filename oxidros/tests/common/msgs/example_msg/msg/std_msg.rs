@@ -95,8 +95,8 @@ impl Drop for StdMsg {
 #[derive(Debug)]
 struct StdMsgSeqRaw {
     data: *mut StdMsg,
-    size: size_t,
-    capacity: size_t,
+    size: usize,
+    capacity: usize,
 }
 
 /// Sequence of StdMsg.
@@ -106,8 +106,8 @@ struct StdMsgSeqRaw {
 #[derive(Debug)]
 pub struct StdMsgSeq<const N: usize> {
     data: *mut StdMsg,
-    size: size_t,
-    capacity: size_t,
+    size: usize,
+    capacity: usize,
 }
 
 impl<const N: usize> StdMsgSeq<N> {

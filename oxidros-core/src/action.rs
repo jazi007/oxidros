@@ -63,6 +63,9 @@ pub enum GoalEvent {
 
     /// Goal was canceled.
     Canceled = 4,
+
+    /// Number of events
+    NumEvents = 5,
 }
 
 impl From<i8> for GoalEvent {
@@ -73,6 +76,7 @@ impl From<i8> for GoalEvent {
             2 => GoalEvent::Succeed,
             3 => GoalEvent::Abort,
             4 => GoalEvent::Canceled,
+            5 => GoalEvent::NumEvents,
             _ => GoalEvent::Execute,
         }
     }

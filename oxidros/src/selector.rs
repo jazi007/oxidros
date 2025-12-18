@@ -155,12 +155,12 @@ pub struct Statistics {
 }
 
 struct EntitySize {
-    subscriptions: rcl::size_t,
-    guard_condititons: rcl::size_t,
-    timers: rcl::size_t,
-    clients: rcl::size_t,
-    services: rcl::size_t,
-    events: rcl::size_t,
+    subscriptions: usize,
+    guard_condititons: usize,
+    timers: usize,
+    clients: usize,
+    services: usize,
+    events: usize,
 }
 
 /// Selector invokes callback functions associated with subscribers, services, timers, or condition variables.
@@ -1344,21 +1344,21 @@ impl Selector {
             )?;
         }
 
-        let n_servers = self.action_servers.len() as rcl::size_t;
-        let n_clients = self.action_clients.len() as rcl::size_t;
+        let n_servers = self.action_servers.len() as usize;
+        let n_clients = self.action_clients.len() as usize;
 
         Ok(EntitySize {
-            subscriptions: self.subscriptions.len() as rcl::size_t
+            subscriptions: self.subscriptions.len() as usize
                 + action_server_subscriptions_size * n_servers
                 + action_client_subscriptions_size * n_clients,
-            guard_condititons: self.cond.len() as rcl::size_t
+            guard_condititons: self.cond.len() as usize
                 + action_server_guard_conditions_size * n_servers
                 + action_client_guard_conditions_size * n_clients,
             timers: action_server_timers_size * n_servers + action_client_timers_size * n_clients,
-            clients: self.clients.len() as rcl::size_t
+            clients: self.clients.len() as usize
                 + action_server_clients_size * n_servers
                 + action_client_clients_size * n_clients,
-            services: self.services.len() as rcl::size_t
+            services: self.services.len() as usize
                 + action_server_services_size * n_servers
                 + action_client_services_size * n_clients,
             events: 0,

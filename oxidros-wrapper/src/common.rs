@@ -4,10 +4,7 @@ use futures::ready;
 use oxidros::{
     msg::TypeSupport,
     node::Node,
-    qos::{
-        policy::{DurabilityPolicy, HistoryPolicy, ReliabilityPolicy},
-        Profile,
-    },
+    qos::{DurabilityPolicy, HistoryPolicy, Profile, ReliabilityPolicy},
     topic::subscriber::{Subscriber, TakenMsg},
 };
 use std::pin::Pin;

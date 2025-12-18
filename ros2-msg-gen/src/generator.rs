@@ -341,7 +341,7 @@ impl Generator {
         lines.push_back(gen_impl_for_struct(lib, "msg", &struct_def.id));
 
         lines.push_front(
-            "use {prefix}oxidros_core::TypeSupport;\n#[allow(unused_imports)]\nuse {prefix}{msg, rcl::{self, size_t}};"
+            "use {prefix}oxidros_core::TypeSupport;\n#[allow(unused_imports)]\nuse {prefix}{msg, rcl};"
                 .to_string(),
         );
     }
@@ -363,7 +363,7 @@ impl Generator {
 
         if *idl_type == IDLType::NoType {
             lines.push_front(
-                "use {prefix}oxidros_core::{ServiceMsg, TypeSupport};\n#[allow(unused_imports)]\nuse {prefix}{msg, rcl::{self, size_t}};".to_string()
+                "use {prefix}oxidros_core::{ServiceMsg, TypeSupport};\n#[allow(unused_imports)]\nuse {prefix}{msg, rcl};".to_string()
             );
             lines.push_back(gen_impl_service_msg(lib, "srv", type_str));
         }
@@ -409,7 +409,7 @@ impl Generator {
 
         if *idl_type == IDLType::NoType {
             lines.push_front(
-                "use {prefix}oxidros_core::{ActionMsg, ActionGoal, ActionResult, GetUUID, GoalResponse, ResultResponse, TypeSupport};\nuse {prefix}{msg, rcl::{self, size_t}, builtin_interfaces::UnsafeTime, unique_identifier_msgs};".to_string()
+                "use {prefix}oxidros_core::{ActionMsg, ActionGoal, ActionResult, GetUUID, GoalResponse, ResultResponse, TypeSupport};\nuse {prefix}{msg, rcl, builtin_interfaces::UnsafeTime, unique_identifier_msgs};".to_string()
             );
             lines.push_back(gen_impl_action_msg(lib, type_str));
         }
@@ -749,7 +749,7 @@ impl Generator {
 
         lines.push_back(gen_impl_for_msg(lib, &rs_type_name).into());
         lines.push_front(
-            "use {prefix}oxidros_core::TypeSupport;\n#[allow(unused_imports)]\nuse {prefix}{msg, rcl::{self, size_t}};"
+            "use {prefix}oxidros_core::TypeSupport;\n#[allow(unused_imports)]\nuse {prefix}{msg, rcl};"
                 .into(),
         );
 
@@ -810,7 +810,7 @@ impl Generator {
         lines.push_back(gen_impl_for_srv(lib, &rs_type_name).into());
         lines.push_front(
             format!(
-                "use {}::{{msg::{{ServiceMsg, TypeSupport}}, rcl::{{self, size_t}}}};",
+                "use {}::{{msg::{{ServiceMsg, TypeSupport}}, rcl}};",
                 self.oxidros_path()
             )
             .into(),
@@ -1153,8 +1153,8 @@ impl Drop for {type_name_full} {{
 #[derive(Debug)]
 struct {type_name_full}SeqRaw {{
     data: *mut {type_name_full},
-    size: size_t,
-    capacity: size_t,
+    size: usize,
+    capacity: usize,
 }}
 
 /// Sequence of {type_name_full}.
@@ -1164,8 +1164,8 @@ struct {type_name_full}SeqRaw {{
 #[derive(Debug)]
 pub struct {type_name_full}Seq<const N: usize> {{
     data: *mut {type_name_full},
-    size: size_t,
-    capacity: size_t,
+    size: usize,
+    capacity: usize,
 }}
 
 impl<const N: usize> {type_name_full}Seq<N> {{
@@ -1420,8 +1420,8 @@ impl Drop for {type_name} {{
 #[derive(Debug)]
 struct {type_name}SeqRaw {{
     data: *mut {type_name},
-    size: size_t,
-    capacity: size_t,
+    size: usize,
+    capacity: usize,
 }}
 
 /// Sequence of {type_name}.
@@ -1431,8 +1431,8 @@ struct {type_name}SeqRaw {{
 #[derive(Debug)]
 pub struct {type_name}Seq<const N: usize> {{
     data: *mut {type_name},
-    size: size_t,
-    capacity: size_t,
+    size: usize,
+    capacity: usize,
 }}
 
 impl<const N: usize> {type_name}Seq<N> {{

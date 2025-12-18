@@ -161,14 +161,33 @@ macro_rules! pr_debug {
     }}
 }
 
-#[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive, ToPrimitive)]
 enum Severity {
-    Debug = rcl::RCUTILS_LOG_SEVERITY_DEBUG,
-    Info = rcl::RCUTILS_LOG_SEVERITY_INFO,
-    Warn = rcl::RCUTILS_LOG_SEVERITY_WARN,
-    Error = rcl::RCUTILS_LOG_SEVERITY_ERROR,
-    Fatal = rcl::RCUTILS_LOG_SEVERITY_FATAL,
+    Debug,
+    Info,
+    Warn,
+    Error,
+    Fatal,
+}
+
+impl From<Severity> for rcl::rcl_log_severity_t {
+    fn from(value: Severity) -> Self {
+        use rcl::rcl_log_severity_t::*;
+        match value {
+            Severity::Debug => RCUTILS_LOG_SEVERITY_DEBUG,
+            Severity::Info => RCUTILS_LOG_SEVERITY_INFO,
+            Severity::Warn => RCUTILS_LOG_SEVERITY_WARN,
+            Severity::Error => RCUTILS_LOG_SEVERITY_ERROR,
+            Severity::Fatal => RCUTILS_LOG_SEVERITY_FATAL,
+        }
+    }
+}
+
+impl Severity {
+    fn to_i32(self) -> i32 {
+        let value: rcl::rcl_log_severity_t = self.into();
+        value as i32
+    }
 }
 
 /// Logger of ROS2.
@@ -218,7 +237,7 @@ impl Logger {
         let guard = rcl::MT_UNSAFE_LOG_FN.lock();
         guard.rcutils_log(
             &logging_location,
-            severity as i32,
+            severity.to_i32(),
             self.name.as_ptr(),
             msg.as_ptr(),
         );

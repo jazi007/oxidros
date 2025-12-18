@@ -1,6 +1,7 @@
 //! Action server.
 
 use futures::try_join;
+use oxidros_core::{DurabilityPolicy, HistoryPolicy, LivelinessPolicy, ReliabilityPolicy};
 use oxidros_msg::interfaces::action_msgs::srv::CancelGoal_Response_Constants::{
     ERROR_GOAL_TERMINATED, ERROR_NONE, ERROR_REJECTED, ERROR_UNKNOWN_GOAL_ID,
 };
@@ -38,18 +39,6 @@ use crate::{
     signal_handler::Signaled,
     RecvResult,
 };
-
-#[cfg(feature = "galactic")]
-use crate::qos::galactic::*;
-
-#[cfg(feature = "humble")]
-use crate::qos::humble::*;
-
-#[cfg(feature = "iron")]
-use crate::qos::iron::*;
-
-#[cfg(feature = "jazzy")]
-use crate::qos::jazzy::*;
 
 use super::GoalEvent;
 use super::{handle::GoalHandle, GetResultServiceRequest, GoalStatus, SendGoalServiceRequest};
@@ -551,8 +540,8 @@ impl<T: ActionMsg> ServerCancelSend<T> {
         if code == ERROR_NONE {
             response.msg.goals_canceling = action_msgs__msg__GoalInfo__Sequence {
                 data: accepted_goals.as_mut_ptr() as *mut _ as *mut action_msgs__msg__GoalInfo,
-                size: accepted_goals.len() as rcl::size_t,
-                capacity: accepted_goals.capacity() as rcl::size_t,
+                size: accepted_goals.len() as usize,
+                capacity: accepted_goals.capacity() as usize,
             };
         } else {
             let mut empty = vec![];

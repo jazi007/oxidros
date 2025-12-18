@@ -13,8 +13,7 @@ use oxidros::{
     context::Context,
     error::DynError,
     msg::{
-        builtin_interfaces::UnsafeTime,
-        interfaces::action_msgs::{msg::GoalInfo, srv::CancelGoalRequest},
+        interfaces::action_msgs::{msg::GoalInfo, srv::CancelGoal_Request},
         unique_identifier_msgs::msg::UUID,
     },
 };
@@ -209,10 +208,10 @@ async fn run_client_cancel(client: Client<MyAction>) -> Result<(), DynError> {
     thread::sleep(Duration::from_secs(1));
 
     // send a cancel request
-    let receiver = client.send_cancel_request(&CancelGoalRequest {
+    let receiver = client.send_cancel_request(&CancelGoal_Request {
         goal_info: GoalInfo {
-            goal_id: UUID { uuid },
-            stamp: UnsafeTime { sec: 0, nanosec: 0 },
+            goal_id: oxidros_msg::interfaces::unique_identifier_msgs::msg::UUID { uuid },
+            stamp: oxidros_msg::interfaces::builtin_interfaces::msg::Time { sec: 0, nanosec: 0 },
         },
     })?;
     println!("client: cancel request sent");

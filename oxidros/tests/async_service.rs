@@ -135,7 +135,7 @@ fn test_client_rs() {
         let mut n_timeout = 0;
 
         loop {
-            let request = std_srvs::srv::EmptyRequest::new().unwrap();
+            let request = std_srvs::srv::Empty_Request::new().unwrap();
             let mut receiver = client.send(&request).unwrap().recv();
 
             pr_info!(logger, "receiving");

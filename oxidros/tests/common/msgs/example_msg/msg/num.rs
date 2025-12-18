@@ -46,8 +46,8 @@ impl Drop for Num {
 #[derive(Debug)]
 struct NumSeqRaw {
     data: *mut Num,
-    size: size_t,
-    capacity: size_t,
+    size: usize,
+    capacity: usize,
 }
 
 /// Sequence of Num.
@@ -57,8 +57,8 @@ struct NumSeqRaw {
 #[derive(Debug)]
 pub struct NumSeq<const N: usize> {
     data: *mut Num,
-    size: size_t,
-    capacity: size_t,
+    size: usize,
+    capacity: usize,
 }
 
 impl<const N: usize> NumSeq<N> {

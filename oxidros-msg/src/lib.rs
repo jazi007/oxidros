@@ -409,7 +409,6 @@ pub mod msg {
 
 // Re-export rcl types for generated code
 pub mod rcl {
-    pub use std::os::raw::c_ulong as size_t;
     // Re-export C types from runtime_c
     pub use crate::{
         rosidl_action_type_support_t, rosidl_message_type_support_t, rosidl_service_type_support_t,

@@ -132,7 +132,10 @@ fn generate_runtime_c(out_dir: &Path) {
         .allowlist_var("rosidl_.*")
         .allowlist_type("builtin_interfaces__msg__Time")
         .blocklist_function("atexit")
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
+        .default_enum_style(bindgen::EnumVariation::Rust {
+            non_exhaustive: false,
+        })
+        .size_t_is_usize(true)
         .generate()
         .expect("Unable to generate bindings for runtime_c");
 

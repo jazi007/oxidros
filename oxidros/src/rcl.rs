@@ -152,12 +152,12 @@ impl MTUnsafeFn {
     pub fn rcl_wait_set_init(
         &self,
         wait_set: *mut rcl_wait_set_t,
-        number_of_subscriptions: size_t,
-        number_of_guard_conditions: size_t,
-        number_of_timers: size_t,
-        number_of_clients: size_t,
-        number_of_services: size_t,
-        number_of_events: size_t,
+        number_of_subscriptions: usize,
+        number_of_guard_conditions: usize,
+        number_of_timers: usize,
+        number_of_clients: usize,
+        number_of_services: usize,
+        number_of_events: usize,
         context: *mut rcl_context_t,
         allocator: rcl_allocator_t,
     ) -> RCLResult<()> {
@@ -183,12 +183,12 @@ impl MTUnsafeFn {
     pub fn rcl_wait_set_resize(
         &self,
         wait_set: *mut rcl_wait_set_t,
-        subscriptions_size: size_t,
-        guard_conditions_size: size_t,
-        timers_size: size_t,
-        clients_size: size_t,
-        services_size: size_t,
-        events_size: size_t,
+        subscriptions_size: usize,
+        guard_conditions_size: usize,
+        timers_size: usize,
+        clients_size: usize,
+        services_size: usize,
+        events_size: usize,
     ) -> RCLResult<()> {
         ret_val_to_err(unsafe {
             self::rcl_wait_set_resize(
@@ -207,7 +207,7 @@ impl MTUnsafeFn {
         &self,
         wait_set: *mut rcl_wait_set_t,
         subscription: *const rcl_subscription_t,
-        index: *mut size_t,
+        index: *mut usize,
     ) -> RCLResult<()> {
         ret_val_to_err(unsafe {
             self::rcl_wait_set_add_subscription(wait_set, subscription, index)
@@ -245,7 +245,7 @@ impl MTUnsafeFn {
         &self,
         wait_set: *mut rcl_wait_set_t,
         guard_condition: *const rcl_guard_condition_t,
-        index: *mut size_t,
+        index: *mut usize,
     ) -> RCLResult<()> {
         ret_val_to_err(unsafe {
             self::rcl_wait_set_add_guard_condition(wait_set, guard_condition, index)
@@ -320,7 +320,7 @@ impl MTUnsafeFn {
         &self,
         wait_set: *mut rcl_wait_set_t,
         client: *const rcl_client_t,
-        index: *mut size_t,
+        index: *mut usize,
     ) -> RCLResult<()> {
         ret_val_to_err(unsafe { self::rcl_wait_set_add_client(wait_set, client, index) })
     }
@@ -329,7 +329,7 @@ impl MTUnsafeFn {
         &self,
         wait_set: *mut rcl_wait_set_t,
         service: *const rcl_service_t,
-        index: *mut size_t,
+        index: *mut usize,
     ) -> RCLResult<()> {
         ret_val_to_err(unsafe { self::rcl_wait_set_add_service(wait_set, service, index) })
     }
@@ -670,8 +670,8 @@ impl MTUnsafeFn {
         &self,
         wait_set: *mut rcl_wait_set_t,
         action_client: *const rcl_action_client_t,
-        client_index: *mut size_t,
-        subscription_index: *mut size_t,
+        client_index: *mut usize,
+        subscription_index: *mut usize,
     ) -> RCLActionResult<()> {
         action_ret_val_to_err(unsafe {
             self::rcl_action_wait_set_add_action_client(
@@ -687,7 +687,7 @@ impl MTUnsafeFn {
         &self,
         wait_set: *mut rcl_wait_set_t,
         action_server: *const rcl_action_server_t,
-        service_index: *mut size_t,
+        service_index: *mut usize,
     ) -> RCLActionResult<()> {
         action_ret_val_to_err(unsafe {
             self::rcl_action_wait_set_add_action_server(wait_set, action_server, service_index)
@@ -1041,11 +1041,11 @@ impl MTSafeFn {
 
     pub fn rcl_action_server_wait_set_get_num_entities(
         action_server: *const rcl_action_server_t,
-        num_subscriptions: *mut size_t,
-        num_guard_conditions: *mut size_t,
-        num_timers: *mut size_t,
-        num_clients: *mut size_t,
-        num_services: *mut size_t,
+        num_subscriptions: *mut usize,
+        num_guard_conditions: *mut usize,
+        num_timers: *mut usize,
+        num_clients: *mut usize,
+        num_services: *mut usize,
     ) -> RCLActionResult<()> {
         action_ret_val_to_err(unsafe {
             self::rcl_action_server_wait_set_get_num_entities(
@@ -1061,11 +1061,11 @@ impl MTSafeFn {
 
     pub fn rcl_action_client_wait_set_get_num_entities(
         action_client: *const rcl_action_client_t,
-        num_subscriptions: *mut size_t,
-        num_guard_conditions: *mut size_t,
-        num_timers: *mut size_t,
-        num_clients: *mut size_t,
-        num_services: *mut size_t,
+        num_subscriptions: *mut usize,
+        num_guard_conditions: *mut usize,
+        num_timers: *mut usize,
+        num_clients: *mut usize,
+        num_services: *mut usize,
     ) -> RCLActionResult<()> {
         action_ret_val_to_err(unsafe {
             self::rcl_action_client_wait_set_get_num_entities(

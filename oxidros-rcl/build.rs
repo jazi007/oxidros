@@ -11,19 +11,10 @@ fn main() {
     println!("cargo:rerun-if-env-changed=AMENT_PREFIX_PATH");
     println!("cargo:rerun-if-env-changed=CMAKE_PREFIX_PATH");
     println!("cargo:rerun-if-env-changed=ROS_DISTRO");
-
-    println!("cargo:warning=Generating RCL bindings for ROS2 {}", distro);
-
     // Generate RCL bindings
     generate_rcl_bindings(out_path);
-
     // Link ROS2 C libraries
     link_ros2_libs();
-
-    println!(
-        "cargo:warning=RCL bindings generation complete for {}",
-        distro
-    );
 }
 
 fn generate_rcl_bindings(out_dir: &Path) {
@@ -116,6 +107,7 @@ fn generate_rcl_bindings(out_dir: &Path) {
         .default_enum_style(bindgen::EnumVariation::Rust {
             non_exhaustive: false,
         })
+        .size_t_is_usize(true)
         .generate()
         .expect("Unable to generate RCL bindings");
 
