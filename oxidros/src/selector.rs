@@ -63,7 +63,7 @@ use crate::{
     logger::{pr_error_in, pr_fatal_in, Logger},
     msg::{interfaces::action_msgs::msg::GoalInfo, ActionMsg, GetUUID, ServiceMsg, TypeSupport},
     parameter::{ParameterServer, Parameters},
-    rcl::{self, rcl_action_client_t, rcl_action_server_t},
+    rcl::{self, rcl_action_client_t},
     service::{
         client::{ClientData, ClientRecv},
         server::{Server, ServerData},
@@ -83,6 +83,9 @@ use std::{
 };
 
 use parking_lot::Mutex;
+
+#[cfg(not(feature = "statistics"))]
+use crate::rcl::rcl_action_server_t;
 
 #[cfg(feature = "statistics")]
 use serde::Serialize;
@@ -111,6 +114,7 @@ struct ConditionHandler<T> {
 
 type ActionHandler = Box<dyn FnMut() -> CallbackResult>;
 
+#[cfg_attr(feature = "statistics", allow(dead_code))]
 struct ActionClientConditionHandler {
     client: *const rcl_action_client_t,
     feedback_handler: Option<ActionHandler>,
@@ -120,6 +124,7 @@ struct ActionClientConditionHandler {
     result_handler: Option<ActionHandler>,
 }
 
+#[cfg_attr(feature = "statistics", allow(dead_code))]
 struct ActionServerConditionHandler {
     goal_handler: Option<ActionHandler>,
     cancel_goal_handler: Option<ActionHandler>,
@@ -329,13 +334,12 @@ impl Selector {
 
         #[cfg(feature = "statistics")]
         let symbol = {
-            let node_name = subscriber.subscription.node.get_name();
-            let node_namespace =
-                if let Some(namespace) = subscriber.subscription.node.get_namespace() {
-                    namespace.as_str()
-                } else {
-                    ""
-                };
+            let node_name = subscriber.subscription.node.get_name().unwrap_or_default();
+            let node_namespace = subscriber
+                .subscription
+                .node
+                .get_namespace()
+                .unwrap_or_default();
             let topic_name = subscriber.get_topic_name();
             format!("{node_namespace}:{node_name}:subscriber:{topic_name}")
         };
@@ -1436,6 +1440,7 @@ fn notify<K, V>(m: &mut BTreeMap<*const K, ConditionHandler<V>>, array: *const *
     }
 }
 
+#[cfg(not(feature = "statistics"))]
 /// Scan the waitset to see if there are any updates for action servers.
 fn notify_action_server(
     m: &mut BTreeMap<*const rcl_action_server_t, Vec<ActionServerConditionHandler>>,
@@ -1491,6 +1496,7 @@ fn notify_action_server(
     ret
 }
 
+#[cfg(not(feature = "statistics"))]
 /// Scan the waitset to see if there are any updates for action clients.
 fn notify_action_client(
     m: &mut BTreeMap<*const rcl_action_client_t, ActionClientConditionHandler>,
