@@ -13,7 +13,6 @@
 #![allow(clippy::too_many_arguments)]
 #![allow(clashing_extern_declarations)]
 
-use num_traits::FromPrimitive;
 use regex::Regex;
 
 use std::{collections::BTreeMap, ffi::CStr};
@@ -763,11 +762,8 @@ impl MTUnsafeFn {
     ) -> RCLResult<BTreeMap<String, Value>> {
         let mut params_map = BTreeMap::new();
         let mut params: Box<*mut rcl_params_t> = Box::new(std::ptr::null_mut());
-        let ret =
-            unsafe { self::rcl_arguments_get_param_overrides(arguments, params.as_mut()) } as u32;
-        if ret != self::RCL_RET_OK {
-            return Err(FromPrimitive::from_u32(ret).unwrap_or(RCLError::InvalidRetVal));
-        }
+        let ret = unsafe { self::rcl_arguments_get_param_overrides(arguments, params.as_mut()) };
+        ret_val_to_err(ret)?;
         if params.is_null() {
             return Ok(params_map);
         }

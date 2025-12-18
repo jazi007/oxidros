@@ -1,0 +1,10 @@
+[package]
+name = "oxidros-build"
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license-file.workspace = true
+
+[dependencies]
+bindgen = "0.72.1"

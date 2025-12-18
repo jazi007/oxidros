@@ -540,8 +540,8 @@ impl<T: ActionMsg> ServerCancelSend<T> {
         if code == ERROR_NONE {
             response.msg.goals_canceling = action_msgs__msg__GoalInfo__Sequence {
                 data: accepted_goals.as_mut_ptr() as *mut _ as *mut action_msgs__msg__GoalInfo,
-                size: accepted_goals.len() as usize,
-                capacity: accepted_goals.capacity() as usize,
+                size: accepted_goals.len(),
+                capacity: accepted_goals.capacity(),
             };
         } else {
             let mut empty = vec![];

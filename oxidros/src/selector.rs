@@ -1344,21 +1344,21 @@ impl Selector {
             )?;
         }
 
-        let n_servers = self.action_servers.len() as usize;
-        let n_clients = self.action_clients.len() as usize;
+        let n_servers = self.action_servers.len();
+        let n_clients = self.action_clients.len();
 
         Ok(EntitySize {
-            subscriptions: self.subscriptions.len() as usize
+            subscriptions: self.subscriptions.len()
                 + action_server_subscriptions_size * n_servers
                 + action_client_subscriptions_size * n_clients,
-            guard_condititons: self.cond.len() as usize
+            guard_condititons: self.cond.len()
                 + action_server_guard_conditions_size * n_servers
                 + action_client_guard_conditions_size * n_clients,
             timers: action_server_timers_size * n_servers + action_client_timers_size * n_clients,
-            clients: self.clients.len() as usize
+            clients: self.clients.len()
                 + action_server_clients_size * n_servers
                 + action_client_clients_size * n_clients,
-            services: self.services.len() as usize
+            services: self.services.len()
                 + action_server_services_size * n_servers
                 + action_client_services_size * n_clients,
             events: 0,

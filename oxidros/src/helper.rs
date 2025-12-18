@@ -1,44 +1,3 @@
-use std::sync::atomic::{AtomicBool, Ordering};
-
-pub trait Contains {
-    type T;
-    fn contains(&self, val: Self::T) -> bool;
-}
-
-pub(crate) struct InitOnce {
-    lock: AtomicBool,
-    is_init: AtomicBool,
-}
-
-impl InitOnce {
-    pub const fn new() -> Self {
-        InitOnce {
-            lock: AtomicBool::new(false),
-            is_init: AtomicBool::new(false),
-        }
-    }
-
-    pub fn init<F, R>(&self, f: F, default: R) -> R
-    where
-        F: Fn() -> R,
-    {
-        while !self.is_init.load(Ordering::Relaxed) {
-            if !self.lock.load(Ordering::Relaxed)
-                && self
-                    .lock
-                    .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
-                    .is_ok()
-            {
-                let result = f();
-                self.is_init.store(true, Ordering::Release);
-                return result;
-            }
-        }
-
-        default
-    }
-}
-
 #[cfg(feature = "statistics")]
 pub(crate) mod statistics {
     use serde::Serialize;
@@ -116,9 +75,7 @@ pub(crate) mod statistics {
 
 #[cfg(test)]
 mod tests {
-    use crate::helper::InitOnce;
-
-    static INITIALIZER: InitOnce = InitOnce::new();
+    static INITIALIZER: std::sync::OnceLock<()> = std::sync::OnceLock::new();
     static mut N: usize = 0;
 
     #[test]
@@ -129,10 +86,20 @@ mod tests {
             }
         }
 
-        let th = std::thread::spawn(|| INITIALIZER.init(init_n, ()));
-        INITIALIZER.init(init_n, ());
-        INITIALIZER.init(init_n, ());
-        INITIALIZER.init(init_n, ());
+        let th = std::thread::spawn(|| {
+            INITIALIZER.get_or_init(|| {
+                init_n();
+            });
+        });
+        INITIALIZER.get_or_init(|| {
+            init_n();
+        });
+        INITIALIZER.get_or_init(|| {
+            init_n();
+        });
+        INITIALIZER.get_or_init(|| {
+            init_n();
+        });
         th.join().unwrap();
 
         assert_eq!(unsafe { N }, 1);

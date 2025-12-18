@@ -65,13 +65,12 @@
 
 use crate::{
     error::{DynError, RCLResult},
-    helper::InitOnce,
     rcl,
 };
 use num_derive::{FromPrimitive, ToPrimitive};
 use std::ffi::CString;
 
-static INITIALIZER: InitOnce = InitOnce::new();
+static INITIALIZER: std::sync::OnceLock<RCLResult<()>> = std::sync::OnceLock::new();
 
 /// Get the function name called this macro.
 #[macro_export]
@@ -307,20 +306,16 @@ impl Logger {
 
     fn is_enable_for(&self, severity: Severity) -> bool {
         let guard = rcl::MT_UNSAFE_LOG_FN.lock();
-        guard.rcutils_logging_logger_is_enabled_for(self.name.as_ptr(), severity as i32)
+        guard.rcutils_logging_logger_is_enabled_for(self.name.as_ptr(), severity.to_i32())
     }
 }
 
 fn init_once() -> RCLResult<()> {
-    INITIALIZER.init(
-        || {
-            // initialize
-            let guard = rcl::MT_UNSAFE_LOG_FN.lock();
-            guard.rcutils_logging_initialize()?;
-            Ok(())
-        },
-        Ok(()),
-    )
+    *INITIALIZER.get_or_init(|| {
+        // initialize
+        let guard = rcl::MT_UNSAFE_LOG_FN.lock();
+        guard.rcutils_logging_initialize()
+    })
 }
 
 #[cfg(test)]

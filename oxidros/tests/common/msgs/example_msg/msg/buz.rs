@@ -142,8 +142,11 @@ unsafe impl<const N: usize> Send for BuzSeq<N> {}
 unsafe impl<const N: usize> Sync for BuzSeq<N> {}
 
 impl TypeSupport for Buz {
-    fn type_support() -> *const rcl::rosidl_message_type_support_t {
-        unsafe { rosidl_typesupport_c__get_message_type_support_handle__example_msg__msg__Buz() }
+    fn type_support() -> *const std::ffi::c_void {
+        unsafe {
+            rosidl_typesupport_c__get_message_type_support_handle__example_msg__msg__Buz()
+                as *const _
+        }
     }
 }
 

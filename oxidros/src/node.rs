@@ -20,7 +20,6 @@ use libc::atexit;
 use crate::{
     context::{remove_context, Context},
     error::{DynError, RCLResult},
-    helper::InitOnce,
     msg::{ServiceMsg, TypeSupport},
     parameter::ParameterServer,
     qos, rcl,
@@ -30,12 +29,12 @@ use crate::{
 };
 use std::{ffi::CString, sync::Arc};
 
-static SET_ATEXIT: InitOnce = InitOnce::new();
+static SET_ATEXIT: std::sync::OnceLock<()> = std::sync::OnceLock::new();
 
 /// Node of ROS2.
 pub struct Node {
     node: rcl::rcl_node_t,
-    init_param_server: InitOnce,
+    init_param_server: std::sync::OnceLock<()>,
     pub(crate) context: Arc<Context>,
 }
 
@@ -65,11 +64,13 @@ impl Node {
         // FastDDS uses atexit(3) to destroy resources when creating a node.
         // Because of functions registed to atexit(3) will be invoked reverse order,
         // remove_context() must be set here.
-        SET_ATEXIT.init(|| unsafe { atexit(remove_context) }, 0);
+        SET_ATEXIT.get_or_init(|| unsafe {
+            atexit(remove_context);
+        });
 
         Ok(Arc::new(Node {
             node,
-            init_param_server: InitOnce::new(),
+            init_param_server: std::sync::OnceLock::new(),
             context,
         }))
     }
@@ -95,10 +96,10 @@ impl Node {
     }
 
     pub fn create_parameter_server(self: &Arc<Self>) -> Result<ParameterServer, DynError> {
-        self.init_param_server.init(
-            || ParameterServer::new(self.clone()),
-            Err("a parameter server has been already created".into()),
-        )
+        match self.init_param_server.set(()) {
+            Ok(()) => ParameterServer::new(self.clone()),
+            Err(_) => Err("a parameter server has been already created".into()),
+        }
     }
 
     /// Create a publisher.

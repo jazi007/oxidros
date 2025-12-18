@@ -17,5 +17,5 @@ humble = []
 galactic = []
 
 [build-dependencies]
-bindgen = "0.70"
+oxidros-build = { path = "../oxidros-build" }
 

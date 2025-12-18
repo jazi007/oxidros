@@ -286,25 +286,26 @@ pub struct AddThreeInts;
 impl ServiceMsg for AddThreeInts {
     type Request = AddThreeIntsRequest;
     type Response = AddThreeIntsResponse;
-    fn type_support() -> *const rcl::rosidl_service_type_support_t {
+    fn type_support() -> *const std::ffi::c_void {
         unsafe {
             rosidl_typesupport_c__get_service_type_support_handle__example_msg__srv__AddThreeInts()
+                as *const _
         }
     }
 }
 
 impl TypeSupport for AddThreeIntsRequest {
-    fn type_support() -> *const rcl::rosidl_message_type_support_t {
+    fn type_support() -> *const std::ffi::c_void {
         unsafe {
-            rosidl_typesupport_c__get_message_type_support_handle__example_msg__srv__AddThreeInts_Request()
+            rosidl_typesupport_c__get_message_type_support_handle__example_msg__srv__AddThreeInts_Request() as *const _
         }
     }
 }
 
 impl TypeSupport for AddThreeIntsResponse {
-    fn type_support() -> *const rcl::rosidl_message_type_support_t {
+    fn type_support() -> *const std::ffi::c_void {
         unsafe {
-            rosidl_typesupport_c__get_message_type_support_handle__example_msg__srv__AddThreeInts_Response()
+            rosidl_typesupport_c__get_message_type_support_handle__example_msg__srv__AddThreeInts_Response() as *const _
         }
     }
 }

@@ -22,3 +22,8 @@ include!(concat!(env!("OUT_DIR"), "/rcl.rs"));
 
 // Type conversions
 mod conversions;
+
+/// A wrapper type around rcl_ret_t
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct RclRetErr(pub crate::rcl_ret_t);

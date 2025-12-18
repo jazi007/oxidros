@@ -24,6 +24,7 @@ mod runtime_c {
     include!(concat!(env!("OUT_DIR"), "/runtime_c.rs"));
 }
 
+use oxidros_core::Value;
 // Re-export runtime_c types
 pub use runtime_c::*;
 
@@ -450,3 +451,159 @@ pub use oxidros_core::{
 
 // Re-export UnsafeTime and UnsafeDuration from oxidros-core
 pub use oxidros_core::{UnsafeDuration, UnsafeTime};
+
+use crate::interfaces::rcl_interfaces::msg::ParameterValue;
+
+impl From<&oxidros_core::parameter::IntegerRange>
+    for interfaces::rcl_interfaces::msg::IntegerRange
+{
+    fn from(range: &oxidros_core::parameter::IntegerRange) -> Self {
+        interfaces::rcl_interfaces::msg::IntegerRange {
+            from_value: range.min,
+            to_value: range.max,
+            step: range.step as u64,
+        }
+    }
+}
+
+impl From<&oxidros_core::parameter::FloatingPointRange>
+    for interfaces::rcl_interfaces::msg::FloatingPointRange
+{
+    fn from(range: &oxidros_core::parameter::FloatingPointRange) -> Self {
+        interfaces::rcl_interfaces::msg::FloatingPointRange {
+            from_value: range.min,
+            to_value: range.max,
+            step: range.step,
+        }
+    }
+}
+
+impl From<&ParameterValue> for Value {
+    fn from(var: &ParameterValue) -> Self {
+        match var.r#type {
+            1 => Value::Bool(var.bool_value),
+            2 => Value::I64(var.integer_value),
+            3 => Value::F64(var.double_value),
+            4 => Value::String(var.string_value.to_string()),
+            5 => {
+                let mut v = Vec::new();
+                var.byte_array_value.iter().for_each(|x| v.push(*x));
+                Value::VecU8(v)
+            }
+            6 => {
+                let mut v = Vec::new();
+                var.bool_array_value.iter().for_each(|x| v.push(*x));
+                Value::VecBool(v)
+            }
+            7 => {
+                let mut v = Vec::new();
+                var.integer_array_value.iter().for_each(|x| v.push(*x));
+                Value::VecI64(v)
+            }
+            8 => {
+                let mut v = Vec::new();
+                var.double_array_value.iter().for_each(|x| v.push(*x));
+                Value::VecF64(v)
+            }
+            9 => {
+                let mut v = Vec::new();
+                var.string_array_value
+                    .iter()
+                    .for_each(|x| v.push(x.to_string()));
+                Value::VecString(v)
+            }
+            _ => Value::NotSet,
+        }
+    }
+}
+
+impl From<&Value> for ParameterValue {
+    fn from(var: &Value) -> Self {
+        let mut result = ParameterValue::new().unwrap();
+        match var {
+            Value::NotSet => result.r#type = 0,
+            Value::Bool(val) => {
+                result.r#type = 1;
+                result.bool_value = *val;
+            }
+            Value::I64(val) => {
+                result.r#type = 2;
+                result.integer_value = *val;
+            }
+            Value::F64(val) => {
+                result.r#type = 3;
+                result.double_value = *val;
+            }
+            Value::String(val) => {
+                result.r#type = 4;
+                result.string_value = RosString::new(val).unwrap_or_else(|| {
+                    log::error!("{}:{}: failed allocation", file!(), line!());
+                    RosString::null()
+                });
+            }
+            Value::VecU8(val) => {
+                result.r#type = 5;
+                result.byte_array_value = U8Seq::new(val.len()).unwrap_or_else(|| {
+                    log::error!("{}:{}: failed allocation", file!(), line!());
+                    U8Seq::null()
+                });
+                result
+                    .byte_array_value
+                    .iter_mut()
+                    .zip(val.iter())
+                    .for_each(|(dst, src)| *dst = *src);
+            }
+            Value::VecBool(val) => {
+                result.r#type = 6;
+                result.bool_array_value = BoolSeq::new(val.len()).unwrap_or_else(|| {
+                    log::error!("{}:{}: failed allocation", file!(), line!());
+                    BoolSeq::null()
+                });
+                result
+                    .bool_array_value
+                    .iter_mut()
+                    .zip(val.iter())
+                    .for_each(|(dst, src)| *dst = *src);
+            }
+            Value::VecI64(val) => {
+                result.r#type = 7;
+                result.integer_array_value = I64Seq::new(val.len()).unwrap_or_else(|| {
+                    log::error!("{}:{}: failed allocation", file!(), line!());
+                    I64Seq::null()
+                });
+                result
+                    .integer_array_value
+                    .iter_mut()
+                    .zip(val.iter())
+                    .for_each(|(dst, src)| *dst = *src);
+            }
+            Value::VecF64(val) => {
+                result.r#type = 8;
+                result.double_array_value = F64Seq::new(val.len()).unwrap_or_else(|| {
+                    log::error!("{}:{}: failed allocation", file!(), line!());
+                    F64Seq::null()
+                });
+                result
+                    .double_array_value
+                    .iter_mut()
+                    .zip(val.iter())
+                    .for_each(|(dst, src)| *dst = *src);
+            }
+            Value::VecString(val) => {
+                result.r#type = 9;
+                result.string_array_value = RosStringSeq::new(val.len()).unwrap_or_else(|| {
+                    log::error!("{}:{}: failed allocation", file!(), line!());
+                    RosStringSeq::null()
+                });
+                result
+                    .string_array_value
+                    .iter_mut()
+                    .zip(val.iter())
+                    .for_each(|(dst, src)| {
+                        dst.assign(src);
+                    });
+            }
+        }
+        result
+    }
+}

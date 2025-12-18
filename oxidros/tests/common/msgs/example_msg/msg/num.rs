@@ -142,8 +142,11 @@ unsafe impl<const N: usize> Send for NumSeq<N> {}
 unsafe impl<const N: usize> Sync for NumSeq<N> {}
 
 impl TypeSupport for Num {
-    fn type_support() -> *const rcl::rosidl_message_type_support_t {
-        unsafe { rosidl_typesupport_c__get_message_type_support_handle__example_msg__msg__Num() }
+    fn type_support() -> *const std::ffi::c_void {
+        unsafe {
+            rosidl_typesupport_c__get_message_type_support_handle__example_msg__msg__Num()
+                as *const _
+        }
     }
 }
 

@@ -67,3 +67,6 @@ all-features = false
 
 # Whether to pass `--no-default-features` to Cargo (default: false)
 no-default-features = true
+
+[build-dependencies]
+oxidros-build = { path = "../oxidros-build" }

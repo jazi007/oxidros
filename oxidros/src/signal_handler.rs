@@ -1,7 +1,6 @@
 //! Receive signals on a thread for graceful shutdown.
 
 use crate::{
-    helper::InitOnce,
     logger::{pr_info_in, Logger},
     rcl,
     selector::guard_condition::GuardCondition,
@@ -30,7 +29,7 @@ unsafe impl Send for KeyCond {}
 
 type ConditionSet = BTreeMap<KeyCond, GuardCondition>;
 
-static INITIALIZER: InitOnce = InitOnce::new();
+static INITIALIZER: std::sync::OnceLock<()> = std::sync::OnceLock::new();
 static GUARD_COND: Lazy<Mutex<ConditionSet>> = Lazy::new(|| Mutex::new(ConditionSet::new()));
 #[cfg(not(target_os = "windows"))]
 static SIGHDL: Lazy<Mutex<Option<Handle>>> = Lazy::new(|| Mutex::new(None));
@@ -53,32 +52,26 @@ impl Error for Signaled {}
 
 #[cfg(not(target_os = "windows"))]
 pub(crate) fn init() {
-    INITIALIZER.init(
-        || {
-            let signals = Signals::new([SIGHUP, SIGTERM, SIGINT, SIGQUIT]).unwrap();
-            let handle = signals.handle();
+    INITIALIZER.get_or_init(|| {
+        let signals = Signals::new([SIGHUP, SIGTERM, SIGINT, SIGQUIT]).unwrap();
+        let handle = signals.handle();
 
-            let mut guard = SIGHDL.lock();
-            *guard = Some(handle);
+        let mut guard = SIGHDL.lock();
+        *guard = Some(handle);
 
-            let th = thread::spawn(move || handler(signals));
-            *THREAD.lock() = Some(th);
-        },
-        (),
-    );
+        let th = thread::spawn(move || handler(signals));
+        *THREAD.lock() = Some(th);
+    });
 }
 
 #[cfg(target_os = "windows")]
 pub(crate) fn init() {
-    INITIALIZER.init(
-        || {
-            let term = Arc::clone(&IS_HALT);
-            signal_hook::flag::register(SIGTERM | SIGINT, Arc::clone(&term)).unwrap();
-            let th = thread::spawn(move || handler(term));
-            *THREAD.lock() = Some(th);
-        },
-        (),
-    );
+    INITIALIZER.get_or_init(|| {
+        let term = Arc::clone(&IS_HALT);
+        signal_hook::flag::register(SIGTERM | SIGINT, Arc::clone(&term)).unwrap();
+        let th = thread::spawn(move || handler(term));
+        *THREAD.lock() = Some(th);
+    });
 }
 
 pub(crate) fn register_guard_condition(cond: GuardCondition) {

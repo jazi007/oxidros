@@ -6,7 +6,7 @@ members = [
     "oxidros-rcl",
     "oxidros-wrapper",
     "ros2-msg-gen",
-    "examples/ros2msg_example",
+    "examples/ros2msg_example", "oxidros-build",
 ]
 resolver = "2"
 
@@ -19,3 +19,4 @@ license-file = "LICENSE"
 [workspace.dependencies]
 num-traits = "0.2"
 futures = "0.3"
+log = "0.4"

@@ -24,7 +24,7 @@ impl ActionMsg for MyAction {
     fn type_support() -> *const std::ffi::c_void {
         unsafe {
             rosidl_typesupport_c__get_action_type_support_handle__example_msg__action__MyAction()
-                as *const _
+                as *const _ as *const _
         }
     }
 
@@ -465,9 +465,9 @@ extern "C" {
 }
 
 impl TypeSupport for MyAction_SendGoal_Response {
-    fn type_support() -> *const rcl::rosidl_message_type_support_t {
+    fn type_support() -> *const std::ffi::c_void {
         unsafe {
-            rosidl_typesupport_c__get_message_type_support_handle__example_msg__action__MyAction_SendGoal_Response()
+            rosidl_typesupport_c__get_message_type_support_handle__example_msg__action__MyAction_SendGoal_Response() as *const _
         }
     }
 }
@@ -626,9 +626,9 @@ pub struct MyAction_SendGoal;
 impl ActionGoal for MyAction_SendGoal {
     type Request = MyAction_SendGoal_Request;
     type Response = MyAction_SendGoal_Response;
-    fn type_support() -> *const rcl::rosidl_service_type_support_t {
+    fn type_support() -> *const std::ffi::c_void {
         unsafe {
-            rosidl_typesupport_c__get_service_type_support_handle__example_msg__action__MyAction_SendGoal()
+            rosidl_typesupport_c__get_service_type_support_handle__example_msg__action__MyAction_SendGoal() as *const _
         }
     }
 }
@@ -683,9 +683,9 @@ extern "C" {
 }
 
 impl TypeSupport for MyAction_Result {
-    fn type_support() -> *const rcl::rosidl_message_type_support_t {
+    fn type_support() -> *const std::ffi::c_void {
         unsafe {
-            rosidl_typesupport_c__get_message_type_support_handle__example_msg__action__MyAction_Result()
+            rosidl_typesupport_c__get_message_type_support_handle__example_msg__action__MyAction_Result() as *const _
         }
     }
 }
@@ -855,9 +855,9 @@ extern "C" {
 }
 
 impl TypeSupport for MyAction_GetResult_Request {
-    fn type_support() -> *const rcl::rosidl_message_type_support_t {
+    fn type_support() -> *const std::ffi::c_void {
         unsafe {
-            rosidl_typesupport_c__get_message_type_support_handle__example_msg__action__MyAction_GetResult_Request()
+            rosidl_typesupport_c__get_message_type_support_handle__example_msg__action__MyAction_GetResult_Request() as *const _
         }
     }
 }
@@ -1032,9 +1032,9 @@ extern "C" {
 }
 
 impl TypeSupport for MyAction_GetResult_Response {
-    fn type_support() -> *const rcl::rosidl_message_type_support_t {
+    fn type_support() -> *const std::ffi::c_void {
         unsafe {
-            rosidl_typesupport_c__get_message_type_support_handle__example_msg__action__MyAction_GetResult_Response()
+            rosidl_typesupport_c__get_message_type_support_handle__example_msg__action__MyAction_GetResult_Response() as *const _
         }
     }
 }
@@ -1193,9 +1193,9 @@ pub struct MyAction_GetResult;
 impl ActionResult for MyAction_GetResult {
     type Request = MyAction_GetResult_Request;
     type Response = MyAction_GetResult_Response;
-    fn type_support() -> *const rcl::rosidl_service_type_support_t {
+    fn type_support() -> *const std::ffi::c_void {
         unsafe {
-            rosidl_typesupport_c__get_service_type_support_handle__example_msg__action__MyAction_GetResult()
+            rosidl_typesupport_c__get_service_type_support_handle__example_msg__action__MyAction_GetResult() as *const _
         }
     }
 }
@@ -1239,9 +1239,9 @@ extern "C" {
 }
 
 impl TypeSupport for MyAction_Feedback {
-    fn type_support() -> *const rcl::rosidl_message_type_support_t {
+    fn type_support() -> *const std::ffi::c_void {
         unsafe {
-            rosidl_typesupport_c__get_message_type_support_handle__example_msg__action__MyAction_Feedback()
+            rosidl_typesupport_c__get_message_type_support_handle__example_msg__action__MyAction_Feedback() as *const _
         }
     }
 }
@@ -1411,9 +1411,9 @@ extern "C" {
 }
 
 impl TypeSupport for MyAction_FeedbackMessage {
-    fn type_support() -> *const rcl::rosidl_message_type_support_t {
+    fn type_support() -> *const std::ffi::c_void {
         unsafe {
-            rosidl_typesupport_c__get_message_type_support_handle__example_msg__action__MyAction_FeedbackMessage()
+            rosidl_typesupport_c__get_message_type_support_handle__example_msg__action__MyAction_FeedbackMessage() as *const _
         }
     }
 }

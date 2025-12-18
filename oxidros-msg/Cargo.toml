@@ -12,6 +12,8 @@ authors.workspace = true
 
 [dependencies]
 oxidros-core = { path = "../oxidros-core" }
+oxidros-rcl = { path = "../oxidros-rcl" }
+log.workspace = true
 
 [features]
 default = []
@@ -22,4 +24,4 @@ galactic = []
 
 [build-dependencies]
 ros2-msg-gen = { path = "../ros2-msg-gen" }
-bindgen = "0.70"
+oxidros-build = { path = "../oxidros-build" }

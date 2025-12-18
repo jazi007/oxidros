@@ -137,6 +137,8 @@ pub trait AddTimer: SelectorLike {
     ) -> RCLResult<u64>;
 }
 
+pub type ParameterServerCb = Box<dyn FnMut(&mut crate::parameter::Parameter, BTreeSet<String>)>;
+
 /// Trait for adding parameter servers to a selector.
 pub trait AddParameterServer: SelectorLike {
     /// The parameter server type used by this implementation.
@@ -146,7 +148,7 @@ pub trait AddParameterServer: SelectorLike {
     fn add_parameter_server(
         &mut self,
         server: Self::ParameterServer,
-        callback: Box<dyn FnMut(&mut crate::parameter::Parameter, BTreeSet<String>)>,
+        callback: ParameterServerCb,
     ) -> RCLResult<()>;
 }
 

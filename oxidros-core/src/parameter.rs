@@ -1,8 +1,11 @@
 //! Parameter types and structures for ROS2 parameter server.
 
-use crate::helper::Contains;
+use crate::{helper::Contains, DynError};
 use num_traits::Zero;
-use std::fmt::Display;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::Display,
+};
 
 /// Describes a range of integers for parameter validation.
 ///
@@ -229,6 +232,223 @@ impl Display for Value {
             Value::VecU8(v) => write!(f, "{:?}", v),
             Value::VecF64(v) => write!(f, "{:?}", v),
             Value::VecString(v) => write!(f, "{:?}", v),
+        }
+    }
+}
+
+/// Parameters.
+///
+/// # Example
+///
+/// ```
+/// use oxidros_core::{error::DynError, parameter::{Parameters, Parameter, Value}};
+///
+/// fn get_param<'a>(params: &'a Parameters, name: &str) -> Option<&'a Parameter>
+/// {
+///     params.get_parameter(name)
+/// }
+///
+/// fn set_param(params: &mut Parameters, name: String, value: Value) -> Result<(), DynError>
+/// {
+///     params.set_parameter(name, value, false /* read_only */, Some("description".to_string()))
+/// }
+/// ```
+#[derive(Debug, Default)]
+pub struct Parameters {
+    pub params: BTreeMap<String, Parameter>,
+    pub updated: BTreeSet<String>,
+}
+
+impl Parameters {
+    pub const fn new() -> Self {
+        Self {
+            params: BTreeMap::new(),
+            updated: BTreeSet::new(),
+        }
+    }
+
+    pub fn take_updated(&mut self) -> BTreeSet<String> {
+        std::mem::take(&mut self.updated)
+    }
+
+    pub fn get_parameter(&self, name: &str) -> Option<&Parameter> {
+        self.params.get(name)
+    }
+
+    pub fn add_parameter(&mut self, name: String, parameter: Parameter) -> Result<(), DynError> {
+        if self.params.get_mut(&name).is_some() {
+            let msg: String = format!("{} is already declared", name);
+            Err(msg.into())
+        } else if parameter.check_range(&parameter.value) {
+            self.params.insert(name, parameter);
+            Ok(())
+        } else {
+            let msg = format!("{} is exceeding the range", name);
+            Err(msg.into())
+        }
+    }
+
+    pub fn set_parameter(
+        &mut self,
+        name: String,
+        value: Value,
+        read_only: bool,
+        description: Option<String>,
+    ) -> Result<(), DynError> {
+        if value == Value::NotSet {
+            Err("Value::NotSet cannot be used as a statically typed value".into())
+        } else if let Some(param) = self.params.get_mut(&name) {
+            if param.descriptor.dynamic_typing {
+                let msg = format!("{} is a dynamically typed value", name);
+                return Err(msg.into());
+            }
+
+            if param.descriptor.read_only {
+                let msg = format!("{} is read only", name);
+                return Err(msg.into());
+            }
+
+            if !param.check_range(&value) {
+                let msg = format!("{} is exceeding the range", name);
+                return Err(msg.into());
+            }
+
+            if param.value.type_check(&value) {
+                param.value = value;
+                Ok(())
+            } else {
+                let msg = format!(
+                    "failed type checking: dst = {}, src = {}",
+                    param.value.type_name(),
+                    value.type_name()
+                );
+                Err(msg.into())
+            }
+        } else {
+            let param = Parameter::new(
+                value,
+                read_only,
+                false,
+                description.unwrap_or_else(|| name.clone()),
+            );
+            self.params.insert(name, param);
+            Ok(())
+        }
+    }
+
+    pub fn set_dynamically_typed_parameter(
+        &mut self,
+        name: String,
+        value: Value,
+        read_only: bool,
+        description: Option<String>,
+    ) -> Result<(), DynError> {
+        if let Some(param) = self.params.get_mut(&name) {
+            if !param.descriptor.dynamic_typing {
+                let msg = format!("{} is a statically typed value", name);
+                return Err(msg.into());
+            }
+
+            if param.descriptor.read_only {
+                let msg = format!("{} is read only", name);
+                return Err(msg.into());
+            }
+
+            if !param.check_range(&value) {
+                let msg = format!("{} is exceeding the range", name);
+                return Err(msg.into());
+            }
+
+            param.value = value;
+        } else {
+            let param = Parameter::new(
+                value,
+                read_only,
+                true,
+                description.unwrap_or_else(|| name.clone()),
+            );
+            self.params.insert(name, param);
+        }
+        Ok(())
+    }
+
+    pub fn set_floating_point_range(
+        &mut self,
+        name: &str,
+        min: f64,
+        max: f64,
+        step: f64,
+    ) -> Result<(), DynError> {
+        let range = FloatingPointRange { min, max, step };
+
+        if let Some(param) = self.params.get_mut(name) {
+            if !param.check_range(&param.value) {
+                let msg = format!("{:?} is not in the range.", param.value);
+                return Err(msg.into());
+            }
+
+            if param.descriptor.dynamic_typing {
+                param.descriptor.floating_point_range = Some(range);
+                Ok(())
+            } else {
+                match &param.value {
+                    Value::F64(_) | Value::VecF64(_) => {
+                        param.descriptor.floating_point_range = Some(range);
+                        Ok(())
+                    }
+                    _ => {
+                        let msg = format!(
+                            "{}({}) is not a floating point (array) type.",
+                            name,
+                            param.value.type_name()
+                        );
+                        Err(msg.into())
+                    }
+                }
+            }
+        } else {
+            let msg = format!("no such parameter: name = {}", name);
+            Err(msg.into())
+        }
+    }
+
+    pub fn set_integer_range(
+        &mut self,
+        name: &str,
+        min: i64,
+        max: i64,
+        step: usize,
+    ) -> Result<(), DynError> {
+        let range = IntegerRange { min, max, step };
+
+        if let Some(param) = self.params.get_mut(name) {
+            if !param.check_range(&param.value) {
+                let msg = format!("{:?} is not in the range.", param.value);
+                return Err(msg.into());
+            }
+
+            if param.descriptor.dynamic_typing {
+                param.descriptor.integer_range = Some(range);
+                Ok(())
+            } else {
+                match &param.value {
+                    Value::I64(_) | Value::VecI64(_) => {
+                        param.descriptor.integer_range = Some(range);
+                        Ok(())
+                    }
+                    _ => {
+                        let msg = format!(
+                            "{}({}) is not an integer (array) type.",
+                            name,
+                            param.value.type_name()
+                        );
+                        Err(msg.into())
+                    }
+                }
+            }
+        } else {
+            let msg = format!("no such parameter: name = {}", name);
+            Err(msg.into())
         }
     }
 }
