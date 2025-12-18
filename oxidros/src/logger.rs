@@ -164,11 +164,11 @@ macro_rules! pr_debug {
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive, ToPrimitive)]
 enum Severity {
-    Debug = rcl::RCUTILS_LOG_SEVERITY_RCUTILS_LOG_SEVERITY_DEBUG,
-    Info = rcl::RCUTILS_LOG_SEVERITY_RCUTILS_LOG_SEVERITY_INFO,
-    Warn = rcl::RCUTILS_LOG_SEVERITY_RCUTILS_LOG_SEVERITY_WARN,
-    Error = rcl::RCUTILS_LOG_SEVERITY_RCUTILS_LOG_SEVERITY_ERROR,
-    Fatal = rcl::RCUTILS_LOG_SEVERITY_RCUTILS_LOG_SEVERITY_FATAL,
+    Debug = rcl::RCUTILS_LOG_SEVERITY_DEBUG,
+    Info = rcl::RCUTILS_LOG_SEVERITY_INFO,
+    Warn = rcl::RCUTILS_LOG_SEVERITY_WARN,
+    Error = rcl::RCUTILS_LOG_SEVERITY_ERROR,
+    Fatal = rcl::RCUTILS_LOG_SEVERITY_FATAL,
 }
 
 /// Logger of ROS2.

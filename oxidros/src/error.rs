@@ -150,13 +150,4 @@ impl From<RCLError> for RCLActionError {
     }
 }
 
-impl std::fmt::Display for rcl::rcutils_error_string_t {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = self.str_;
-        let inner: &[u8] = unsafe { std::slice::from_raw_parts(s.as_ptr() as *const u8, s.len()) };
-        let s = String::from_utf8(inner.to_vec()).unwrap();
-        write!(f, "{}", s)
-    }
-}
-
-impl Error for rcl::rcutils_error_string_t {}
+// Display and Error implementations for rcutils_error_string_t are now in oxidros-rcl

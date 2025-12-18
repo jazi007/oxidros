@@ -14,7 +14,6 @@ use std::{
 };
 
 use crate::logger::{pr_error_in, Logger};
-use crate::msg::interfaces::action_msgs::msg::GoalInfoSeq;
 use crate::msg::GetUUID;
 use crate::PhantomUnsync;
 use crate::{
@@ -28,7 +27,7 @@ use crate::{
     node::Node,
     qos::Profile,
     rcl::{
-        self, bindgen_action_msgs__msg__GoalInfo, bindgen_action_msgs__msg__GoalInfo__Sequence,
+        self, action_msgs__msg__GoalInfo, action_msgs__msg__GoalInfo__Sequence,
         rcl_action_cancel_request_t, rcl_action_goal_handle_t, rcl_action_server_t,
         rmw_request_id_t, unique_identifier_msgs__msg__UUID,
     },
@@ -272,20 +271,16 @@ where
                     return RecvResult::Err(e.into());
                 }
 
-                let goal_seq_ptr =
-                    &process_response.msg.goals_canceling as *const _ as *const GoalInfoSeq<0>;
-                let candidates = unsafe { &(*goal_seq_ptr) };
-                let goals = candidates
+                // Convert RCL goal info sequence to oxidros-msg GoalInfo vector
+                let rcl_goals = unsafe {
+                    std::slice::from_raw_parts(
+                        process_response.msg.goals_canceling.data,
+                        process_response.msg.goals_canceling.size,
+                    )
+                };
+                let goals = rcl_goals
                     .iter()
-                    .map(|g| GoalInfo {
-                        goal_id: UUID {
-                            uuid: g.goal_id.uuid,
-                        },
-                        stamp: oxidros_msg::interfaces::builtin_interfaces::msg::Time {
-                            sec: g.stamp.sec,
-                            nanosec: g.stamp.nanosec,
-                        },
-                    })
+                    .map(|g| RclGoalInfo(*g).into())
                     .collect::<Vec<_>>();
 
                 // return sender
@@ -554,15 +549,14 @@ impl<T: ActionMsg> ServerCancelSend<T> {
         response.msg.return_code = code;
 
         if code == ERROR_NONE {
-            response.msg.goals_canceling = bindgen_action_msgs__msg__GoalInfo__Sequence {
-                data: accepted_goals.as_mut_ptr() as *mut _
-                    as *mut bindgen_action_msgs__msg__GoalInfo,
+            response.msg.goals_canceling = action_msgs__msg__GoalInfo__Sequence {
+                data: accepted_goals.as_mut_ptr() as *mut _ as *mut action_msgs__msg__GoalInfo,
                 size: accepted_goals.len() as rcl::size_t,
                 capacity: accepted_goals.capacity() as rcl::size_t,
             };
         } else {
             let mut empty = vec![];
-            response.msg.goals_canceling = bindgen_action_msgs__msg__GoalInfo__Sequence {
+            response.msg.goals_canceling = action_msgs__msg__GoalInfo__Sequence {
                 data: empty.as_mut_ptr() as *mut _,
                 size: 0,
                 capacity: 0,
@@ -884,37 +878,60 @@ impl<T: ActionMsg + 'static> AsyncServer<T> {
     }
 }
 
-impl From<bindgen_action_msgs__msg__GoalInfo> for GoalInfo {
-    fn from(value: bindgen_action_msgs__msg__GoalInfo) -> Self {
+// Newtype wrappers to avoid orphan rule violations
+pub(crate) struct RclGoalInfo(action_msgs__msg__GoalInfo);
+pub(crate) struct RclUUID(unique_identifier_msgs__msg__UUID);
+pub(crate) struct RclTime(crate::rcl::builtin_interfaces__msg__Time);
+
+impl From<RclGoalInfo> for GoalInfo {
+    fn from(value: RclGoalInfo) -> Self {
         Self {
-            goal_id: value.goal_id.into(),
+            goal_id: RclUUID(value.0.goal_id).into(),
             stamp: oxidros_msg::interfaces::builtin_interfaces::msg::Time {
-                sec: value.stamp.sec,
-                nanosec: value.stamp.nanosec,
+                sec: value.0.stamp.sec,
+                nanosec: value.0.stamp.nanosec,
             },
         }
     }
 }
 
-impl From<unique_identifier_msgs__msg__UUID> for UUID {
-    fn from(value: unique_identifier_msgs__msg__UUID) -> Self {
-        Self { uuid: value.uuid }
+impl From<action_msgs__msg__GoalInfo> for RclGoalInfo {
+    fn from(value: action_msgs__msg__GoalInfo) -> Self {
+        RclGoalInfo(value)
     }
 }
 
-impl From<crate::rcl::builtin_interfaces__msg__Time> for crate::msg::builtin_interfaces__msg__Time {
-    fn from(value: crate::rcl::builtin_interfaces__msg__Time) -> Self {
+impl From<RclUUID> for UUID {
+    fn from(value: RclUUID) -> Self {
+        Self { uuid: value.0.uuid }
+    }
+}
+
+impl From<unique_identifier_msgs__msg__UUID> for RclUUID {
+    fn from(value: unique_identifier_msgs__msg__UUID) -> Self {
+        RclUUID(value)
+    }
+}
+
+impl From<RclTime> for crate::msg::builtin_interfaces__msg__Time {
+    fn from(value: RclTime) -> Self {
         Self {
-            sec: value.sec,
-            nanosec: value.nanosec,
+            sec: value.0.sec,
+            nanosec: value.0.nanosec,
         }
+    }
+}
+
+impl From<crate::rcl::builtin_interfaces__msg__Time> for RclTime {
+    fn from(value: crate::rcl::builtin_interfaces__msg__Time) -> Self {
+        RclTime(value)
     }
 }
 
 #[allow(clippy::result_large_err)]
 fn rcl_action_accept_new_goal(
     server: *mut rcl_action_server_t,
-    goal_info: &bindgen_action_msgs__msg__GoalInfo,
+    goal_info: &action_msgs__msg__GoalInfo,
 ) -> Result<*mut rcl_action_goal_handle_t, Box<rcl::rcutils_error_string_t>> {
     let goal_handle = {
         let guard = rcl::MT_UNSAFE_FN.lock();

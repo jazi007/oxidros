@@ -3,6 +3,7 @@ members = [
     "oxidros",
     "oxidros-core",
     "oxidros-msg",
+    "oxidros-rcl",
     "oxidros-wrapper",
     "ros2-msg-gen",
     "examples/ros2msg_example",

@@ -32,6 +32,9 @@ pub enum ReliabilityPolicy {
 
     /// Reliability policy has not yet been set.
     Unknown,
+
+    /// Will match the majority of endpoints and use a reliable policy if possible
+    BestAvailable,
 }
 
 /// QoS durability policy - how samples persist.
@@ -48,6 +51,9 @@ pub enum DurabilityPolicy {
 
     /// Durability policy has not yet been set.
     Unknown,
+
+    /// Will match the majority of endpoints and use a transient local policy if possible
+    BestAvailable,
 }
 
 /// QoS liveliness policy - a publisher's reporting policy for its alive status.
@@ -66,6 +72,9 @@ pub enum LivelinessPolicy {
 
     /// Liveliness policy has not yet been set.
     Unknown,
+
+    /// Will match the majority of endpoints and use a manual by topic policy if possible
+    BestAvailable,
 }
 
 /// Represents a QoS profile.

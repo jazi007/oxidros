@@ -186,12 +186,12 @@ impl<T: ServiceMsg> Server<T> {
 
         let rcl_introspection_state = match introspection_state {
             RCLServiceIntrospection::RCLServiceIntrospectionMetadata => {
-                rcl::rcl_service_introspection_state_e_RCL_SERVICE_INTROSPECTION_METADATA
+                rcl::RCL_SERVICE_INTROSPECTION_METADATA
             }
             RCLServiceIntrospection::RCLServiceIntrospectionContents => {
-                rcl::rcl_service_introspection_state_e_RCL_SERVICE_INTROSPECTION_CONTENTS
+                rcl::RCL_SERVICE_INTROSPECTION_CONTENTS
             }
-            _ => rcl::rcl_service_introspection_state_e_RCL_SERVICE_INTROSPECTION_OFF,
+            _ => rcl::RCL_SERVICE_INTROSPECTION_OFF,
         };
 
         let mut data = self.data.lock();

@@ -906,6 +906,7 @@ dependencies = [
  "once_cell",
  "oxidros-core",
  "oxidros-msg",
+ "oxidros-rcl",
  "parking_lot",
  "pin-project",
  "rand",
@@ -930,6 +931,14 @@ dependencies = [
  "bindgen",
  "oxidros-core",
  "ros2-msg-gen",
+]
+
+[[package]]
+name = "oxidros-rcl"
+version = "0.1.0"
+dependencies = [
+ "bindgen",
+ "oxidros-core",
 ]
 
 [[package]]
