@@ -10,3 +10,11 @@ pub trait Contains {
     /// Returns true if the container contains the value.
     fn contains(&self, val: Self::T) -> bool;
 }
+
+impl Contains for (usize, usize) {
+    type T = usize;
+    fn contains(&self, val: Self::T) -> bool {
+        (self.0..self.1).contains(&val)
+    }
+}
+

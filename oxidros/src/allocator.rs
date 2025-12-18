@@ -24,7 +24,7 @@
 //! }
 //! ```
 
-use crate::helper::Contains;
+use oxidros_core::helper::Contains;
 use std::{
     alloc::{GlobalAlloc, Layout, System},
     mem::size_of,
@@ -41,13 +41,6 @@ pub struct CustomAllocator {
 
 #[global_allocator]
 pub static mut ALLOCATOR: CustomAllocator = CustomAllocator::new();
-
-impl Contains for (usize, usize) {
-    type T = usize;
-    fn contains(&self, val: Self::T) -> bool {
-        (self.0..self.1).contains(&val)
-    }
-}
 
 impl CustomAllocator {
     const fn new() -> Self {
