@@ -124,14 +124,14 @@ impl Drop for ServerData {
     }
 }
 
-#[cfg(any(feature = "iron", feature = "jazzy"))]
+#[cfg(any(feature = "jazzy", feature = "kilted"))]
 pub enum RCLServiceIntrospection {
     RCLServiceIntrospectionOff,
     RCLServiceIntrospectionMetadata,
     RCLServiceIntrospectionContents,
 }
 
-#[cfg(any(feature = "iron", feature = "jazzy"))]
+#[cfg(any(feature = "jazzy", feature = "kilted"))]
 impl From<rcl::rcl_service_introspection_state_t> for RCLServiceIntrospection {
     fn from(value: rcl::rcl_service_introspection_state_t) -> Self {
         use rcl::rcl_service_introspection_state_t::*;
@@ -142,7 +142,7 @@ impl From<rcl::rcl_service_introspection_state_t> for RCLServiceIntrospection {
         }
     }
 }
-#[cfg(any(feature = "iron", feature = "jazzy"))]
+#[cfg(any(feature = "jazzy", feature = "kilted"))]
 impl From<RCLServiceIntrospection> for rcl::rcl_service_introspection_state_t {
     fn from(value: RCLServiceIntrospection) -> Self {
         use rcl::rcl_service_introspection_state_t::*;

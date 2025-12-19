@@ -39,10 +39,9 @@ oxidros-build = { path = "../oxidros-build" }
 [features]
 default = []
 custom_alloc = []
-galactic = ["oxidros-msg/galactic"]
 humble = ["oxidros-msg/humble"]
-iron = ["oxidros-msg/iron"]
 jazzy = ["oxidros-msg/jazzy"]
+kilted = ["oxidros-msg/kilted"]
 rcl_stat = ["statistics"]
 statistics = ["serde", "serde_json"]
 

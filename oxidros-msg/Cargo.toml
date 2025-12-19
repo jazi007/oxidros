@@ -18,9 +18,8 @@ log.workspace = true
 [features]
 default = []
 jazzy = []
-iron = []
 humble = []
-galactic = []
+kilted = []
 
 [build-dependencies]
 ros2-msg-gen = { path = "../ros2-msg-gen" }

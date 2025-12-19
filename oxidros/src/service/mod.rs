@@ -25,12 +25,12 @@ impl Header {
         self.header.request_id.sequence_number
     }
 
-    #[cfg(not(any(feature = "iron", feature = "jazzy")))]
+    #[cfg(not(any(feature = "jazzy", feature = "kilted")))]
     pub fn get_writer_guid(self) -> [i8; 16] {
         self.header.request_id.writer_guid
     }
 
-    #[cfg(any(feature = "iron", feature = "jazzy"))]
+    #[cfg(any(feature = "jazzy", feature = "kilted"))]
     pub fn get_writer_guid(self) -> [u8; 16] {
         self.header.request_id.writer_guid
     }

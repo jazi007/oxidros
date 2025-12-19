@@ -12,9 +12,8 @@ oxidros-core = { path = "../oxidros-core" }
 [features]
 default = []
 jazzy = []
-iron = []
 humble = []
-galactic = []
+kilted = []
 
 [build-dependencies]
 oxidros-build = { path = "../oxidros-build" }

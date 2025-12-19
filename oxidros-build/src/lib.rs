@@ -13,7 +13,7 @@ struct CustomCallbacks;
 
 impl ParseCallbacks for CustomCallbacks {
     fn process_comment(&self, comment: &str) -> Option<String> {
-        Some(format!("````ignore\n{}\n````", comment))
+        Some(format!("````text\n{}\n````", comment))
     }
 }
 

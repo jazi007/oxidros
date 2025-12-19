@@ -319,10 +319,7 @@ impl<T: msg::ServiceMsg> ST<ClientRecv<T>> {
     }
 }
 
-#[cfg(feature = "galactic")]
-type RcutilsAllocator = rcl::rcutils_allocator_t;
-
-#[cfg(any(feature = "humble", feature = "iron", feature = "jazzy"))]
+#[cfg(any(feature = "humble", feature = "jazzy", feature = "kilted"))]
 type RcutilsAllocator = rcl::rcutils_allocator_s;
 
 #[cfg(feature = "custom_alloc")]

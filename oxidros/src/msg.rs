@@ -11,19 +11,9 @@
 #![allow(clippy::useless_conversion)]
 
 // Re-export all messages from oxidros-msg crate (generated at compile time)
-#[cfg(any(
-    feature = "galactic",
-    feature = "humble",
-    feature = "iron",
-    feature = "jazzy"
-))]
+#[cfg(any(feature = "humble", feature = "jazzy", feature = "kilted"))]
 pub use oxidros_msg::*;
 
 // Re-export submodules explicitly (pub use * doesn't re-export modules)
-#[cfg(any(
-    feature = "galactic",
-    feature = "humble",
-    feature = "iron",
-    feature = "jazzy"
-))]
+#[cfg(any(feature = "humble", feature = "jazzy", feature = "kilted"))]
 pub use oxidros_msg::{common_interfaces, interfaces, primitives::*, ros2msg};
