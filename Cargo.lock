@@ -1377,8 +1377,6 @@ dependencies = [
 [[package]]
 name = "t4_idl_parser"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce719119d9844440d884601ca53a7b75c75cfc590278546533ccfda3bc137dc9"
 dependencies = [
  "nom 7.1.3",
  "nom-greedyerror",

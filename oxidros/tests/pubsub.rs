@@ -1,6 +1,6 @@
 pub mod common;
 
-use common::msgs::example_msg::msg::Num;
+use oxidros::msg::common_interfaces::example_interfaces::msg::Int64;
 use oxidros::{context::Context, msg::common_interfaces::std_msgs};
 use std::error::Error;
 
@@ -23,7 +23,7 @@ fn test_pubsub() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
 
     // publish a message
     let n = 100;
-    let msg = Num { num: n };
+    let msg = Int64 { data: n };
     publisher.send(&msg)?; // send message
 
     // wait messages
@@ -31,7 +31,7 @@ fn test_pubsub() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
     selector.add_subscriber(
         subscriber,
         Box::new(move |msg| {
-            assert_eq!(msg.num, n);
+            assert_eq!(msg.data, n);
         }),
     );
     selector.wait()?;

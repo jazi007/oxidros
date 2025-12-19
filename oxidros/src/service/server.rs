@@ -32,7 +32,7 @@
 //!     server,
 //!     Box::new(|request, header| {
 //!         // Create a response.
-//!         let response = std_srvs::srv::EmptyResponse::new().unwrap();
+//!         let response = std_srvs::srv::Empty_Response::new().unwrap();
 //!         response
 //!     })
 //! );
@@ -70,7 +70,7 @@
 //!         let req = server.recv().await;
 //!         match req {
 //!             Ok((sender, request, _header)) => {
-//!                 let response = std_srvs::srv::EmptyResponse::new().unwrap();
+//!                 let response = std_srvs::srv::Empty_Response::new().unwrap();
 //!                 match sender.send(&response) {
 //!                     Ok(s) => server = s,                  // Get a new server to handle next request.
 //!                     Err((s, _e)) => server = s.give_up(), // Failed to send.
@@ -245,7 +245,7 @@ impl<T: ServiceMsg> Server<T> {
     ///         match server.try_recv() {
     ///             RecvResult::Ok((sender, request, header)) => {
     ///                 pr_info!(logger, "received: header = {:?}", header);
-    ///                 let msg = std_srvs::srv::EmptyResponse::new().unwrap();
+    ///                 let msg = std_srvs::srv::Empty_Response::new().unwrap();
     ///                 match sender.send(&msg) {
     ///                     Ok(s) => server = s,                  // Get a new server to handle next request.
     ///                     Err((s, _e)) => server = s.give_up(), // Failed to send.
@@ -320,7 +320,7 @@ impl<T: ServiceMsg> Server<T> {
     ///         match req {
     ///             Ok((sender, request, header)) => {
     ///                 pr_info!(logger, "recv: header = {:?}", header);
-    ///                 let response = std_srvs::srv::EmptyResponse::new().unwrap();
+    ///                 let response = std_srvs::srv::Empty_Response::new().unwrap();
     ///                 match sender.send(&response) {
     ///                     Ok(s) => server = s,                  // Get a new server to handle next request.
     ///                     Err((s, _e)) => server = s.give_up(), // Failed to send.
@@ -385,7 +385,7 @@ impl<T: ServiceMsg> ServerSend<T> {
     ///         let req = server.recv().await;
     ///         match req {
     ///             Ok((sender, request, _header)) => {
-    ///                 let response = std_srvs::srv::EmptyResponse::new().unwrap();
+    ///                 let response = std_srvs::srv::Empty_Response::new().unwrap();
     ///                 match sender.send(&response) {
     ///                     Ok(s) => server = s,                  // Get a new server to handle next request.
     ///                     Err((s, _e)) => server = s.give_up(), // Failed to send.

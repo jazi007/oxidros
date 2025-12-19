@@ -1,0 +1,21 @@
+[package]
+name = "t4_idl_parser"
+version = "0.1.1"
+edition = "2021"
+authors = [ "Yuuki Takano <yuuki.takano@tier4.jp>, TIER IV, Inc." ]
+description = "A parser for the interface definition language (IDL) specified by Object Management Group (OMG)  written in Rust. This supports IDL version 4.2."
+license-file = "LICENSE"
+readme = "README.md"
+keywords = ["parser", "IDL" ]
+categories = [ "parser-implementations", "parsing" ]
+repository = "https://github.com/tier4/idl_parser"
+homepage = "https://github.com/tier4/idl_parser"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+nom = "7.1"
+nom-greedyerror = "0.4"
+nom_locate = "4.0"
+num-bigint = "0.4"
+num-traits = "0.2"

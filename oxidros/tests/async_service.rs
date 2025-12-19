@@ -2,7 +2,9 @@ pub mod common;
 
 #[allow(unused_imports)]
 use async_std::{future, prelude::*};
-use common::msgs::example_msg::srv::{AddThreeInts, AddThreeIntsRequest, AddThreeIntsResponse};
+use oxidros::msg::common_interfaces::example_interfaces::srv::{
+    AddTwoInts, AddTwoInts_Request, AddTwoInts_Response,
+};
 use oxidros::{
     context::Context,
     error::DynError,
@@ -46,14 +48,14 @@ fn test_async_service() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
 }
 
 /// The server
-async fn run_server(mut server: Server<AddThreeInts>) -> Result<(), DynError> {
+async fn run_server(mut server: Server<AddTwoInts>) -> Result<(), DynError> {
     for _ in 0..3 {
         // receive a request
         let (sender, request, _) = server.recv().await?;
         println!("Server: request = {:?}", request);
 
-        let response = AddThreeIntsResponse {
-            sum: request.a + request.b + request.c,
+        let response = AddTwoInts_Response {
+            sum: request.a + request.b,
         };
 
         // send a response
@@ -69,14 +71,10 @@ async fn run_server(mut server: Server<AddThreeInts>) -> Result<(), DynError> {
 }
 
 /// The client
-async fn run_client(mut client: Client<AddThreeInts>) -> Result<(), DynError> {
+async fn run_client(mut client: Client<AddTwoInts>) -> Result<(), DynError> {
     let dur = Duration::from_millis(500);
     for n in 0..3 {
-        let data = AddThreeIntsRequest {
-            a: n,
-            b: n * 10,
-            c: n * 100,
-        };
+        let data = AddTwoInts_Request { a: n, b: n * 10 };
 
         // send a request
         println!("Client: request = {:?}", data);
@@ -90,7 +88,7 @@ async fn run_client(mut client: Client<AddThreeInts>) -> Result<(), DynError> {
         match async_std::future::timeout(dur, &mut receiver).await {
             Ok(Ok((c, response, _header))) => {
                 pr_info!(logger, "received: {:?}", response);
-                assert_eq!(response.sum, n + n * 10 + n * 100);
+                assert_eq!(response.sum, n + n * 10);
 
                 // got a new client to send the next request
                 client = c;

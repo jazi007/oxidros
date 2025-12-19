@@ -1,6 +1,5 @@
 pub mod common;
 
-use common::action_msg::action::my_action::*;
 use futures::Future;
 use oxidros::{
     self,
@@ -13,6 +12,10 @@ use oxidros::{
     context::Context,
     error::DynError,
     msg::{
+        common_interfaces::example_interfaces::action::{
+            Fibonacci, Fibonacci_Feedback, Fibonacci_GetResult_Request, Fibonacci_Goal,
+            Fibonacci_Result,
+        },
         interfaces::action_msgs::{msg::GoalInfo, srv::CancelGoal_Request},
         unique_identifier_msgs::msg::UUID,
     },
@@ -24,7 +27,7 @@ fn create_server(
     node: &str,
     action: &str,
     qos: Option<ServerQosOption>,
-) -> Result<Server<MyAction>, DynError> {
+) -> Result<Server<Fibonacci>, DynError> {
     let node_server = ctx.create_node(node, None, Default::default()).unwrap();
 
     Server::new(node_server, action, qos).map_err(|e| e.into())
@@ -34,12 +37,12 @@ fn create_client(
     ctx: &Arc<Context>,
     node: &str,
     action: &str,
-) -> Result<Client<MyAction>, DynError> {
+) -> Result<Client<Fibonacci>, DynError> {
     let node_client = ctx.create_node(node, None, Default::default())?;
     Client::new(node_client, action, None).map_err(|e| e.into())
 }
 
-async fn assert_status(client: Client<MyAction>, expected: GoalStatus) -> Client<MyAction> {
+async fn assert_status(client: Client<Fibonacci>, expected: GoalStatus) -> Client<Fibonacci> {
     let recv = client.recv_status();
     match async_std::future::timeout(Duration::from_secs(3), recv).await {
         Ok(Ok((c, status_array))) => {
@@ -54,25 +57,40 @@ async fn assert_status(client: Client<MyAction>, expected: GoalStatus) -> Client
     }
 }
 
-fn spawn_worker(handle: GoalHandle<MyAction>) {
+fn spawn_worker(handle: GoalHandle<Fibonacci>) {
     std::thread::Builder::new()
         .name("worker".into())
         .spawn(move || {
+            let mut sequence = vec![0, 1];
             for c in 0..=5 {
                 if handle.is_canceling().unwrap() {
                     println!("server worker: canceling the goal");
-                    handle.canceled(MyAction_Result { b: 1000 }).unwrap();
+                    handle
+                        .canceled(Fibonacci_Result {
+                            sequence: sequence.as_slice().try_into().unwrap(),
+                        })
+                        .unwrap();
                     return;
                 }
 
                 println!("server worker: sending feedback {c}");
-                let feedback = MyAction_Feedback { c };
+                if c > 1 {
+                    let next = sequence[sequence.len() - 1] + sequence[sequence.len() - 2];
+                    sequence.push(next);
+                }
+                let feedback = Fibonacci_Feedback {
+                    sequence: sequence.as_slice().try_into().unwrap(),
+                };
                 handle.feedback(feedback).unwrap();
                 std::thread::sleep(Duration::from_secs(1));
             }
 
             println!("server worker: result is now available");
-            handle.finish(MyAction_Result { b: 500 }).unwrap();
+            handle
+                .finish(Fibonacci_Result {
+                    sequence: sequence.as_slice().try_into().unwrap(),
+                })
+                .unwrap();
 
             loop {
                 std::thread::sleep(Duration::from_secs(5));
@@ -81,7 +99,7 @@ fn spawn_worker(handle: GoalHandle<MyAction>) {
         .unwrap();
 }
 
-fn spawn_worker_abort(handle: GoalHandle<MyAction>) {
+fn spawn_worker_abort(handle: GoalHandle<Fibonacci>) {
     std::thread::Builder::new()
         .name("worker".into())
         .spawn(move || {
@@ -93,10 +111,10 @@ fn spawn_worker_abort(handle: GoalHandle<MyAction>) {
         .unwrap();
 }
 
-async fn run_server(server: Server<MyAction>, abort: bool) -> Result<(), DynError> {
+async fn run_server(server: Server<Fibonacci>, abort: bool) -> Result<(), DynError> {
     let mut server = AsyncServer::new(server);
 
-    let goal = move |sender: ServerGoalSend<MyAction>, req| {
+    let goal = move |sender: ServerGoalSend<Fibonacci>, req| {
         println!("server: goal received: {:?}", req);
 
         let s = sender
@@ -116,7 +134,7 @@ async fn run_server(server: Server<MyAction>, abort: bool) -> Result<(), DynErro
         s
     };
 
-    let cancel = move |sender: ServerCancelSend<MyAction>, candidates| {
+    let cancel = move |sender: ServerCancelSend<Fibonacci>, candidates| {
         println!("server: received cancel request for: {:?}", candidates);
 
         let accepted = candidates; // filter requests here if needed
@@ -137,7 +155,7 @@ async fn run_server(server: Server<MyAction>, abort: bool) -> Result<(), DynErro
     server.listen(goal, cancel).await
 }
 
-async fn receive_goal_response(receiver: ClientGoalRecv<MyAction>) -> Client<MyAction> {
+async fn receive_goal_response(receiver: ClientGoalRecv<Fibonacci>) -> Client<Fibonacci> {
     let recv = receiver.recv();
     match async_std::future::timeout(Duration::from_secs(3), recv).await {
         Ok(Ok((c, response, _header))) => {
@@ -149,7 +167,7 @@ async fn receive_goal_response(receiver: ClientGoalRecv<MyAction>) -> Client<MyA
     }
 }
 
-async fn receive_result_response(receiver: ClientResultRecv<MyAction>) -> Client<MyAction> {
+async fn receive_result_response(receiver: ClientResultRecv<Fibonacci>) -> Client<Fibonacci> {
     let recv = receiver.recv();
     match async_std::future::timeout(Duration::from_secs(3), recv).await {
         Ok(Ok((c, response, _header))) => {
@@ -161,9 +179,9 @@ async fn receive_result_response(receiver: ClientResultRecv<MyAction>) -> Client
     }
 }
 
-async fn run_client(client: Client<MyAction>) -> Result<(), DynError> {
+async fn run_client(client: Client<Fibonacci>) -> Result<(), DynError> {
     let uuid: [u8; 16] = rand::random();
-    let goal = MyAction_Goal { a: 10 };
+    let goal = Fibonacci_Goal { order: 10 };
     let receiver = client.send_goal_with_uuid(goal, uuid)?;
 
     let mut client = receive_goal_response(receiver).await;
@@ -175,7 +193,7 @@ async fn run_client(client: Client<MyAction>) -> Result<(), DynError> {
             Ok(Ok((c, feedback))) => {
                 println!("client: feedback received: {:?}", feedback);
 
-                if feedback.feedback.c == 5 {
+                if feedback.feedback.sequence.len() >= 6 {
                     client = c;
                     break;
                 }
@@ -190,7 +208,7 @@ async fn run_client(client: Client<MyAction>) -> Result<(), DynError> {
 
     // send a result request
     println!("sending result request...");
-    let receiver = client.send_result_request(&MyAction_GetResult_Request {
+    let receiver = client.send_result_request(&Fibonacci_GetResult_Request {
         goal_id: UUID { uuid },
     })?;
 
@@ -199,9 +217,9 @@ async fn run_client(client: Client<MyAction>) -> Result<(), DynError> {
     Ok(())
 }
 
-async fn run_client_cancel(client: Client<MyAction>) -> Result<(), DynError> {
+async fn run_client_cancel(client: Client<Fibonacci>) -> Result<(), DynError> {
     let uuid: [u8; 16] = rand::random();
-    let goal = MyAction_Goal { a: 10 };
+    let goal = Fibonacci_Goal { order: 10 };
     let receiver = client.send_goal_with_uuid(goal, uuid)?;
 
     let client = receive_goal_response(receiver).await;
@@ -231,9 +249,9 @@ async fn run_client_cancel(client: Client<MyAction>) -> Result<(), DynError> {
     Ok(())
 }
 
-async fn run_client_status(client: Client<MyAction>) -> Result<(), DynError> {
+async fn run_client_status(client: Client<Fibonacci>) -> Result<(), DynError> {
     let uuid: [u8; 16] = rand::random();
-    let goal = MyAction_Goal { a: 10 };
+    let goal = Fibonacci_Goal { order: 10 };
     let receiver = client.send_goal_with_uuid(goal, uuid)?;
 
     let client = receive_goal_response(receiver).await;
@@ -248,9 +266,9 @@ async fn run_client_status(client: Client<MyAction>) -> Result<(), DynError> {
     Ok(())
 }
 
-async fn run_client_abort(client: Client<MyAction>) -> Result<(), DynError> {
+async fn run_client_abort(client: Client<Fibonacci>) -> Result<(), DynError> {
     let uuid: [u8; 16] = rand::random();
-    let goal = MyAction_Goal { a: 10 };
+    let goal = Fibonacci_Goal { order: 10 };
     let receiver = client.send_goal_with_uuid(goal, uuid)?;
 
     let client = receive_goal_response(receiver).await;
@@ -272,7 +290,7 @@ fn start_server_client<G>(
     server_abort: bool,
 ) -> Result<(), DynError>
 where
-    G: FnOnce(Client<MyAction>) -> Pin<Box<dyn Future<Output = Result<(), DynError>> + Send>>
+    G: FnOnce(Client<Fibonacci>) -> Pin<Box<dyn Future<Output = Result<(), DynError>> + Send>>
         + Send
         + 'static,
 {

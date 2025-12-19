@@ -1,6 +1,6 @@
 pub mod common;
 
-use common::msgs::example_msg::msg::Num;
+use oxidros::msg::common_interfaces::example_interfaces::msg::Int64;
 use oxidros::{context::Context, RecvResult};
 use std::error::Error;
 
@@ -11,7 +11,7 @@ fn test_subscription() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
         .create_node("test_subscription_node", None, Default::default())
         .unwrap();
 
-    let subscription = node.create_subscriber::<Num>("test_subscription", Default::default())?;
+    let subscription = node.create_subscriber::<Int64>("test_subscription", Default::default())?;
 
     match subscription.try_recv() {
         RecvResult::RetryLater(_) => Ok(()), // must fail because there is no publisher

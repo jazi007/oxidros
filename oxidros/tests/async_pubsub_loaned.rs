@@ -2,7 +2,7 @@ pub mod common;
 
 #[allow(unused_imports)]
 use async_std::{future, prelude::*};
-use common::msgs::example_msg::msg::Num;
+use oxidros::msg::common_interfaces::example_interfaces::msg::Int64;
 use oxidros::{
     context::Context,
     topic::{
@@ -43,12 +43,12 @@ fn test_async_pubsub() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
 }
 
 /// The publisher
-async fn run_publisher(p: Publisher<Num>) {
+async fn run_publisher(p: Publisher<Int64>) {
     let dur = Duration::from_millis(100);
     for n in 0..3 {
         // publish a message periodically
         let mut loaned = p.borrow_loaned_message().unwrap();
-        *loaned = Num { num: n };
+        *loaned = Int64 { data: n };
         if let Err(e) = p.send_loaned(loaned) {
             println!("error: {e}");
             return;
@@ -61,7 +61,7 @@ async fn run_publisher(p: Publisher<Num>) {
 }
 
 /// The subscriber
-async fn run_subscriber(mut s: Subscriber<Num>) {
+async fn run_subscriber(mut s: Subscriber<Int64>) {
     let dur = Duration::from_millis(500);
     for n in 0.. {
         // receive a message specifying timeout of 500ms
@@ -73,8 +73,8 @@ async fn run_subscriber(mut s: Subscriber<Num>) {
                 }
 
                 // received a message
-                println!("async subscribe: msg = {}", msg.num);
-                assert_eq!(msg.num, n);
+                println!("async subscribe: msg = {}", msg.data);
+                assert_eq!(msg.data, n);
             }
             Ok(Err(e)) => panic!("{}", e), // fatal error
             Err(_) => {

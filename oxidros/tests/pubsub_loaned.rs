@@ -1,7 +1,7 @@
 pub mod common;
 
-use common::msgs::example_msg::msg::Num;
 use oxidros::context::Context;
+use oxidros::msg::common_interfaces::example_interfaces::msg::Int64;
 use std::error::Error;
 
 const TOPIC_NAME: &str = "test_pubsub_loaned";
@@ -25,7 +25,7 @@ fn test_pubsub_loaned() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
     let num = 100;
 
     let mut loaned = publisher.borrow_loaned_message()?;
-    *loaned = Num { num };
+    *loaned = Int64 { data: num };
     publisher.send_loaned(loaned)?; // send message
 
     // wait messages
@@ -33,7 +33,7 @@ fn test_pubsub_loaned() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
     selector.add_subscriber(
         subscriber,
         Box::new(move |msg| {
-            assert_eq!(msg.num, num);
+            assert_eq!(msg.data, num);
         }),
     );
     selector.wait()?;

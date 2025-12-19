@@ -451,7 +451,7 @@ impl Selector {
     ///         server,
     ///         Box::new(|request: <std_srvs::srv::Empty as ServiceMsg>::Request, header| {
     ///             // Return the response.
-    ///             let response = std_srvs::srv::EmptyResponse::new().unwrap();
+    ///             let response = std_srvs::srv::Empty_Response::new().unwrap();
     ///             response
     ///         }), // Callback function.
     ///     );

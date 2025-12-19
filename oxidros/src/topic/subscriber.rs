@@ -110,7 +110,7 @@
 //! use oxidros::{
 //!     context::Context,
 //!     msg::common_interfaces::std_msgs,
-//!     qos::policy::HistoryPolicy,
+//!     qos::HistoryPolicy,
 //! };
 //!
 //! let ctx = Context::new().unwrap();
@@ -131,7 +131,7 @@
 //! use oxidros::{
 //!     context::Context,
 //!     msg::common_interfaces::std_msgs,
-//!     qos::{policy::HistoryPolicy, Profile},
+//!     qos::{HistoryPolicy, Profile},
 //! };
 //!
 //! let ctx = Context::new().unwrap();

@@ -1,6 +1,6 @@
 pub mod common;
 
-use common::msgs::example_msg::msg::Num;
+use oxidros::msg::common_interfaces::example_interfaces::msg::Int64;
 use oxidros::node::Node;
 use std::{cell::Cell, error::Error, rc::Rc, sync::Arc, thread, time::Duration};
 
@@ -42,7 +42,7 @@ fn test_select_subscriptions() -> Result<(), Box<dyn Error + Sync + Send + 'stat
     selector.add_subscriber(
         s1,
         Box::new(move |msg| {
-            assert_eq!(msg.num, cnt1_m.get());
+            assert_eq!(msg.data, cnt1_m.get());
             cnt1_m.set(cnt1_m.get() + 1);
         }),
     );
@@ -53,7 +53,7 @@ fn test_select_subscriptions() -> Result<(), Box<dyn Error + Sync + Send + 'stat
     selector.add_subscriber(
         s2,
         Box::new(move |msg| {
-            assert_eq!(msg.num, cnt2_m.get());
+            assert_eq!(msg.data, cnt2_m.get());
             cnt2_m.set(cnt2_m.get() + 1);
         }),
     );
@@ -77,7 +77,7 @@ fn pub_thread(node: Arc<Node>, topic_name: &str, dur: Duration, init: i64) {
     for i in 0..COUNT {
         thread::sleep(dur);
         let n = init + i;
-        let msg = Num { num: n };
+        let msg = Int64 { data: n };
         publisher.send(&msg).unwrap(); // send message
     }
 }
@@ -107,7 +107,7 @@ fn test_callback() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
     selector.add_subscriber(
         subscriber,
         Box::new(move |msg| {
-            println!("callback: num = {}", msg.num);
+            println!("callback: num = {}", msg.data);
             cnt1.set(cnt1.get() + 1);
         }),
     );

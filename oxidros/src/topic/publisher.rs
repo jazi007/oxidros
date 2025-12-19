@@ -28,7 +28,7 @@
 //! ## Specifying QoS Profile
 //!
 //! ```
-//! use oxidros::{context::Context, msg::common_interfaces::std_msgs, qos::{Profile, policy::HistoryPolicy}};
+//! use oxidros::{context::Context, msg::common_interfaces::std_msgs, qos::{Profile, HistoryPolicy}};
 //!
 //! let ctx = Context::new().unwrap();
 //! let node_pub = ctx

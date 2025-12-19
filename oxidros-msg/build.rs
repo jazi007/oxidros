@@ -9,6 +9,7 @@ fn main() {
     let common_interfaces_deps = [
         "actionlib_msgs",
         "diagnostic_msgs",
+        "example_interfaces",
         "geometry_msgs",
         "nav_msgs",
         "sensor_msgs",

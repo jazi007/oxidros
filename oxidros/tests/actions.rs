@@ -1,6 +1,5 @@
 pub mod common;
 
-use common::action_msg::action::my_action::*;
 use oxidros::{
     action::{
         client::Client,
@@ -11,6 +10,10 @@ use oxidros::{
     context::Context,
     error::DynError,
     msg::{
+        common_interfaces::example_interfaces::action::{
+            Fibonacci, Fibonacci_Feedback, Fibonacci_GetResult_Request, Fibonacci_Goal,
+            Fibonacci_Result,
+        },
         interfaces::action_msgs::{msg::GoalInfo, srv::CancelGoal_Request},
         unique_identifier_msgs::msg::UUID,
     },
@@ -23,7 +26,7 @@ fn create_server(
     node: &str,
     action: &str,
     qos: Option<ServerQosOption>,
-) -> Result<Server<MyAction>, DynError> {
+) -> Result<Server<Fibonacci>, DynError> {
     let node_server = ctx.create_node(node, None, Default::default()).unwrap();
 
     Server::new(node_server, action, qos).map_err(|e| e.into())
@@ -33,25 +36,36 @@ fn create_client(
     ctx: &Arc<Context>,
     node: &str,
     action: &str,
-) -> Result<Client<MyAction>, DynError> {
+) -> Result<Client<Fibonacci>, DynError> {
     let options = oxidros::node::NodeOptions::default();
     let node_client = ctx.create_node(node, None, options)?;
     Client::new(node_client, action, None).map_err(|e| e.into())
 }
 
-fn accept_handler(handle: GoalHandle<MyAction>) {
+fn accept_handler(handle: GoalHandle<Fibonacci>) {
     std::thread::Builder::new()
         .name("worker".into())
         .spawn(move || {
-            for c in 0..=5 {
+            let mut sequence = vec![0, 1];
+            for i in 0..=5 {
                 std::thread::sleep(Duration::from_secs(2));
-                println!("server worker: sending feedback {c}");
-                let feedback = MyAction_Feedback { c };
+                println!("server worker: sending feedback {i}");
+                if i > 1 {
+                    let next = sequence[sequence.len() - 1] + sequence[sequence.len() - 2];
+                    sequence.push(next);
+                }
+                let feedback = Fibonacci_Feedback {
+                    sequence: sequence.as_slice().try_into().unwrap(),
+                };
                 handle.feedback(feedback).unwrap();
             }
 
             println!("server worker: sending result");
-            handle.finish(MyAction_Result { b: 500 }).unwrap();
+            handle
+                .finish(Fibonacci_Result {
+                    sequence: sequence.as_slice().try_into().unwrap(),
+                })
+                .unwrap();
 
             loop {
                 std::thread::sleep(Duration::from_secs(5));
@@ -72,7 +86,7 @@ fn test_action() -> Result<(), DynError> {
     // send goal request
     let uuid: [u8; 16] = rand::random();
     let uuid_ = uuid;
-    let goal = MyAction_Goal { a: 10 };
+    let goal = Fibonacci_Goal { order: 10 };
     let mut recv = client.send_goal_with_uuid(goal, uuid)?;
 
     thread::sleep(Duration::from_millis(100));
@@ -119,7 +133,7 @@ fn test_action() -> Result<(), DynError> {
 
     let mut goal_id = UUID::new().unwrap();
     goal_id.uuid = uuid_;
-    let result_req = MyAction_GetResult_Request { goal_id };
+    let result_req = Fibonacci_GetResult_Request { goal_id };
     let mut recv = client.send_result_request(&result_req)?;
 
     selector.wait()?;
@@ -159,7 +173,7 @@ fn test_action_cancel() -> Result<(), DynError> {
 
     // send goal request
     let uuid: [u8; 16] = rand::random();
-    let goal = MyAction_Goal { a: 10 };
+    let goal = Fibonacci_Goal { order: 10 };
     let mut recv = client.send_goal_with_uuid(goal, uuid)?;
 
     thread::sleep(Duration::from_millis(100));
@@ -235,7 +249,7 @@ fn test_action_status() -> Result<(), DynError> {
 
     // send goal request
     let uuid: [u8; 16] = rand::random();
-    let goal = MyAction_Goal { a: 10 };
+    let goal = Fibonacci_Goal { order: 0 };
     let mut recv = client.send_goal_with_uuid(goal, uuid)?;
 
     thread::sleep(Duration::from_millis(100));

@@ -1,7 +1,6 @@
 pub mod common;
 
-use common::msgs::example_msg::msg::Num;
-use oxidros::context::Context;
+use oxidros::{context::Context, msg::common_interfaces::example_interfaces::msg::Int64};
 use std::error::Error;
 
 #[test]
@@ -11,9 +10,9 @@ fn test_publish() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
         .create_node("test_publish_node", None, Default::default())
         .unwrap();
 
-    let publisher = node.create_publisher::<Num>("test_publish", Default::default())?;
+    let publisher = node.create_publisher::<Int64>("test_publish", Default::default())?;
 
-    let msg = Num { num: 100 };
+    let msg = Int64 { data: 100 };
     publisher.send(&msg)?;
 
     Ok(())

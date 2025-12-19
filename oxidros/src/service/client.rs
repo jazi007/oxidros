@@ -32,7 +32,7 @@
 //!     let dur = Duration::from_millis(100);
 //!
 //!     for _ in 0..5 {
-//!         let request = std_srvs::srv::EmptyRequest::new().unwrap();
+//!         let request = std_srvs::srv::Empty_Request::new().unwrap();
 //!         let mut receiver = client.send(&request).unwrap().recv();
 //!         match async_std::future::timeout(dur, &mut receiver).await {
 //!             Ok(Ok((c, response, _header))) => {
@@ -141,7 +141,7 @@ impl<T: ServiceMsg> Client<T> {
     ///     let dur = Duration::from_millis(100);
     ///
     ///     loop {
-    ///         let request = std_srvs::srv::EmptyRequest::new().unwrap();
+    ///         let request = std_srvs::srv::Empty_Request::new().unwrap();
     ///         let mut receiver = client.send(&request).unwrap().recv();
     ///         match async_std::future::timeout(dur, &mut receiver).await {
     ///             Ok(Ok((c, response, _header))) => {
@@ -186,7 +186,7 @@ impl<T: ServiceMsg> Client<T> {
     ///     let dur = Duration::from_millis(100);
     ///
     ///     loop {
-    ///         let request = std_srvs::srv::EmptyRequest::new().unwrap();
+    ///         let request = std_srvs::srv::Empty_Request::new().unwrap();
     ///         let (receiver, sequence) = client.send_ret_seq(&request).unwrap();
     ///         let mut receiver = receiver.recv();
     ///         pr_info!(logger, "sent: sequence = {sequence}");
@@ -297,7 +297,7 @@ impl<T: ServiceMsg> ClientRecv<T> {
     ///     let dur = Duration::from_millis(100);
     ///
     ///     loop {
-    ///         let request = std_srvs::srv::EmptyRequest::new().unwrap();
+    ///         let request = std_srvs::srv::Empty_Request::new().unwrap();
     ///         let mut receiver = client.send(&request).unwrap().recv();
     ///         match async_std::future::timeout(dur, &mut receiver).await {
     ///             Ok(Ok((c, response, header))) => {
@@ -361,7 +361,7 @@ impl<T: ServiceMsg> ClientRecv<T> {
     ///             // Take the client.
     ///             let c = client.take().unwrap();
     ///
-    ///             let request = std_srvs::srv::EmptyRequest::new().unwrap();
+    ///             let request = std_srvs::srv::Empty_Request::new().unwrap();
     ///
     ///             // Send a request.
     ///             let receiver = c.send(&request).unwrap();

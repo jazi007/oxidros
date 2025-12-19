@@ -24,7 +24,7 @@ mod runtime_c {
     include!(concat!(env!("OUT_DIR"), "/runtime_c.rs"));
 }
 
-use oxidros_core::Value;
+use oxidros_core::{DynError, Value};
 // Re-export runtime_c types
 pub use runtime_c::*;
 
@@ -36,7 +36,7 @@ macro_rules! def_sequence {
         /// `N` represents the maximum number of elements.
         /// If `N` is `0`, the sequence is unlimited.
         #[repr(C)]
-        #[derive(Debug)]
+        #[derive(Debug, Clone)]
         pub struct $ty<const N: usize>($ty_seq);
 
         impl<const N: usize> $ty<N> {
@@ -213,13 +213,51 @@ def_sequence!(
     rosidl_runtime_c__int64__Sequence__are_equal
 );
 
+/// The error type returned when a conversion from a slice to an array fails.
+#[derive(Debug, Copy, Clone)]
+pub struct TryFromSliceError(());
+
+impl std::fmt::Display for TryFromSliceError {
+    #[inline]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        "could not convert slice to array".fmt(f)
+    }
+}
+
+impl std::error::Error for TryFromSliceError {}
+
+macro_rules! def_try_from {
+    ($from:ty, $to:ty) => {
+        impl TryFrom<&[$from]> for $to {
+            type Error = TryFromSliceError;
+            fn try_from(value: &[$from]) -> Result<Self, Self::Error> {
+                let mut seq = Self::new(value.len()).ok_or(TryFromSliceError(()))?;
+                seq.iter_mut().zip(value).for_each(|(dst, &src)| *dst = src);
+                Ok(seq)
+            }
+        }
+    };
+}
+
+def_try_from!(bool, BoolSeq<0>);
+def_try_from!(i8, I8Seq<0>);
+def_try_from!(i16, I16Seq<0>);
+def_try_from!(i32, I32Seq<0>);
+def_try_from!(i64, I64Seq<0>);
+def_try_from!(u8, U8Seq<0>);
+def_try_from!(u16, U16Seq<0>);
+def_try_from!(u32, U32Seq<0>);
+def_try_from!(u64, U64Seq<0>);
+def_try_from!(f32, F32Seq<0>);
+def_try_from!(f64, F64Seq<0>);
+
 // Definition of String ---------------------------------------------------------------------------
 
 /// String.
 /// `N` represents the maximum number of characters excluding `\0`.
 /// If `N` is `0`, the string is unlimited.
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RosString<const N: usize>(rosidl_runtime_c__String);
 
 impl<const N: usize> RosString<N> {
@@ -317,7 +355,7 @@ unsafe impl<const N: usize> Send for RosString<N> {}
 /// `M` represents the maximum number of elements in a sequence.
 /// If `SEQLEN` is `0`, the sequence is unlimited.
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RosStringSeq<const STRLEN: usize, const SEQLEN: usize>(
     rosidl_runtime_c__String__Sequence,
 );

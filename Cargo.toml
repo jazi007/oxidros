@@ -6,7 +6,7 @@ members = [
     "oxidros-rcl",
     "oxidros-wrapper",
     "ros2-msg-gen",
-    "examples/ros2msg_example", "oxidros-build",
+    "examples/ros2msg_example", "oxidros-build", "idl_parser",
 ]
 resolver = "2"
 

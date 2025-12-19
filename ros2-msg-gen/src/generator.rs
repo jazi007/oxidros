@@ -19,7 +19,7 @@ use std::{
 use t4_idl_parser::expr::{
     AnyDeclarator, ArrayDeclarator, ConstType, ConstrTypeDcl, Definition, Member, Module,
     PrimitiveType, ScopedName, SequenceType, StringType, StructDcl, StructDef, TemplateTypeSpec,
-    TypeDcl, TypeSpec, Typedef, TypedefType,
+    TypeDcl, TypeSpec, Typedef, TypedefType, WStringType,
 };
 
 #[derive(Debug, Clone)]
@@ -536,7 +536,7 @@ impl Generator {
 
     fn idl_struct(&mut self, lines: &mut VecDeque<String>, struct_def: &StructDef, lib: &str) {
         lines.push_back("\n#[repr(C)]".to_string());
-        lines.push_back("#[derive(Debug)]".to_string());
+        lines.push_back("#[derive(Debug, Clone)]".to_string());
         lines.push_back(format!("pub struct {} {{", struct_def.id));
         for member in struct_def.members.iter() {
             self.idl_member(lines, member, lib);
@@ -581,7 +581,7 @@ impl Generator {
             TemplateTypeSpec::Sequence(val) => self.idl_sequence_type(val, lib),
             TemplateTypeSpec::FixedPoint(_) => unimplemented!(),
             TemplateTypeSpec::Map(_) => unimplemented!(),
-            TemplateTypeSpec::WString(_) => unimplemented!(),
+            TemplateTypeSpec::WString(val) => idl_wstring_type(val),
         }
     }
 
@@ -930,7 +930,7 @@ impl Generator {
         lines: &mut VecDeque<Cow<'static, str>>,
     ) {
         lines.push_back("#[repr(C)]".into());
-        lines.push_back("#[derive(Debug)]".into());
+        lines.push_back("#[derive(Debug, Clone)]".into());
         lines.push_back(format!("pub struct {struct_name} {{").into());
 
         let mut num_member = 0;
@@ -1017,6 +1017,18 @@ fn idl_string_type(string_type: &StringType) -> String {
             }
         }
         StringType::UnlimitedSize => "crate::msg::RosString<0>".to_string(),
+    }
+}
+fn idl_wstring_type(string_type: &WStringType) -> String {
+    match string_type {
+        WStringType::Sized(expr) => {
+            if let ConstValue::Integer(n) = eval(expr) {
+                format!("crate::msg::RosString<{n}>")
+            } else {
+                panic!("not a integer number")
+            }
+        }
+        WStringType::UnlimitedSize => "crate::msg::RosString<0>".to_string(),
     }
 }
 
@@ -1150,7 +1162,7 @@ impl Drop for {type_name_full} {{
 }}
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct {type_name_full}SeqRaw {{
     data: *mut {type_name_full},
     size: usize,
@@ -1161,7 +1173,7 @@ struct {type_name_full}SeqRaw {{
 /// `N` is the maximum number of elements.
 /// If `N` is `0`, the size is unlimited.
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct {type_name_full}Seq<const N: usize> {{
     data: *mut {type_name_full},
     size: usize,
@@ -1417,7 +1429,7 @@ impl Drop for {type_name} {{
 }}
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct {type_name}SeqRaw {{
     data: *mut {type_name},
     size: usize,
@@ -1428,7 +1440,7 @@ struct {type_name}SeqRaw {{
 /// `N` is the maximum number of elements.
 /// If `N` is `0`, the size is unlimited.
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct {type_name}Seq<const N: usize> {{
     data: *mut {type_name},
     size: usize,
@@ -1510,7 +1522,7 @@ extern \"C\" {{
     fn rosidl_typesupport_c__get_service_type_support_handle__{module_name}__{module_2nd}__{type_name}_SendGoal() -> *const rcl::rosidl_service_type_support_t;
 }}
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct {type_name}_SendGoal;
 
 impl ActionGoal for {type_name}_SendGoal {{
@@ -1556,7 +1568,7 @@ extern \"C\" {{
     fn rosidl_typesupport_c__get_service_type_support_handle__{module_name}__{module_2nd}__{type_name}_GetResult() -> *const rcl::rosidl_service_type_support_t;
 }}
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct {type_name}_GetResult;
 
 impl ActionResult for {type_name}_GetResult {{
@@ -1602,7 +1614,7 @@ extern \"C\" {{
     fn rosidl_typesupport_c__get_service_type_support_handle__{module_name}__{module_2nd}__{type_name}() -> *const rcl::rosidl_service_type_support_t;
 }}
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct {type_name};
 
 impl ServiceMsg for {type_name} {{
@@ -1625,7 +1637,7 @@ extern \"C\" {{
     fn rosidl_typesupport_c__get_action_type_support_handle__{module_name}__action__{type_name}() -> *const rcl::rosidl_action_type_support_t;
 }}
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct {type_name};
 
 impl ActionMsg for {type_name} {{
@@ -1670,34 +1682,34 @@ impl ActionMsg for {type_name} {{
 }}
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct {type_name}_SendGoal_Request {{
     pub goal_id: unique_identifier_msgs::msg::UUID,
     pub goal: {type_name}_Goal,
 }}
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct {type_name}_SendGoal_Response {{
     pub accepted: bool,
     pub stamp: UnsafeTime,
 }}
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct {type_name}_GetResult_Request {{
     pub goal_id: unique_identifier_msgs::msg::UUID,
 }}
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct {type_name}_GetResult_Response {{
     pub status: u8,
     pub result: {type_name}_Result,
 }}
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct {type_name}_FeedbackMessage {{
     pub goal_id: unique_identifier_msgs::msg::UUID,
     pub feedback: {type_name}_Feedback,

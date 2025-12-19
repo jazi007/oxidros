@@ -17,4 +17,3 @@ impl Contains for (usize, usize) {
         (self.0..self.1).contains(&val)
     }
 }
-

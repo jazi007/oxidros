@@ -11,9 +11,10 @@ authors.workspace = true
 repository.workspace = true
 
 [dependencies]
+
 nom = "8"
 convert_case = "0.10"
 checksumdir = "0.3"
-t4_idl_parser = "0.1"
+t4_idl_parser = { path = "../idl_parser" }
 num-bigint = "0.4"
 num-traits.workspace = true

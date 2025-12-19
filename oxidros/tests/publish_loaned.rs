@@ -1,7 +1,7 @@
 pub mod common;
 
-use common::msgs::example_msg::msg::Num;
 use oxidros::context::Context;
+use oxidros::msg::common_interfaces::example_interfaces::msg::Int64;
 use std::error::Error;
 
 const TOPIC_NAME: &str = "test_publish_loaned";
@@ -13,10 +13,10 @@ fn test_publish_loaned() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
         .create_node("test_publish_node", None, Default::default())
         .unwrap();
 
-    let publisher = node.create_publisher::<Num>(TOPIC_NAME, Default::default())?;
+    let publisher = node.create_publisher::<Int64>(TOPIC_NAME, Default::default())?;
 
     let mut loaned = publisher.borrow_loaned_message()?;
-    *loaned = Num { num: 100 };
+    *loaned = Int64 { data: 100 };
 
     publisher.send_loaned(loaned)?;
 

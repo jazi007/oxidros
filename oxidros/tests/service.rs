@@ -1,7 +1,11 @@
 pub mod common;
 
-use common::msgs::example_msg::srv::{AddThreeIntsRequest, AddThreeIntsResponse};
-use oxidros::{context::Context, error::DynError, RecvResult};
+use oxidros::{
+    context::Context,
+    error::DynError,
+    msg::common_interfaces::example_interfaces::srv::{AddTwoInts_Request, AddTwoInts_Response},
+    RecvResult,
+};
 use std::time::Duration;
 
 const SERVICE_NAME1: &str = "test_service1";
@@ -25,7 +29,7 @@ fn test_service() -> Result<(), DynError> {
     let mut selector = ctx.create_selector()?;
 
     // Client: send a request
-    let req = AddThreeIntsRequest { a: 1, b: 2, c: 5 };
+    let req = AddTwoInts_Request { a: 1, b: 7 };
     let rcv_client = match client.send_ret_seq(&req) {
         Ok((c, seq)) => {
             println!("Client: seq = {seq}");
@@ -44,8 +48,8 @@ fn test_service() -> Result<(), DynError> {
                 "Server: received: data = {:?}, header = {:?}",
                 request, header
             );
-            AddThreeIntsResponse {
-                sum: request.a + request.b + request.c,
+            AddTwoInts_Response {
+                sum: request.a + request.b,
             }
         }),
     );
