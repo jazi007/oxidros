@@ -26,4 +26,4 @@ pub use oxidros_msg::*;
     feature = "iron",
     feature = "jazzy"
 ))]
-pub use oxidros_msg::{common_interfaces, interfaces, ros2msg};
+pub use oxidros_msg::{common_interfaces, interfaces, primitives::*, ros2msg};

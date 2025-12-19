@@ -1,9 +1,21 @@
 use std::{env, path::Path};
 
+use bindgen::callbacks::ParseCallbacks;
+
 #[cfg(target_os = "windows")]
 pub const SEPARATOR: char = ';';
 #[cfg(not(target_os = "windows"))]
 pub const SEPARATOR: char = ':';
+
+// https://github.com/rust-lang/rust-bindgen/issues/1313
+#[derive(Debug)]
+struct CustomCallbacks;
+
+impl ParseCallbacks for CustomCallbacks {
+    fn process_comment(&self, comment: &str) -> Option<String> {
+        Some(format!("````ignore\n{}\n````", comment))
+    }
+}
 
 pub fn ros2_env_var_changed() {
     let distro_env = std::env::var_os("ROS_DISTRO").expect("Source your ros2 env");
@@ -20,6 +32,7 @@ pub fn builder_base() -> bindgen::Builder {
             non_exhaustive: false,
         })
         .size_t_is_usize(true)
+        .parse_callbacks(Box::new(CustomCallbacks))
 }
 
 pub fn generate_rcl_bindings(out_dir: &Path) {

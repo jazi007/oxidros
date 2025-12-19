@@ -11,7 +11,6 @@
 //! In contrast, the starvation freedom of our executor has been validated by not only dynamic analysis but also
 //! formal verification.
 //!
-//! See [specifications](https://github.com/tier4/safe_drive/tree/main/specifications).
 //!
 //! We specified and tested as follows.
 //!
