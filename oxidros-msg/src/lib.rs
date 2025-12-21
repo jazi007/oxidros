@@ -27,6 +27,7 @@ pub mod rcl {
 }
 
 pub mod primitives;
+pub mod strings;
 
 // Include runtime C bindings first (provides rosidl_runtime_c types)
 mod runtime_c {
@@ -40,9 +41,9 @@ pub use runtime_c::*;
 // Re-export msg module utilities for generated code
 pub mod msg {
     pub use crate::primitives::{
-        BoolSeq, F32Seq, F64Seq, I16Seq, I32Seq, I64Seq, I8Seq, RosString, RosStringSeq, U16Seq,
-        U32Seq, U64Seq, U8Seq,
+        BoolSeq, F32Seq, F64Seq, I16Seq, I32Seq, I64Seq, I8Seq, U16Seq, U32Seq, U64Seq, U8Seq,
     };
+    pub use crate::strings::{RosString, RosStringSeq, RosWString, RosWStringSeq};
     pub use oxidros_core::TypeSupport;
 }
 

@@ -517,7 +517,7 @@ impl Generator {
                     ConstType::PrimitiveType(t) => idl_primitive(t).to_string(),
                     ConstType::StringType(_) => "&str".to_string(),
                     ConstType::ScopedName(t) => self.idl_scoped_name(t, lib),
-                    ConstType::WStringType(_) => unimplemented!(),
+                    ConstType::WStringType(_) => "&str".to_string(),
                     ConstType::FixedPointConst => unimplemented!(),
                 };
 
@@ -596,7 +596,7 @@ impl Generator {
             TemplateTypeSpec::Sequence(val) => self.idl_sequence_type(val, lib),
             TemplateTypeSpec::FixedPoint(_) => unimplemented!(),
             TemplateTypeSpec::Map(_) => unimplemented!(),
-            TemplateTypeSpec::WString(_) => unimplemented!(),
+            TemplateTypeSpec::WString(val) => idl_wstring_type_seq(val, size),
         }
     }
 
@@ -1023,12 +1023,12 @@ fn idl_wstring_type(string_type: &WStringType) -> String {
     match string_type {
         WStringType::Sized(expr) => {
             if let ConstValue::Integer(n) = eval(expr) {
-                format!("crate::msg::RosString<{n}>")
+                format!("crate::msg::RosWString<{n}>")
             } else {
                 panic!("not a integer number")
             }
         }
-        WStringType::UnlimitedSize => "crate::msg::RosString<0>".to_string(),
+        WStringType::UnlimitedSize => "crate::msg::RosWString<0>".to_string(),
     }
 }
 
@@ -1045,6 +1045,18 @@ fn idl_string_type_seq(string_type: &StringType, size: &BigInt) -> String {
     }
 }
 
+fn idl_wstring_type_seq(string_type: &WStringType, size: &BigInt) -> String {
+    match string_type {
+        WStringType::Sized(expr) => {
+            if let ConstValue::Integer(n) = eval(expr) {
+                format!("crate::msg::RosWStringSeq<{n}, {size}>")
+            } else {
+                panic!("not a integer number")
+            }
+        }
+        WStringType::UnlimitedSize => format!("crate::msg::RosWStringSeq<0, {size}>"),
+    }
+}
 fn module_file_type(path: &Path) -> Result<(String, PathBuf, String), DynError> {
     // "{CamelFileName}.msg" to "{snake_file_name}.rs"
     let names: Vec<_> = path

@@ -16,4 +16,4 @@ pub use oxidros_msg::*;
 
 // Re-export submodules explicitly (pub use * doesn't re-export modules)
 #[cfg(any(feature = "humble", feature = "jazzy", feature = "kilted"))]
-pub use oxidros_msg::{common_interfaces, interfaces, primitives::*, ros2msg};
+pub use oxidros_msg::{common_interfaces, interfaces, primitives::*, ros2msg, strings::*};
