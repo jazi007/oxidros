@@ -1,7 +1,5 @@
 pub mod common;
 
-#[allow(unused_imports)]
-use async_std::{future, prelude::*};
 use oxidros::msg::common_interfaces::example_interfaces::srv::{
     AddTwoInts, AddTwoInts_Request, AddTwoInts_Response,
 };
@@ -17,8 +15,8 @@ use std::{error::Error, time::Duration};
 
 const SERVICE_NAME: &str = "test_async_service";
 
-#[test]
-fn test_async_service() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_async_service() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
     // create a context
     let ctx = Context::new()?;
 
@@ -33,14 +31,12 @@ fn test_async_service() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
     let client = common::create_client(node_client, SERVICE_NAME).unwrap();
 
     // create tasks
-    async_std::task::block_on(async {
-        let p = async_std::task::spawn(async {
-            let _ = async_std::future::timeout(Duration::from_secs(3), run_server(server)).await;
-        });
-        let s = async_std::task::spawn(run_client(client));
-        p.await;
-        s.await.unwrap();
+    let p = tokio::task::spawn(async {
+        let _ = tokio::time::timeout(Duration::from_secs(3), run_server(server)).await;
     });
+    let s = tokio::task::spawn(run_client(client));
+    p.await.unwrap();
+    s.await.unwrap().unwrap();
 
     println!("finished test_async_service");
 
@@ -85,7 +81,7 @@ async fn run_client(mut client: Client<AddTwoInts>) -> Result<(), DynError> {
 
         // receive a response
         let mut receiver = receiver.recv();
-        match async_std::future::timeout(dur, &mut receiver).await {
+        match tokio::time::timeout(dur, &mut receiver).await {
             Ok(Ok((c, response, _header))) => {
                 pr_info!(logger, "received: {:?}", response);
                 assert_eq!(response.sum, n + n * 10);
@@ -104,14 +100,14 @@ async fn run_client(mut client: Client<AddTwoInts>) -> Result<(), DynError> {
         }
 
         // sleep 500[ms]
-        async_std::task::sleep(dur).await;
+        tokio::time::sleep(dur).await;
     }
 
     Ok(())
 }
 
-#[test]
-fn test_client_rs() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_client_rs() {
     // Create a context.
     let ctx = Context::new().unwrap();
 
@@ -137,7 +133,7 @@ fn test_client_rs() {
             let mut receiver = client.send(&request).unwrap().recv();
 
             pr_info!(logger, "receiving");
-            match async_std::future::timeout(dur, &mut receiver).await {
+            match tokio::time::timeout(dur, &mut receiver).await {
                 Ok(Ok((c, response, _header))) => {
                     pr_info!(logger, "received: {:?}", response);
                     client = c;
@@ -158,7 +154,7 @@ fn test_client_rs() {
         }
     }
 
-    async_std::task::block_on(run_client(client, logger)); // Spawn an asynchronous task.
+    run_client(client, logger).await; // Spawn an asynchronous task.
 
     println!("finished test_client_rs");
 }

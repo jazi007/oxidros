@@ -85,7 +85,8 @@
 //! }
 //!
 //! // We don't call `server_task` here because testing this code will block forever.
-//! // async_std::task::block_on(server_task(server, logger)); // Spawn an asynchronous task.
+//! // let rt = tokio::runtime::Runtime::new().unwrap(); --- IGNORE ---
+//! // rt.block_on(server_task(server, logger)); // Spawn an asynchronous task.
 //! ```
 
 use super::Header;

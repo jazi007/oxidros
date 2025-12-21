@@ -34,7 +34,7 @@
 //!     for _ in 0..5 {
 //!         let request = std_srvs::srv::Empty_Request::new().unwrap();
 //!         let mut receiver = client.send(&request).unwrap().recv();
-//!         match async_std::future::timeout(dur, &mut receiver).await {
+//!         match tokio::time::timeout(dur, &mut receiver).await {
 //!             Ok(Ok((c, response, _header))) => {
 //!                 pr_info!(logger, "received: {:?}", response);
 //!                 client = c;
@@ -51,7 +51,8 @@
 //!     }
 //! }
 //!
-//! async_std::task::block_on(run_client(client, logger)); // Spawn an asynchronous task.
+//! let rt = tokio::runtime::Runtime::new().unwrap();
+//! rt.block_on(run_client(client, logger)); // Spawn an asynchronous task.
 //! ```
 
 use super::Header;
@@ -127,6 +128,17 @@ impl<T: ServiceMsg> Client<T> {
         })
     }
 
+    /// Check if service is available
+    /// # Errors
+    ///
+    /// - `RCLError::NodeInvalid`  if the node is invalid, or
+    /// - `RCLError::InvalidArgument` if any arguments are invalid, or
+    /// - `RCLError::Error` if an unspecified error occurs.
+    pub fn is_service_available(&self) -> RCLResult<bool> {
+        let guard = rcl::MT_UNSAFE_FN.lock();
+        guard.rcl_service_server_is_available(self.data.node.as_ptr(), &self.data.client)
+    }
+
     /// Send a request.
     ///
     /// # Example
@@ -143,7 +155,7 @@ impl<T: ServiceMsg> Client<T> {
     ///     loop {
     ///         let request = std_srvs::srv::Empty_Request::new().unwrap();
     ///         let mut receiver = client.send(&request).unwrap().recv();
-    ///         match async_std::future::timeout(dur, &mut receiver).await {
+    ///         match tokio::time::timeout(dur, &mut receiver).await {
     ///             Ok(Ok((c, response, _header))) => {
     ///                 pr_info!(logger, "received: {:?}", response);
     ///                 client = c;
@@ -190,7 +202,7 @@ impl<T: ServiceMsg> Client<T> {
     ///         let (receiver, sequence) = client.send_ret_seq(&request).unwrap();
     ///         let mut receiver = receiver.recv();
     ///         pr_info!(logger, "sent: sequence = {sequence}");
-    ///         match async_std::future::timeout(dur, &mut receiver).await {
+    ///         match tokio::time::timeout(dur, &mut receiver).await {
     ///             Ok(Ok((c, response, _header))) => {
     ///                 pr_info!(logger, "received: {:?}", response);
     ///                 client = c;
@@ -299,7 +311,7 @@ impl<T: ServiceMsg> ClientRecv<T> {
     ///     loop {
     ///         let request = std_srvs::srv::Empty_Request::new().unwrap();
     ///         let mut receiver = client.send(&request).unwrap().recv();
-    ///         match async_std::future::timeout(dur, &mut receiver).await {
+    ///         match tokio::time::timeout(dur, &mut receiver).await {
     ///             Ok(Ok((c, response, header))) => {
     ///                 pr_info!(logger, "received: header = {:?}", header);
     ///                 client = c;

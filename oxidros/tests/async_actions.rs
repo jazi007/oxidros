@@ -44,7 +44,7 @@ fn create_client(
 
 async fn assert_status(client: Client<Fibonacci>, expected: GoalStatus) -> Client<Fibonacci> {
     let recv = client.recv_status();
-    match async_std::future::timeout(Duration::from_secs(3), recv).await {
+    match tokio::time::timeout(Duration::from_secs(3), recv).await {
         Ok(Ok((c, status_array))) => {
             let list = status_array.status_list.as_slice();
             assert!(!list.is_empty());
@@ -157,7 +157,7 @@ async fn run_server(server: Server<Fibonacci>, abort: bool) -> Result<(), DynErr
 
 async fn receive_goal_response(receiver: ClientGoalRecv<Fibonacci>) -> Client<Fibonacci> {
     let recv = receiver.recv();
-    match async_std::future::timeout(Duration::from_secs(3), recv).await {
+    match tokio::time::timeout(Duration::from_secs(3), recv).await {
         Ok(Ok((c, response, _header))) => {
             println!("client: goal response received: {:?}", response);
             c
@@ -169,7 +169,7 @@ async fn receive_goal_response(receiver: ClientGoalRecv<Fibonacci>) -> Client<Fi
 
 async fn receive_result_response(receiver: ClientResultRecv<Fibonacci>) -> Client<Fibonacci> {
     let recv = receiver.recv();
-    match async_std::future::timeout(Duration::from_secs(3), recv).await {
+    match tokio::time::timeout(Duration::from_secs(3), recv).await {
         Ok(Ok((c, response, _header))) => {
             println!("client: result response received: {:?}", response);
             c
@@ -189,7 +189,7 @@ async fn run_client(client: Client<Fibonacci>) -> Result<(), DynError> {
     // receive feedback
     loop {
         let recv = client.recv_feedback();
-        client = match async_std::future::timeout(Duration::from_secs(3), recv).await {
+        client = match tokio::time::timeout(Duration::from_secs(3), recv).await {
             Ok(Ok((c, feedback))) => {
                 println!("client: feedback received: {:?}", feedback);
 
@@ -282,7 +282,7 @@ async fn run_client_abort(client: Client<Fibonacci>) -> Result<(), DynError> {
     Ok(())
 }
 
-fn start_server_client<G>(
+async fn start_server_client<G>(
     action: &str,
     client_node: &str,
     server_node: &str,
@@ -298,27 +298,25 @@ where
     let client = create_client(&ctx, client_node, action).unwrap();
     let server = create_server(&ctx, server_node, action, None).unwrap();
 
-    async_std::task::block_on(async {
-        let (tx, rx) = crossbeam_channel::unbounded();
+    let (tx, rx) = crossbeam_channel::unbounded();
 
-        async_std::task::spawn({
-            let server = server.clone();
-            run_server(server, server_abort)
-        });
-        async_std::task::spawn(async move {
-            let ret = run_client_fn(client).await;
-            let _ = tx.send(());
-            ret
-        });
-
-        let _ = rx.recv();
+    tokio::task::spawn({
+        let server = server.clone();
+        run_server(server, server_abort)
     });
+    tokio::task::spawn(async move {
+        let ret = run_client_fn(client).await;
+        let _ = tx.send(());
+        ret
+    });
+
+    let _ = rx.recv();
 
     Ok(())
 }
 
-#[test]
-fn test_async_action() -> Result<(), DynError> {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_async_action() -> Result<(), DynError> {
     start_server_client(
         "test_async_action",
         "test_async_action_client",
@@ -326,10 +324,12 @@ fn test_async_action() -> Result<(), DynError> {
         |client| Box::pin(run_client(client)),
         false,
     )
+    .await?;
+    Ok(())
 }
 
-#[test]
-fn test_async_action_cancel() -> Result<(), DynError> {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_async_action_cancel() -> Result<(), DynError> {
     start_server_client(
         "test_async_action_cancel",
         "test_async_action_client_cancel",
@@ -337,10 +337,12 @@ fn test_async_action_cancel() -> Result<(), DynError> {
         |client| Box::pin(run_client_cancel(client)),
         false,
     )
+    .await?;
+    Ok(())
 }
 
-#[test]
-fn test_async_action_status() -> Result<(), DynError> {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_async_action_status() -> Result<(), DynError> {
     start_server_client(
         "test_async_action_status",
         "test_async_action_client_status",
@@ -348,10 +350,12 @@ fn test_async_action_status() -> Result<(), DynError> {
         |client| Box::pin(run_client_status(client)),
         false,
     )
+    .await?;
+    Ok(())
 }
 
-#[test]
-fn test_async_action_abort() -> Result<(), DynError> {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_async_action_abort() -> Result<(), DynError> {
     start_server_client(
         "test_async_action_abort",
         "test_async_action_client_abort",
@@ -359,4 +363,6 @@ fn test_async_action_abort() -> Result<(), DynError> {
         |client| Box::pin(run_client_abort(client)),
         true,
     )
+    .await?;
+    Ok(())
 }

@@ -130,7 +130,7 @@
 //!
 //! ### Multi Threaded Execution
 //!
-//! This code uses `async_std` as a async/await's runtime.
+//! This code uses `tokio` as a async/await's runtime.
 //! You can use other runtime such as `tokio`.
 //!
 //! ```
@@ -142,8 +142,6 @@
 //!     pr_info, pr_warn,
 //!     topic::{publisher::Publisher, subscriber::Subscriber},
 //! };
-//! #[allow(unused_imports)]
-//! use async_std::{future, prelude::*};
 //! use std::time::Duration;
 //!
 //! // Create a context.
@@ -167,10 +165,11 @@
 //!     .create_subscriber::<std_msgs::msg::String>("example_topic_async", None,
 //! ).unwrap();
 //!
+//! let rt = tokio::runtime::Runtime::new().unwrap();
 //! // Create tasks.
-//! async_std::task::block_on(async {
-//!     let p = async_std::task::spawn(run_publisher(publisher));
-//!     let s = async_std::task::spawn(run_subscriber(subscriber));
+//! rt.block_on(async {
+//!     let p = tokio::task::spawn(run_publisher(publisher));
+//!     let s = tokio::task::spawn(run_subscriber(subscriber));
 //!     p.await;
 //!     s.await;
 //! });
@@ -188,7 +187,7 @@
 //!         publisher.send(&msg).unwrap();
 //!
 //!         // Sleep 100[ms].
-//!         async_std::task::sleep(dur).await;
+//!         tokio::time::sleep(dur).await;
 //!     }
 //! }
 //!
@@ -198,7 +197,7 @@
 //!     let logger = Logger::new("example_subscriber_async");
 //!     loop {
 //!         // receive a message specifying timeout of 500ms
-//!         match future::timeout(dur, s.recv()).await {
+//!         match tokio::time::timeout(dur, s.recv()).await {
 //!             Ok(Ok(msg)) => {
 //!                 // received a message
 //!                 pr_info!(logger, "Received (async): msg = {}", msg.data);

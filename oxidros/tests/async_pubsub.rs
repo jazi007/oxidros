@@ -1,7 +1,5 @@
 pub mod common;
 
-#[allow(unused_imports)]
-use async_std::{future, prelude::*};
 use oxidros::msg::common_interfaces::example_interfaces::msg::Int64;
 use oxidros::{
     context::Context,
@@ -11,8 +9,8 @@ use std::{error::Error, time::Duration};
 
 const TOPIC_NAME: &str = "test_async_pubsub";
 
-#[test]
-fn test_async_pubsub() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_async_pubsub() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
     // create a context
     let ctx = Context::new()?;
 
@@ -27,13 +25,10 @@ fn test_async_pubsub() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
     let s = common::create_subscriber(node_sub, TOPIC_NAME, true).unwrap();
 
     // create tasks
-    async_std::task::block_on(async {
-        let p = async_std::task::spawn(run_publisher(p));
-        let s = async_std::task::spawn(run_subscriber(s));
-        p.await;
-        s.await;
-    });
-
+    let p = tokio::task::spawn(run_publisher(p));
+    let s = tokio::task::spawn(run_subscriber(s));
+    p.await.unwrap();
+    s.await.unwrap();
     println!("finished");
 
     Ok(())
@@ -51,7 +46,7 @@ async fn run_publisher(p: Publisher<Int64>) {
         }
 
         // sleep 100[ms]
-        async_std::task::sleep(dur).await;
+        tokio::time::sleep(dur).await;
         println!("async publish: msg = {n}");
     }
 }
@@ -61,7 +56,7 @@ async fn run_subscriber(mut s: Subscriber<Int64>) {
     let dur = Duration::from_millis(500);
     for n in 0.. {
         // receive a message specifying timeout of 500ms
-        match future::timeout(dur, s.recv()).await {
+        match tokio::time::timeout(dur, s.recv()).await {
             Ok(Ok(msg)) => {
                 // received a message
                 println!("async subscribe: msg = {}", msg.data);

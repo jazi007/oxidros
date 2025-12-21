@@ -54,8 +54,6 @@
 //! ## Multi Threaded Execution
 //!
 //! ```
-//! #[allow(unused_imports)]
-//! use async_std::{future, prelude::*};
 //! use oxidros::{
 //!     context::Context, logger::Logger, msg::common_interfaces::std_msgs, pr_info, pr_warn,
 //!     topic::subscriber::Subscriber,
@@ -76,9 +74,10 @@
 //!     )
 //!     .unwrap();
 //!
+//! let rt = tokio::runtime::Runtime::new().unwrap();
 //! // Create tasks.
-//! async_std::task::block_on(async {
-//!     let s = async_std::task::spawn(run_subscriber(subscriber));
+//! rt.block_on(async {
+//!     let s = tokio::task::spawn(run_subscriber(subscriber));
 //!     s.await;
 //! });
 //!
@@ -88,7 +87,7 @@
 //!     let logger = Logger::new("subscriber_rs_recv");
 //!     for _ in 0..3 {
 //!         // receive a message specifying timeout of 100ms
-//!         match future::timeout(dur, s.recv()).await {
+//!         match tokio::time::timeout(dur, s.recv()).await {
 //!             Ok(Ok(msg)) => {
 //!                 // received a message
 //!                 pr_info!(logger, "Received (async): msg = {}", msg.data);
@@ -360,13 +359,11 @@ impl<T: TypeSupport> Subscriber<T> {
     /// This waits and blocks forever until a message arrives.
     /// In order to call `recv()` with timeout,
     /// use mechanisms provided by asynchronous libraries,
-    /// such as `async_std::future::timeout`.
+    /// such as `tokio::time::timeout`.
     ///
     /// # Example
     ///
     /// ```
-    /// #[allow(unused_imports)]
-    /// use async_std::{future, prelude::*};
     /// use oxidros::{
     ///     logger::Logger, msg::common_interfaces::std_msgs, pr_info, pr_warn,
     ///     topic::subscriber::Subscriber,
@@ -378,7 +375,7 @@ impl<T: TypeSupport> Subscriber<T> {
     ///     let logger = Logger::new("subscriber_rs_recv");
     ///     for _ in 0..3 {
     ///         // receive a message specifying timeout of 100ms
-    ///         match future::timeout(dur, s.recv()).await {
+    ///         match tokio::time::timeout(dur, s.recv()).await {
     ///             Ok(Ok(msg)) => {
     ///                 // received a message
     ///                 pr_info!(logger, "Received (async): msg = {}", msg.data);

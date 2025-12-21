@@ -7,6 +7,7 @@
 #![allow(unused_imports)]
 #![allow(clippy::upper_case_acronyms)]
 
+use once_cell::sync::OnceCell;
 // Use oxidros-msg generated messages instead of custom ones
 use oxidros::msg::common_interfaces::example_interfaces::{
     action::Fibonacci, msg::Int64, srv::AddTwoInts,
@@ -21,6 +22,7 @@ use oxidros::{
     service::{client::Client, server::Server},
     topic::{publisher::Publisher, subscriber::Subscriber},
 };
+use std::future::Future;
 use std::{error::Error, sync::Arc};
 
 pub fn create_publisher(

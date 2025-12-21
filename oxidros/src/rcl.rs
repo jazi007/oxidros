@@ -817,6 +817,17 @@ impl MTUnsafeFn {
         Ok(params_map)
     }
 
+    pub fn rcl_service_server_is_available(
+        &self,
+        node: *const rcl_node_t,
+        client: *const rcl_client_t,
+    ) -> RCLResult<bool> {
+        let mut available = false;
+        let ret = unsafe { self::rcl_service_server_is_available(node, client, &mut available) };
+        ret_val_to_err(ret)?;
+        Ok(available)
+    }
+
     #[cfg(feature = "jazzy")]
     pub fn rcl_service_configure_service_introspection(
         &self,

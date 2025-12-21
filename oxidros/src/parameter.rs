@@ -157,7 +157,8 @@
 //!     }
 //! }
 //!
-//! // async_std::task::block_on(run_wait(param_server)); // Spawn an asynchronous task.
+//! // let rt = tokio::runtime::Runtime::new().unwrap(); --- IGNORE ---
+//! // rt.block_on(run_wait(param_server)); // Spawn an asynchronous task.
 //! ```
 
 use crate::{
