@@ -24,36 +24,33 @@ where
         data: &<T as ServiceMsg>::Request,
     ) -> Result<<T as ServiceMsg>::Response> {
         let client = self.0.take();
-        let Some(client) = client else {
+        let Some(mut client) = client else {
             return Err("Client not yet added".into());
         };
+        debug!("Waiting for service availability");
+        while !client.is_service_available()? {
+            time::sleep(Duration::from_millis(100)).await;
+        }
         debug!("Request: {:?}", data);
-        let mut receiver = client.send(data)?.recv();
-        // Send a request.
-        let resp = match (&mut receiver).await {
-            Ok((c, response, header)) => {
-                trace!("Header: {header:?}");
-                debug!("Response: {:?}", response);
-                self.0 = Some(c);
-                response
-            }
-            Err(e) => {
-                self.0 = Some(receiver.give_up());
-                return Err(e);
-            }
-        };
-        Ok(resp)
-    }
-    /// Send a request with a timeout
-    pub async fn send_timeout(
-        &mut self,
-        data: &<T as ServiceMsg>::Request,
-        timeout: Duration,
-    ) -> Result<<T as ServiceMsg>::Response> {
-        match time::timeout(timeout, self.send(data)).await {
-            Ok(Ok(v)) => Ok(v),
-            Ok(Err(e)) => Err(e),
-            Err(e) => Err(e.into()),
+        loop {
+            let mut receiver = client.send(data)?.recv();
+            // Send a request.
+            match time::timeout(Duration::from_secs(1), &mut receiver).await {
+                Ok(Ok((c, response, header))) => {
+                    trace!("Header: {header:?}");
+                    debug!("Response: {:?}", response);
+                    self.0 = Some(c);
+                    return Ok(response);
+                }
+                Ok(Err(e)) => {
+                    self.0 = Some(receiver.give_up());
+                    return Err(e);
+                }
+                Err(_) => {
+                    log::error!("TimeOut retrying ...");
+                    client = receiver.give_up();
+                }
+            };
         }
     }
 }

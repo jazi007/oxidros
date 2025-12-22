@@ -23,19 +23,22 @@ fn main() -> Result<(), DynError> {
         req.a = index;
         req.b = index + 1;
         index += 1;
-        let crcv = client.send(&req)?;
-        let resp = crcv.recv_timeout(Duration::from_secs(10), &mut selector);
-        client = match resp {
-            RecvResult::Ok((c, v, _)) => {
-                pr_info!(logger, "{v:?}");
-                c
-            }
-            RecvResult::Err(e) => return Err(e),
-            RecvResult::RetryLater(c) => {
-                pr_info!(logger, "server unavailabe");
-                c.give_up()
-            }
-        };
+        loop {
+            let crcv = client.send(&req)?;
+            let resp = crcv.recv_timeout(Duration::from_secs(1), &mut selector);
+            match resp {
+                RecvResult::Ok((c, v, _)) => {
+                    pr_info!(logger, "{v:?}");
+                    client = c;
+                    break;
+                }
+                RecvResult::Err(e) => return Err(e),
+                RecvResult::RetryLater(c) => {
+                    pr_info!(logger, "server unavailabe");
+                    client = c.give_up();
+                }
+            };
+        }
         std::thread::sleep(Duration::from_secs(1));
     }
 }
