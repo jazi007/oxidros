@@ -340,8 +340,9 @@ impl Generator {
         self.idl_struct(lines, struct_def, lib);
         lines.push_back(gen_impl_for_struct(lib, "msg", &struct_def.id));
 
+        lines.push_front("use std::ops::{Deref, DerefMut};\n".to_string());
         lines.push_front(
-            "use {prefix}oxidros_core::{TryClone, TypeSupport};\n#[allow(unused_imports)]\nuse {prefix}{msg, rcl};"
+            "use {prefix}oxidros_core::{SequenceRaw, TryClone, TypeSupport};\n#[allow(unused_imports)]\nuse {prefix}{msg, rcl};"
                 .to_string(),
         );
     }
@@ -362,8 +363,9 @@ impl Generator {
         };
 
         if *idl_type == IDLType::NoType {
+            lines.push_front("use std::ops::{Deref, DerefMut};\n".to_string());
             lines.push_front(
-                "use {prefix}oxidros_core::{ServiceMsg, TryClone, TypeSupport};\n#[allow(unused_imports)]\nuse {prefix}{msg, rcl};".to_string()
+                "use {prefix}oxidros_core::{SequenceRaw, ServiceMsg, TryClone, TypeSupport};\n#[allow(unused_imports)]\nuse {prefix}{msg, rcl};".to_string()
             );
             lines.push_back(gen_impl_service_msg(lib, "srv", type_str));
         }
@@ -408,8 +410,9 @@ impl Generator {
         };
 
         if *idl_type == IDLType::NoType {
+            lines.push_front("use std::ops::{Deref, DerefMut};\n".to_string());
             lines.push_front(
-                "use {prefix}oxidros_core::{ActionMsg, ActionGoal, ActionResult, GetUUID, GoalResponse, ResultResponse, TryClone, TypeSupport};\nuse {prefix}{msg, rcl, builtin_interfaces::UnsafeTime, unique_identifier_msgs};".to_string()
+                "use {prefix}oxidros_core::{ActionMsg, ActionGoal, ActionResult, GetUUID, GoalResponse, ResultResponse, SequenceRaw, TryClone, TypeSupport};\nuse {prefix}{msg, rcl, builtin_interfaces::UnsafeTime, unique_identifier_msgs};".to_string()
             );
             lines.push_back(gen_impl_action_msg(lib, type_str));
         }
@@ -1173,23 +1176,26 @@ impl Drop for {type_name_full} {{
     }}
 }}
 
-#[repr(C)]
-#[derive(Debug)]
-struct {type_name_full}SeqRaw {{
-    data: *mut {type_name_full},
-    size: usize,
-    capacity: usize,
-}}
+type {type_name_full}SeqRaw = SequenceRaw<{type_name_full}>;
 
 /// Sequence of {type_name_full}.
 /// `N` is the maximum number of elements.
 /// If `N` is `0`, the size is unlimited.
-#[repr(C)]
+#[repr(transparent)]
 #[derive(Debug)]
-pub struct {type_name_full}Seq<const N: usize> {{
-    data: *mut {type_name_full},
-    size: usize,
-    capacity: usize,
+pub struct {type_name_full}Seq<const N: usize>(pub {type_name_full}SeqRaw);
+
+impl<const N: usize> Deref for {type_name_full}Seq<N> {{
+    type Target = {type_name_full}SeqRaw;
+    fn deref(&self) -> &Self::Target {{
+        &self.0
+    }}
+}}
+
+impl<const N: usize> DerefMut for {type_name_full}Seq<N> {{
+    fn deref_mut(&mut self) -> &mut Self::Target {{
+        &mut self.0
+    }}
 }}
 
 impl<const N: usize> {type_name_full}Seq<N> {{
@@ -1201,58 +1207,22 @@ impl<const N: usize> {type_name_full}Seq<N> {{
             // the size exceeds in the maximum number
             return None;
         }}
-        let mut msg: {type_name_full}SeqRaw = unsafe {{ std::mem::MaybeUninit::zeroed().assume_init() }};
+        let mut msg = {type_name_full}SeqRaw::null();
         if unsafe {{ {module_name}__{mid}__{type_name}{c_func_mid}__Sequence__init(&mut msg, size) }} {{
-            Some(Self {{ data: msg.data, size: msg.size, capacity: msg.capacity }})
+            Some(Self(msg))
         }} else {{
             None
         }}
     }}
 
-    pub fn null() -> Self {{
-        let msg: {type_name_full}SeqRaw = unsafe {{ std::mem::MaybeUninit::zeroed().assume_init() }};
-        Self {{ data: msg.data, size: msg.size, capacity: msg.capacity }}
-    }}
-
-    pub fn as_slice(&self) -> &[{type_name_full}] {{
-        if self.data.is_null() {{
-            &[]
-        }} else {{
-            let s = unsafe {{ std::slice::from_raw_parts(self.data, self.size as _) }};
-            s
-        }}
-    }}
-
-    pub fn as_slice_mut(&mut self) -> &mut [{type_name_full}] {{
-        if self.data.is_null() {{
-            &mut []
-        }} else {{
-            let s = unsafe {{ std::slice::from_raw_parts_mut(self.data, self.size as _) }};
-            s
-        }}
-    }}
-
-    pub fn iter(&self) -> std::slice::Iter<'_, {type_name_full}> {{
-        self.as_slice().iter()
-    }}
-
-    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, {type_name_full}> {{
-        self.as_slice_mut().iter_mut()
-    }}
-
-    pub fn len(&self) -> usize {{
-        self.as_slice().len()
-    }}
-
-    pub fn is_empty(&self) -> bool {{
-        self.len() == 0
+    pub const fn null() -> Self {{
+        Self({type_name_full}SeqRaw::null())
     }}
 }}
 
 impl<const N: usize> Drop for {type_name_full}Seq<N> {{
     fn drop(&mut self) {{
-        let mut msg = {type_name_full}SeqRaw{{ data: self.data, size: self.size, capacity: self.capacity }};
-        unsafe {{ {module_name}__{mid}__{type_name}{c_func_mid}__Sequence__fini(&mut msg) }};
+        unsafe {{ {module_name}__{mid}__{type_name}{c_func_mid}__Sequence__fini(self.deref_mut()) }};
     }}
 }}
 
@@ -1567,23 +1537,24 @@ impl Drop for {type_name} {{
     }}
 }}
 
-#[repr(C)]
-#[derive(Debug)]
-struct {type_name}SeqRaw {{
-    data: *mut {type_name},
-    size: usize,
-    capacity: usize,
-}}
+type {type_name}SeqRaw = SequenceRaw<{type_name}>;
 
 /// Sequence of {type_name}.
 /// `N` is the maximum number of elements.
 /// If `N` is `0`, the size is unlimited.
-#[repr(C)]
+#[repr(transparent)]
 #[derive(Debug)]
-pub struct {type_name}Seq<const N: usize> {{
-    data: *mut {type_name},
-    size: usize,
-    capacity: usize,
+pub struct {type_name}Seq<const N: usize>(pub {type_name}SeqRaw);
+impl<const N: usize> Deref for {type_name}Seq<N> {{
+    type Target = {type_name}SeqRaw;
+    fn deref(&self) -> &Self::Target {{
+        &self.0
+    }}
+}}
+impl<const N: usize> DerefMut for {type_name}Seq<N> {{
+    fn deref_mut(&mut self) -> &mut Self::Target {{
+        &mut self.0
+    }}
 }}
 
 impl<const N: usize> {type_name}Seq<N> {{
@@ -1595,58 +1566,22 @@ impl<const N: usize> {type_name}Seq<N> {{
             // the size exceeds in the maximum number
             return None;
         }}
-        let mut msg: {type_name}SeqRaw = unsafe {{ std::mem::MaybeUninit::zeroed().assume_init() }};
+        let mut msg = {type_name}SeqRaw::null();
         if unsafe {{ {module_name_1st}__{module_name_2nd}__{type_name}__Sequence__init(&mut msg, size) }} {{
-            Some(Self {{ data: msg.data, size: msg.size, capacity: msg.capacity }})
+            Some(Self(msg))
         }} else {{
             None
         }}
     }}
 
-    pub fn null() -> Self {{
-        let msg: {type_name}SeqRaw = unsafe {{ std::mem::MaybeUninit::zeroed().assume_init() }};
-        Self {{ data: msg.data, size: msg.size, capacity: msg.capacity }}
-    }}
-
-    pub fn as_slice(&self) -> &[{type_name}] {{
-        if self.data.is_null() {{
-            &[]
-        }} else {{
-            let s = unsafe {{ std::slice::from_raw_parts(self.data, self.size as _) }};
-            s
-        }}
-    }}
-
-    pub fn as_slice_mut(&mut self) -> &mut [{type_name}] {{
-        if self.data.is_null() {{
-            &mut []
-        }} else {{
-            let s = unsafe {{ std::slice::from_raw_parts_mut(self.data, self.size as _) }};
-            s
-        }}
-    }}
-
-    pub fn iter(&self) -> std::slice::Iter<'_, {type_name}> {{
-        self.as_slice().iter()
-    }}
-
-    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, {type_name}> {{
-        self.as_slice_mut().iter_mut()
-    }}
-
-    pub fn len(&self) -> usize {{
-        self.as_slice().len()
-    }}
-
-    pub fn is_empty(&self) -> bool {{
-        self.len() == 0
+    pub const fn null() -> Self {{
+        Self({type_name}SeqRaw::null())
     }}
 }}
 
 impl<const N: usize> Drop for {type_name}Seq<N> {{
     fn drop(&mut self) {{
-        let mut msg = {type_name}SeqRaw{{ data: self.data, size: self.size, capacity: self.capacity }};
-        unsafe {{ {module_name_1st}__{module_name_2nd}__{type_name}__Sequence__fini(&mut msg) }};
+        unsafe {{ {module_name_1st}__{module_name_2nd}__{type_name}__Sequence__fini(self.deref_mut()) }};
     }}
 }}
 
