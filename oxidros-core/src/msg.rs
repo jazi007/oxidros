@@ -3,6 +3,12 @@
 use crate::time::UnsafeTime;
 use std::ffi::c_void;
 
+/// Trait for type that can fail cloning
+pub trait TryClone: Sized {
+    /// Returns Some(Self) if clone susccess else None
+    fn try_clone(&self) -> Option<Self>;
+}
+
 /// Trait for types that have type support information.
 ///
 /// This allows the runtime to understand the structure of messages
@@ -56,7 +62,7 @@ pub trait ActionMsg {
     ) -> <Self::Goal as ActionGoal>::Request;
 
     /// The result content type (the actual result data).
-    type ResultContent: TypeSupport + Clone;
+    type ResultContent: TypeSupport + TryClone;
 
     /// Create a new result response with the given status and result.
     fn new_result_response(

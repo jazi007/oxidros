@@ -17,7 +17,7 @@ pub mod time;
 pub use error::{DynError, RCLActionError, RCLError};
 pub use msg::{
     ActionGoal, ActionMsg, ActionResult, GetUUID, GoalResponse, ResultResponse, ServiceMsg,
-    TypeSupport,
+    TryClone, TypeSupport,
 };
 pub use parameter::{Descriptor, FloatingPointRange, IntegerRange, Parameter, Value};
 pub use qos::{DurabilityPolicy, HistoryPolicy, LivelinessPolicy, Profile, ReliabilityPolicy};

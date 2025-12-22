@@ -8,12 +8,12 @@ use crate::rcl::*;
 // Definition of Sequence types -------------------------------------------------------------------
 
 macro_rules! def_sequence {
-    ($ty: ident, $ty_orig:ty, $ty_seq:ty, $init:ident, $fini:ident, $eq:ident) => {
+    ($ty: ident, $ty_orig:ty, $ty_seq:ty, $init:ident, $fini:ident, $eq:ident, $copy:ident) => {
         /// A sequence of elements.
         /// `N` represents the maximum number of elements.
         /// If `N` is `0`, the sequence is unlimited.
         #[repr(C)]
-        #[derive(Debug, Clone)]
+        #[derive(Debug)]
         pub struct $ty<const N: usize>($ty_seq);
 
         impl<const N: usize> $ty<N> {
@@ -85,6 +85,16 @@ macro_rules! def_sequence {
                 unsafe { $eq(&self.0, &other.0) }
             }
         }
+        impl<const N: usize> ::oxidros_core::msg::TryClone for $ty<N> {
+            fn try_clone(&self) -> Option<Self> {
+                let mut result = Self::new(self.0.size)?;
+                if unsafe { $copy(&self.0, &mut result.0) } {
+                    Some(result)
+                } else {
+                    None
+                }
+            }
+        }
 
         unsafe impl<const N: usize> Sync for $ty<N> {}
         unsafe impl<const N: usize> Send for $ty<N> {}
@@ -97,7 +107,8 @@ def_sequence!(
     rosidl_runtime_c__boolean__Sequence,
     rosidl_runtime_c__boolean__Sequence__init,
     rosidl_runtime_c__boolean__Sequence__fini,
-    rosidl_runtime_c__boolean__Sequence__are_equal
+    rosidl_runtime_c__boolean__Sequence__are_equal,
+    rosidl_runtime_c__boolean__Sequence__copy
 );
 
 def_sequence!(
@@ -106,7 +117,8 @@ def_sequence!(
     rosidl_runtime_c__float__Sequence,
     rosidl_runtime_c__float__Sequence__init,
     rosidl_runtime_c__float__Sequence__fini,
-    rosidl_runtime_c__float__Sequence__are_equal
+    rosidl_runtime_c__float__Sequence__are_equal,
+    rosidl_runtime_c__float__Sequence__copy
 );
 
 def_sequence!(
@@ -115,7 +127,8 @@ def_sequence!(
     rosidl_runtime_c__double__Sequence,
     rosidl_runtime_c__double__Sequence__init,
     rosidl_runtime_c__double__Sequence__fini,
-    rosidl_runtime_c__double__Sequence__are_equal
+    rosidl_runtime_c__double__Sequence__are_equal,
+    rosidl_runtime_c__double__Sequence__copy
 );
 
 def_sequence!(
@@ -124,7 +137,8 @@ def_sequence!(
     rosidl_runtime_c__uint8__Sequence,
     rosidl_runtime_c__uint8__Sequence__init,
     rosidl_runtime_c__uint8__Sequence__fini,
-    rosidl_runtime_c__uint8__Sequence__are_equal
+    rosidl_runtime_c__uint8__Sequence__are_equal,
+    rosidl_runtime_c__uint8__Sequence__copy
 );
 
 def_sequence!(
@@ -133,7 +147,8 @@ def_sequence!(
     rosidl_runtime_c__int8__Sequence,
     rosidl_runtime_c__int8__Sequence__init,
     rosidl_runtime_c__int8__Sequence__fini,
-    rosidl_runtime_c__int8__Sequence__are_equal
+    rosidl_runtime_c__int8__Sequence__are_equal,
+    rosidl_runtime_c__int8__Sequence__copy
 );
 
 def_sequence!(
@@ -142,7 +157,8 @@ def_sequence!(
     rosidl_runtime_c__uint16__Sequence,
     rosidl_runtime_c__uint16__Sequence__init,
     rosidl_runtime_c__uint16__Sequence__fini,
-    rosidl_runtime_c__uint16__Sequence__are_equal
+    rosidl_runtime_c__uint16__Sequence__are_equal,
+    rosidl_runtime_c__uint16__Sequence__copy
 );
 
 def_sequence!(
@@ -151,7 +167,8 @@ def_sequence!(
     rosidl_runtime_c__int16__Sequence,
     rosidl_runtime_c__int16__Sequence__init,
     rosidl_runtime_c__int16__Sequence__fini,
-    rosidl_runtime_c__int16__Sequence__are_equal
+    rosidl_runtime_c__int16__Sequence__are_equal,
+    rosidl_runtime_c__int16__Sequence__copy
 );
 
 def_sequence!(
@@ -160,7 +177,8 @@ def_sequence!(
     rosidl_runtime_c__uint32__Sequence,
     rosidl_runtime_c__uint32__Sequence__init,
     rosidl_runtime_c__uint32__Sequence__fini,
-    rosidl_runtime_c__uint32__Sequence__are_equal
+    rosidl_runtime_c__uint32__Sequence__are_equal,
+    rosidl_runtime_c__uint32__Sequence__copy
 );
 
 def_sequence!(
@@ -169,7 +187,8 @@ def_sequence!(
     rosidl_runtime_c__int32__Sequence,
     rosidl_runtime_c__int32__Sequence__init,
     rosidl_runtime_c__int32__Sequence__fini,
-    rosidl_runtime_c__int32__Sequence__are_equal
+    rosidl_runtime_c__int32__Sequence__are_equal,
+    rosidl_runtime_c__int32__Sequence__copy
 );
 
 def_sequence!(
@@ -178,7 +197,8 @@ def_sequence!(
     rosidl_runtime_c__uint64__Sequence,
     rosidl_runtime_c__uint64__Sequence__init,
     rosidl_runtime_c__uint64__Sequence__fini,
-    rosidl_runtime_c__uint64__Sequence__are_equal
+    rosidl_runtime_c__uint64__Sequence__are_equal,
+    rosidl_runtime_c__uint64__Sequence__copy
 );
 
 def_sequence!(
@@ -187,7 +207,8 @@ def_sequence!(
     rosidl_runtime_c__int64__Sequence,
     rosidl_runtime_c__int64__Sequence__init,
     rosidl_runtime_c__int64__Sequence__fini,
-    rosidl_runtime_c__int64__Sequence__are_equal
+    rosidl_runtime_c__int64__Sequence__are_equal,
+    rosidl_runtime_c__int64__Sequence__copy
 );
 
 /// The error type returned when a conversion from a slice to an array fails.
@@ -227,3 +248,20 @@ def_try_from!(u32, U32Seq<0>);
 def_try_from!(u64, U64Seq<0>);
 def_try_from!(f32, F32Seq<0>);
 def_try_from!(f64, F64Seq<0>);
+
+#[cfg(test)]
+mod tests {
+    use oxidros_core::msg::TryClone;
+
+    use super::*;
+
+    #[test]
+    fn test_clone() {
+        let v1: BoolSeq<0> = [true; 10].as_slice().try_into().unwrap();
+        let v2 = v1.try_clone().unwrap();
+        assert_eq!(v1, v2);
+        let v1: U32Seq<0> = [2; 10].as_slice().try_into().unwrap();
+        let v2 = v1.try_clone().unwrap();
+        assert_eq!(v1, v2);
+    }
+}

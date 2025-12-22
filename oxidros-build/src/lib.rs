@@ -222,6 +222,7 @@ pub fn generate_runtime_c(out_dir: &Path) {
 
     let bindings = builder_base()
         .header(wrapper_path.to_str().unwrap())
+        .derive_copy(false)
         .clang_arg(format!(
             "-I{}",
             ros_include.join("rosidl_runtime_c").display()

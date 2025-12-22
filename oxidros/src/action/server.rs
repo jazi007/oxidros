@@ -1,7 +1,9 @@
 //! Action server.
 
 use futures::try_join;
-use oxidros_core::{DurabilityPolicy, HistoryPolicy, LivelinessPolicy, ReliabilityPolicy};
+use oxidros_core::{
+    DurabilityPolicy, HistoryPolicy, LivelinessPolicy, ReliabilityPolicy, TryClone,
+};
 use oxidros_msg::interfaces::action_msgs::srv::CancelGoal_Response_Constants::{
     ERROR_GOAL_TERMINATED, ERROR_NONE, ERROR_REJECTED, ERROR_UNKNOWN_GOAL_ID,
 };
@@ -680,7 +682,7 @@ impl<T: ActionMsg> ServerResultSend<T> {
     pub fn send(mut self, uuid: &[u8; 16]) -> Result<Server<T>, (Self, DynError)> {
         let res = {
             let results = self.results.lock();
-            results.get(uuid).cloned()
+            results.get(uuid).and_then(|v| v.try_clone())
         };
         match res {
             Some(result) => {

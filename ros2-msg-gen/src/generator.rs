@@ -341,7 +341,7 @@ impl Generator {
         lines.push_back(gen_impl_for_struct(lib, "msg", &struct_def.id));
 
         lines.push_front(
-            "use {prefix}oxidros_core::TypeSupport;\n#[allow(unused_imports)]\nuse {prefix}{msg, rcl};"
+            "use {prefix}oxidros_core::{TryClone, TypeSupport};\n#[allow(unused_imports)]\nuse {prefix}{msg, rcl};"
                 .to_string(),
         );
     }
@@ -363,7 +363,7 @@ impl Generator {
 
         if *idl_type == IDLType::NoType {
             lines.push_front(
-                "use {prefix}oxidros_core::{ServiceMsg, TypeSupport};\n#[allow(unused_imports)]\nuse {prefix}{msg, rcl};".to_string()
+                "use {prefix}oxidros_core::{ServiceMsg, TryClone, TypeSupport};\n#[allow(unused_imports)]\nuse {prefix}{msg, rcl};".to_string()
             );
             lines.push_back(gen_impl_service_msg(lib, "srv", type_str));
         }
@@ -409,7 +409,7 @@ impl Generator {
 
         if *idl_type == IDLType::NoType {
             lines.push_front(
-                "use {prefix}oxidros_core::{ActionMsg, ActionGoal, ActionResult, GetUUID, GoalResponse, ResultResponse, TypeSupport};\nuse {prefix}{msg, rcl, builtin_interfaces::UnsafeTime, unique_identifier_msgs};".to_string()
+                "use {prefix}oxidros_core::{ActionMsg, ActionGoal, ActionResult, GetUUID, GoalResponse, ResultResponse, TryClone, TypeSupport};\nuse {prefix}{msg, rcl, builtin_interfaces::UnsafeTime, unique_identifier_msgs};".to_string()
             );
             lines.push_back(gen_impl_action_msg(lib, type_str));
         }
@@ -536,7 +536,7 @@ impl Generator {
 
     fn idl_struct(&mut self, lines: &mut VecDeque<String>, struct_def: &StructDef, lib: &str) {
         lines.push_back("\n#[repr(C)]".to_string());
-        lines.push_back("#[derive(Debug, Clone)]".to_string());
+        lines.push_back("#[derive(Debug)]".to_string());
         lines.push_back(format!("pub struct {} {{", struct_def.id));
         for member in struct_def.members.iter() {
             self.idl_member(lines, member, lib);
@@ -749,7 +749,7 @@ impl Generator {
 
         lines.push_back(gen_impl_for_msg(lib, &rs_type_name).into());
         lines.push_front(
-            "use {prefix}oxidros_core::TypeSupport;\n#[allow(unused_imports)]\nuse {prefix}{msg, rcl};"
+            "use {prefix}oxidros_core::{TryClone, TypeSupport};\n#[allow(unused_imports)]\nuse {prefix}{msg, rcl};"
                 .into(),
         );
 
@@ -810,7 +810,7 @@ impl Generator {
         lines.push_back(gen_impl_for_srv(lib, &rs_type_name).into());
         lines.push_front(
             format!(
-                "use {}::{{msg::{{ServiceMsg, TypeSupport}}, rcl}};",
+                "use {}::{{msg::{{ServiceMsg, TryClone, TypeSupport}}, rcl}};",
                 self.oxidros_path()
             )
             .into(),
@@ -930,7 +930,7 @@ impl Generator {
         lines: &mut VecDeque<Cow<'static, str>>,
     ) {
         lines.push_back("#[repr(C)]".into());
-        lines.push_back("#[derive(Debug, Clone)]".into());
+        lines.push_back("#[derive(Debug)]".into());
         lines.push_back(format!("pub struct {struct_name} {{").into());
 
         let mut num_member = 0;
@@ -1174,7 +1174,7 @@ impl Drop for {type_name_full} {{
 }}
 
 #[repr(C)]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct {type_name_full}SeqRaw {{
     data: *mut {type_name_full},
     size: usize,
@@ -1185,7 +1185,7 @@ struct {type_name_full}SeqRaw {{
 /// `N` is the maximum number of elements.
 /// If `N` is `0`, the size is unlimited.
 #[repr(C)]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct {type_name_full}Seq<const N: usize> {{
     data: *mut {type_name_full},
     size: usize,
@@ -1268,9 +1268,11 @@ extern \"C\" {{
     fn {module_name}__msg__{type_name}__init(msg: *mut {type_name}) -> bool;
     fn {module_name}__msg__{type_name}__fini(msg: *mut {type_name});
     fn {module_name}__msg__{type_name}__are_equal(lhs: *const {type_name}, rhs: *const {type_name}) -> bool;
+    fn {module_name}__msg__{type_name}__copy(lhs: *const {type_name}, rhs: *mut {type_name}) -> bool;
     fn {module_name}__msg__{type_name}__Sequence__init(msg: *mut {type_name}SeqRaw, size: usize) -> bool;
     fn {module_name}__msg__{type_name}__Sequence__fini(msg: *mut {type_name}SeqRaw);
     fn {module_name}__msg__{type_name}__Sequence__are_equal(lhs: *const {type_name}SeqRaw, rhs: *const {type_name}SeqRaw) -> bool;
+    fn {module_name}__msg__{type_name}__Sequence__copy(lhs: *const {type_name}SeqRaw, rhs: *mut {type_name}SeqRaw) -> bool;
     fn rosidl_typesupport_c__get_message_type_support_handle__{module_name}__msg__{type_name}() -> *const rcl::rosidl_message_type_support_t;
 }}
 "
@@ -1295,6 +1297,18 @@ impl PartialEq for {type_name} {{
         }}
     }}
 }}
+impl TryClone for {type_name} {{
+    fn try_clone(&self) -> Option<Self> {{
+        let mut result = Self::new()?;
+        if unsafe {{
+            {module_name}__msg__{type_name}__copy(self, &mut result)
+        }} {{
+            Some(result)
+        }} else {{
+            None
+        }}
+    }}
+}}
 
 impl<const N: usize> PartialEq for {type_name}Seq<N> {{
     fn eq(&self, other: &Self) -> bool {{
@@ -1302,6 +1316,16 @@ impl<const N: usize> PartialEq for {type_name}Seq<N> {{
             let msg1 = {type_name}SeqRaw{{ data: self.data, size: self.size, capacity: self.capacity }};
             let msg2 = {type_name}SeqRaw{{ data: other.data, size: other.size, capacity: other.capacity }};
             {module_name}__msg__{type_name}__Sequence__are_equal(&msg1, &msg2)
+        }}
+    }}
+}}
+impl<const N: usize> TryClone for {type_name}Seq<N> {{
+    fn try_clone(&self) -> Option<Self> {{
+        let result = Self::new(self.size)?;
+        unsafe {{
+            let msg1 = {type_name}SeqRaw{{ data: self.data, size: self.size, capacity: self.capacity }};
+            let mut msg2 = {type_name}SeqRaw{{ data: result.data, size: result.size, capacity: result.capacity }};
+            {module_name}__msg__{type_name}__Sequence__copy(&msg1, &mut msg2)
         }}
     }}
 }}
@@ -1360,6 +1384,78 @@ impl<const N: usize> PartialEq for {type_name}ResponseSeq<N> {{
     }}
 }}
 
+
+impl TryClone for {type_name}Request {{
+    fn try_clone(&self) -> Option<Self> {{
+        let mut result = Self::new()?;
+        if unsafe {{
+            {module_name}__srv__{type_name}_Request__copy(self, &mut result)
+        }} {{
+            Some(result)
+        }} else {{
+            None
+        }}
+    }}
+}}
+
+impl TryClone for {type_name}Response {{
+    fn try_clone(&self) -> Option<Self> {{
+        let mut result = Self::new()?;
+        unsafe {{
+            {module_name}__srv__{type_name}_Response__copy(self, &mut result)
+        }} {{
+            Some(result)
+        }} else {{
+            None
+        }}
+    }}
+}}
+
+impl<const N: usize> TryClone for {type_name}RequestSeq<N> {{
+    fn try_clone(&self) -> Option<Self> {{
+        let result = Self::new(self.size)?;
+        if unsafe {{
+            let msg1 = {type_name}RequestSeqRaw{{ data: self.data, size: self.size, capacity: self.capacity }};
+            let mut msg2 = {type_name}RequestSeqRaw{{ data: result.data, size: result.size, capacity: result.capacity }};
+            {module_name}__srv__{type_name}_Request__Sequence__copy(&msg1, &mut msg2)
+        }} {{
+            Some(result)
+        }} else {{
+            None
+        }}
+    }}
+}}
+
+impl<const N: usize> TryClone for {type_name}ResponseSeq<N> {{
+    fn try_clone(&self) -> Option<Self> {{
+        let result = Self::new(self.size)?;
+        if unsafe {{
+            let msg1 = {type_name}ResponseSeqRaw{{ data: self.data, size: self.size, capacity: self.capacity }};
+            let mut msg2 = {type_name}ResponseSeqRaw{{ data: result.data, size: result.size, capacity: result.capacity }};
+            {module_name}__srv__{type_name}_Response__Sequence__copy(&msg1, &mut msg2)
+        }} {{
+            Some(result)
+        }} else {{
+            None
+        }}
+    }}
+}}
+
+impl<const N: usize> TryClone for {type_name}ResponseSeq<N> {{
+    fn try_clone(&self) -> Option<Self> {{
+        let result = Self::new(self.size)?;
+        if unsafe {{
+            let msg1 = {type_name}ResponseSeqRaw{{ data: self.data, size: self.size, capacity: self.capacity }};
+            let mut msg2 = {type_name}ResponseSeqRaw{{ data: result.data, size: result.size, capacity: result.capacity }};
+            {module_name}__srv__{type_name}_Response__Sequence__copy(&msg1, &msg2)
+        }} {{
+            Some(result)
+        }} else {{
+            None
+        }}
+    }}
+}}
+
 extern \"C\" {{
     fn rosidl_typesupport_c__get_message_type_support_handle__{module_name}__srv__{type_name}_Request() -> *const rcl::rosidl_message_type_support_t;
     fn rosidl_typesupport_c__get_message_type_support_handle__{module_name}__srv__{type_name}_Response() -> *const rcl::rosidl_message_type_support_t;
@@ -1391,9 +1487,11 @@ extern \"C\" {{
     fn {module_name_1st}__{module_name_2nd}__{type_name}__init(msg: *mut {type_name}) -> bool;
     fn {module_name_1st}__{module_name_2nd}__{type_name}__fini(msg: *mut {type_name});
     fn {module_name_1st}__{module_name_2nd}__{type_name}__are_equal(lhs: *const {type_name}, rhs: *const {type_name}) -> bool;
+    fn {module_name_1st}__{module_name_2nd}__{type_name}__copy(lhs: *const {type_name}, rhs: *mut {type_name}) -> bool;
     fn {module_name_1st}__{module_name_2nd}__{type_name}__Sequence__init(msg: *mut {type_name}SeqRaw, size: usize) -> bool;
     fn {module_name_1st}__{module_name_2nd}__{type_name}__Sequence__fini(msg: *mut {type_name}SeqRaw);
     fn {module_name_1st}__{module_name_2nd}__{type_name}__Sequence__are_equal(lhs: *const {type_name}SeqRaw, rhs: *const {type_name}SeqRaw) -> bool;
+    fn {module_name_1st}__{module_name_2nd}__{type_name}__Sequence__copy(lhs: *const {type_name}SeqRaw, rhs: *mut {type_name}SeqRaw) -> bool;
     fn rosidl_typesupport_c__get_message_type_support_handle__{module_name_1st}__{module_name_2nd}__{type_name}() -> *const rcl::rosidl_message_type_support_t;
 }}
 
@@ -1423,6 +1521,35 @@ impl<const N: usize> PartialEq for {type_name}Seq<N> {{
     }}
 }}
 
+impl TryClone for {type_name} {{
+    fn try_clone(&self) -> Option<Self> {{
+        let mut result = Self::new()?; 
+        if unsafe {{
+            {module_name_1st}__{module_name_2nd}__{type_name}__copy(self, &mut result)
+        }} {{
+            Some(result)
+        }} else {{
+            None
+        }}
+    }}
+}}
+
+impl<const N: usize> TryClone for {type_name}Seq<N> {{
+    fn try_clone(&self) -> Option<Self> {{
+        let result = Self::new(self.size)?;
+        if unsafe {{
+            let msg1 = {type_name}SeqRaw{{ data: self.data, size: self.size, capacity: self.capacity }};
+            let mut msg2 = {type_name}SeqRaw{{ data: result.data, size: result.size, capacity: result.capacity }};
+            {module_name_1st}__{module_name_2nd}__{type_name}__Sequence__copy(&msg1, &mut msg2)
+        }} {{
+            Some(result)
+
+        }} else {{
+            None
+        }}
+    }}
+}}
+
 impl {type_name} {{
     pub fn new() -> Option<Self> {{
         let mut msg: Self = unsafe {{ std::mem::MaybeUninit::zeroed().assume_init() }};
@@ -1441,7 +1568,7 @@ impl Drop for {type_name} {{
 }}
 
 #[repr(C)]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct {type_name}SeqRaw {{
     data: *mut {type_name},
     size: usize,
@@ -1452,7 +1579,7 @@ struct {type_name}SeqRaw {{
 /// `N` is the maximum number of elements.
 /// If `N` is `0`, the size is unlimited.
 #[repr(C)]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct {type_name}Seq<const N: usize> {{
     data: *mut {type_name},
     size: usize,
@@ -1534,7 +1661,7 @@ extern \"C\" {{
     fn rosidl_typesupport_c__get_service_type_support_handle__{module_name}__{module_2nd}__{type_name}_SendGoal() -> *const rcl::rosidl_service_type_support_t;
 }}
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct {type_name}_SendGoal;
 
 impl ActionGoal for {type_name}_SendGoal {{
@@ -1580,7 +1707,7 @@ extern \"C\" {{
     fn rosidl_typesupport_c__get_service_type_support_handle__{module_name}__{module_2nd}__{type_name}_GetResult() -> *const rcl::rosidl_service_type_support_t;
 }}
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct {type_name}_GetResult;
 
 impl ActionResult for {type_name}_GetResult {{
@@ -1626,7 +1753,7 @@ extern \"C\" {{
     fn rosidl_typesupport_c__get_service_type_support_handle__{module_name}__{module_2nd}__{type_name}() -> *const rcl::rosidl_service_type_support_t;
 }}
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct {type_name};
 
 impl ServiceMsg for {type_name} {{
@@ -1649,7 +1776,7 @@ extern \"C\" {{
     fn rosidl_typesupport_c__get_action_type_support_handle__{module_name}__action__{type_name}() -> *const rcl::rosidl_action_type_support_t;
 }}
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct {type_name};
 
 impl ActionMsg for {type_name} {{
@@ -1694,34 +1821,34 @@ impl ActionMsg for {type_name} {{
 }}
 
 #[repr(C)]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct {type_name}_SendGoal_Request {{
     pub goal_id: unique_identifier_msgs::msg::UUID,
     pub goal: {type_name}_Goal,
 }}
 
 #[repr(C)]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct {type_name}_SendGoal_Response {{
     pub accepted: bool,
     pub stamp: UnsafeTime,
 }}
 
 #[repr(C)]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct {type_name}_GetResult_Request {{
     pub goal_id: unique_identifier_msgs::msg::UUID,
 }}
 
 #[repr(C)]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct {type_name}_GetResult_Response {{
     pub status: u8,
     pub result: {type_name}_Result,
 }}
 
 #[repr(C)]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct {type_name}_FeedbackMessage {{
     pub goal_id: unique_identifier_msgs::msg::UUID,
     pub feedback: {type_name}_Feedback,
@@ -1745,6 +1872,10 @@ extern \"C\" {{
     fn {module_name}__srv__{type_name}_Response__are_equal(lhs: *const {type_name}Response, rhs: *const {type_name}Response) -> bool;
     fn {module_name}__srv__{type_name}_Request__Sequence__are_equal(lhs: *const {type_name}RequestSeqRaw, rhs: *const {type_name}RequestSeqRaw) -> bool;
     fn {module_name}__srv__{type_name}_Response__Sequence__are_equal(lhs: *const {type_name}ResponseSeqRaw, rhs: *const {type_name}ResponseSeqRaw) -> bool;
+    fn {module_name}__srv__{type_name}_Request__copy(lhs: *const {type_name}Request, rhs: *mut {type_name}Request) -> bool;
+    fn {module_name}__srv__{type_name}_Response__copy(lhs: *const {type_name}Response, rhs: *mut {type_name}Response) -> bool;
+    fn {module_name}__srv__{type_name}_Request__Sequence__copy(lhs: *const {type_name}RequestSeqRaw, rhs: *mut {type_name}RequestSeqRaw) -> bool;
+    fn {module_name}__srv__{type_name}_Response__Sequence__copy(lhs: *const {type_name}ResponseSeqRaw, rhs: *mut {type_name}ResponseSeqRaw) -> bool;
     fn rosidl_typesupport_c__get_service_type_support_handle__{module_name}__srv__{type_name}() -> *const rcl::rosidl_service_type_support_t;
 }}
 "

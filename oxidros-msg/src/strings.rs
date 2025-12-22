@@ -1,4 +1,6 @@
 //! Definition of Strings
+use oxidros_core::msg::TryClone;
+
 use crate::rcl::*;
 use std::{ffi::CString, fmt::Display, mem::transmute};
 
@@ -6,7 +8,7 @@ use std::{ffi::CString, fmt::Display, mem::transmute};
 /// `N` represents the maximum number of characters excluding `\0`.
 /// If `N` is `0`, the string is unlimited.
 #[repr(C)]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct RosString<const N: usize>(rosidl_runtime_c__String);
 
 impl<const N: usize> RosString<N> {
@@ -93,6 +95,17 @@ impl<const N: usize> PartialEq for RosString<N> {
     }
 }
 
+impl<const N: usize> TryClone for RosString<N> {
+    fn try_clone(&self) -> Option<Self> {
+        let mut result = Self::new(&self.get_string())?;
+        if unsafe { rosidl_runtime_c__String__copy(&self.0, &mut result.0) } {
+            Some(result)
+        } else {
+            None
+        }
+    }
+}
+
 unsafe impl<const N: usize> Sync for RosString<N> {}
 unsafe impl<const N: usize> Send for RosString<N> {}
 
@@ -102,7 +115,7 @@ unsafe impl<const N: usize> Send for RosString<N> {}
 /// `M` represents the maximum number of elements in a sequence.
 /// If `SEQLEN` is `0`, the sequence is unlimited.
 #[repr(C)]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct RosStringSeq<const STRLEN: usize, const SEQLEN: usize>(
     rosidl_runtime_c__String__Sequence,
 );
@@ -180,6 +193,17 @@ impl<const STRLEN: usize, const SEQLEN: usize> PartialEq for RosStringSeq<STRLEN
     }
 }
 
+impl<const STRLEN: usize, const SEQLEN: usize> TryClone for RosStringSeq<STRLEN, SEQLEN> {
+    fn try_clone(&self) -> Option<Self> {
+        let mut result = Self::new(self.0.size)?;
+        if unsafe { rosidl_runtime_c__String__Sequence__copy(&self.0, &mut result.0) } {
+            Some(result)
+        } else {
+            None
+        }
+    }
+}
+
 unsafe impl<const STRLEN: usize, const SEQLEN: usize> Sync for RosStringSeq<STRLEN, SEQLEN> {}
 unsafe impl<const STRLEN: usize, const SEQLEN: usize> Send for RosStringSeq<STRLEN, SEQLEN> {}
 
@@ -187,7 +211,7 @@ unsafe impl<const STRLEN: usize, const SEQLEN: usize> Send for RosStringSeq<STRL
 /// `N` represents the maximum number of characters excluding `\0`.
 /// If `N` is `0`, the string is unlimited.
 #[repr(C)]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct RosWString<const N: usize>(rosidl_runtime_c__U16String);
 
 impl<const N: usize> RosWString<N> {
@@ -274,6 +298,17 @@ impl<const N: usize> PartialEq for RosWString<N> {
     }
 }
 
+impl<const N: usize> TryClone for RosWString<N> {
+    fn try_clone(&self) -> Option<Self> {
+        let mut result = Self::new(&self.get_string())?;
+        if unsafe { rosidl_runtime_c__U16String__copy(&self.0, &mut result.0) } {
+            Some(result)
+        } else {
+            None
+        }
+    }
+}
+
 unsafe impl<const N: usize> Sync for RosWString<N> {}
 unsafe impl<const N: usize> Send for RosWString<N> {}
 
@@ -283,7 +318,7 @@ unsafe impl<const N: usize> Send for RosWString<N> {}
 /// `M` represents the maximum number of elements in a sequence.
 /// If `SEQLEN` is `0`, the sequence is unlimited.
 #[repr(C)]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct RosWStringSeq<const STRLEN: usize, const SEQLEN: usize>(
     rosidl_runtime_c__U16String__Sequence,
 );
@@ -360,6 +395,17 @@ impl<const STRLEN: usize, const SEQLEN: usize> PartialEq for RosWStringSeq<STRLE
                 &self.0 as *const _,
                 &other.0 as *const _,
             )
+        }
+    }
+}
+
+impl<const STRLEN: usize, const SEQLEN: usize> TryClone for RosWStringSeq<STRLEN, SEQLEN> {
+    fn try_clone(&self) -> Option<Self> {
+        let mut result = Self::new(self.0.size)?;
+        if unsafe { rosidl_runtime_c__U16String__Sequence__copy(&self.0, &mut result.0) } {
+            Some(result)
+        } else {
+            None
         }
     }
 }
