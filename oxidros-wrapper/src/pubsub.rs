@@ -2,7 +2,6 @@
 //!
 use std::pin::Pin;
 
-use futures::Stream;
 use oxidros::{
     msg::TypeSupport,
     topic::{
@@ -11,6 +10,7 @@ use oxidros::{
     },
     RecvResult,
 };
+use tokio_stream::Stream;
 
 use crate::common::Result;
 use crate::common::SubscriberStream;

@@ -1,6 +1,6 @@
 //! Action server.
 
-use futures::try_join;
+use futures_util::try_join;
 use oxidros_core::{
     DurabilityPolicy, HistoryPolicy, LivelinessPolicy, ReliabilityPolicy, TryClone,
 };

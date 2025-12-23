@@ -13,8 +13,7 @@ pub struct RosString<const N: usize>(rosidl_runtime_c__String);
 
 impl<const N: usize> RosString<N> {
     pub fn new(s: &str) -> Option<Self> {
-        let mut msg: rosidl_runtime_c__String =
-            unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
+        let mut msg: rosidl_runtime_c__String = unsafe { std::mem::zeroed() };
 
         // initialize string
         if unsafe { rosidl_runtime_c__String__init(&mut msg) } {
@@ -29,8 +28,7 @@ impl<const N: usize> RosString<N> {
     }
 
     pub fn null() -> Self {
-        let msg: rosidl_runtime_c__String =
-            unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
+        let msg: rosidl_runtime_c__String = unsafe { std::mem::zeroed() };
         Self(msg)
     }
 
@@ -127,8 +125,7 @@ impl<const STRLEN: usize, const SEQLEN: usize> RosStringSeq<STRLEN, SEQLEN> {
             return None;
         }
 
-        let mut msg: rosidl_runtime_c__String__Sequence =
-            unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
+        let mut msg: rosidl_runtime_c__String__Sequence = unsafe { std::mem::zeroed() };
         if unsafe { rosidl_runtime_c__String__Sequence__init(&mut msg, size as _) } {
             Some(Self(msg))
         } else {
@@ -137,8 +134,7 @@ impl<const STRLEN: usize, const SEQLEN: usize> RosStringSeq<STRLEN, SEQLEN> {
     }
 
     pub fn null() -> Self {
-        let msg: rosidl_runtime_c__String__Sequence =
-            unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
+        let msg: rosidl_runtime_c__String__Sequence = unsafe { std::mem::zeroed() };
         Self(msg)
     }
 
@@ -216,8 +212,7 @@ pub struct RosWString<const N: usize>(rosidl_runtime_c__U16String);
 
 impl<const N: usize> RosWString<N> {
     pub fn new(s: &str) -> Option<Self> {
-        let mut msg: rosidl_runtime_c__U16String =
-            unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
+        let mut msg: rosidl_runtime_c__U16String = unsafe { std::mem::zeroed() };
 
         // initialize string
         if unsafe { rosidl_runtime_c__U16String__init(&mut msg) } {
@@ -232,8 +227,7 @@ impl<const N: usize> RosWString<N> {
     }
 
     pub fn null() -> Self {
-        let msg: rosidl_runtime_c__U16String =
-            unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
+        let msg: rosidl_runtime_c__U16String = unsafe { std::mem::zeroed() };
         Self(msg)
     }
 
@@ -330,8 +324,7 @@ impl<const STRLEN: usize, const SEQLEN: usize> RosWStringSeq<STRLEN, SEQLEN> {
             return None;
         }
 
-        let mut msg: rosidl_runtime_c__U16String__Sequence =
-            unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
+        let mut msg: rosidl_runtime_c__U16String__Sequence = unsafe { std::mem::zeroed() };
         if unsafe { rosidl_runtime_c__U16String__Sequence__init(&mut msg, size as _) } {
             Some(Self(msg))
         } else {
@@ -340,8 +333,7 @@ impl<const STRLEN: usize, const SEQLEN: usize> RosWStringSeq<STRLEN, SEQLEN> {
     }
 
     pub fn null() -> Self {
-        let msg: rosidl_runtime_c__U16String__Sequence =
-            unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
+        let msg: rosidl_runtime_c__U16String__Sequence = unsafe { std::mem::zeroed() };
         Self(msg)
     }
 

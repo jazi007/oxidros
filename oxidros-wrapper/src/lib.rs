@@ -95,7 +95,6 @@ pub mod prelude {
     pub use crate::common::{create_qos, ArcNode, Attributes, DynError, Result};
     pub use crate::communicate::Communicate;
     pub use crate::pubsub::{Publish, Subscribe};
-    pub use futures::{Stream, StreamExt};
     pub use oxidros::{
         context::Context,
         node::{Node, NodeOptions},
@@ -104,7 +103,8 @@ pub mod prelude {
             subscriber::{Subscriber, TakenMsg},
         },
     };
+    pub use tokio_stream::{Stream, StreamExt};
 }
-pub use futures;
 pub use oxidros;
+pub use tokio;
 pub use tokio_stream;

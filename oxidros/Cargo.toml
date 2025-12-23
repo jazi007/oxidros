@@ -15,7 +15,6 @@ oxidros-core = { path = "../oxidros-core" }
 oxidros-msg = { path = "../oxidros-msg" }
 oxidros-rcl = { path = "../oxidros-rcl" }
 crossbeam-channel = "0.5"
-futures.workspace = true
 libc = "0.2"
 num-derive = "0.4"
 num-traits.workspace = true
@@ -26,10 +25,10 @@ regex = "1.10"
 serde = { version = "1", features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
 signal-hook = "0.3"
+futures-util.workspace = true
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
-futures.workspace = true
 memac = "0.5"
 rand = "0.9"
 

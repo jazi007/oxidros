@@ -7,7 +7,7 @@ pub struct SequenceRaw<T> {
 }
 impl<T> SequenceRaw<T> {
     pub const fn null() -> Self {
-        unsafe { std::mem::MaybeUninit::zeroed().assume_init() }
+        unsafe { std::mem::zeroed() }
     }
     pub fn as_slice(&self) -> &[T] {
         if self.data.is_null() {

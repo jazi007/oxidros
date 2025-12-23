@@ -1,6 +1,6 @@
 //! Common types used by all ROS nodes
 //!
-use futures::ready;
+use futures_util::ready;
 use oxidros::{
     msg::TypeSupport,
     node::Node,

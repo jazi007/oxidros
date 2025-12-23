@@ -47,7 +47,7 @@ where
                     return Err(e);
                 }
                 Err(_) => {
-                    log::error!("TimeOut retrying ...");
+                    log::error!("Timeout retrying ...");
                     client = receiver.give_up();
                 }
             };

@@ -637,7 +637,7 @@ name = "oxidros"
 version = "0.4.6"
 dependencies = [
  "crossbeam-channel",
- "futures",
+ "futures-util",
  "libc",
  "memac",
  "num-derive",
@@ -697,6 +697,7 @@ name = "oxidros-wrapper"
 version = "0.1.7"
 dependencies = [
  "futures",
+ "futures-util",
  "log",
  "oxidros",
  "tokio",

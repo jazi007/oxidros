@@ -1,6 +1,5 @@
 pub mod common;
 
-use futures::Future;
 use oxidros::{
     self,
     action::{
@@ -20,6 +19,7 @@ use oxidros::{
         unique_identifier_msgs::msg::UUID,
     },
 };
+use std::future::Future;
 use std::{pin::Pin, sync::Arc, thread, time::Duration};
 
 fn create_server(

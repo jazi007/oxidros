@@ -23,7 +23,7 @@ macro_rules! def_sequence {
                     return None;
                 }
 
-                let mut msg: $ty_seq = unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
+                let mut msg: $ty_seq = unsafe { std::mem::zeroed() };
                 if unsafe { $init(&mut msg, size as _) } {
                     Some($ty(msg))
                 } else {
@@ -32,7 +32,7 @@ macro_rules! def_sequence {
             }
 
             pub fn null() -> Self {
-                let msg: $ty_seq = unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
+                let msg: $ty_seq = unsafe { std::mem::zeroed() };
                 $ty(msg)
             }
 
