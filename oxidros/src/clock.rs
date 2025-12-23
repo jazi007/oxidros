@@ -1,5 +1,3 @@
-use std::mem::MaybeUninit;
-
 use crate::{error::RCLResult, get_allocator, rcl};
 
 /// A clock. For now only SystemTime/ROSTime is implemented.
@@ -11,7 +9,7 @@ pub struct Clock {
 impl Clock {
     /// Create a clock.
     pub fn new() -> RCLResult<Self> {
-        let mut clock = unsafe { MaybeUninit::zeroed().assume_init() };
+        let mut clock = unsafe { std::mem::zeroed() };
 
         let guard = rcl::MT_UNSAFE_FN.lock();
         guard.rcl_ros_clock_init(&mut clock, &mut get_allocator())?;
@@ -27,7 +25,7 @@ impl Clock {
     }
 
     pub fn get_now(&mut self) -> RCLResult<rcl::rcl_time_point_value_t> {
-        let mut now = unsafe { MaybeUninit::zeroed().assume_init() };
+        let mut now = unsafe { std::mem::zeroed() };
         rcl::MTSafeFn::rcl_clock_get_now(self.clock, &mut now)?;
         Ok(now)
     }

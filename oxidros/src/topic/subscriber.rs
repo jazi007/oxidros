@@ -167,7 +167,6 @@ use std::{
     ffi::CString,
     future::Future,
     marker::PhantomData,
-    mem::MaybeUninit,
     os::raw::c_void,
     pin::Pin,
     ptr::null_mut,
@@ -582,7 +581,7 @@ fn take_loaned_message<T>(
 
 fn rcl_take<T>(subscription: &rcl::rcl_subscription_t) -> RCLResult<T> {
     let guard = rcl::MT_UNSAFE_FN.lock();
-    let mut ros_message: T = unsafe { MaybeUninit::zeroed().assume_init() };
+    let mut ros_message: T = unsafe { std::mem::zeroed() };
     match guard.rcl_take(
         subscription,
         &mut ros_message as *mut _ as *mut c_void,

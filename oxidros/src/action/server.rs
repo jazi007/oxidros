@@ -12,10 +12,7 @@ use oxidros_msg::interfaces::unique_identifier_msgs::msg::UUID;
 use parking_lot::Mutex;
 use pin_project::{pin_project, pinned_drop};
 use std::future::Future;
-use std::{
-    collections::BTreeMap, ffi::CString, mem::MaybeUninit, pin::Pin, sync::Arc, task::Poll,
-    time::Duration,
-};
+use std::{collections::BTreeMap, ffi::CString, pin::Pin, sync::Arc, task::Poll, time::Duration};
 
 use crate::logger::{pr_error_in, Logger};
 use crate::msg::GetUUID;
@@ -190,8 +187,8 @@ where
     pub fn try_recv_goal_request(
         &mut self,
     ) -> RecvResult<(ServerGoalSend<T>, SendGoalServiceRequest<T>), ()> {
-        let mut header: rcl::rmw_request_id_t = unsafe { MaybeUninit::zeroed().assume_init() };
-        let mut request: SendGoalServiceRequest<T> = unsafe { MaybeUninit::zeroed().assume_init() };
+        let mut header: rcl::rmw_request_id_t = unsafe { std::mem::zeroed() };
+        let mut request: SendGoalServiceRequest<T> = unsafe { std::mem::zeroed() };
         let result = {
             let guard = rcl::MT_UNSAFE_FN.lock();
             guard.rcl_action_take_goal_request(
@@ -229,7 +226,7 @@ where
         ),
         (),
     > {
-        let mut header: rcl::rmw_request_id_t = unsafe { MaybeUninit::zeroed().assume_init() };
+        let mut header: rcl::rmw_request_id_t = unsafe { std::mem::zeroed() };
         let mut request: rcl_action_cancel_request_t =
             rcl::MTSafeFn::rcl_action_get_zero_initialized_cancel_request();
 
@@ -290,9 +287,8 @@ where
     pub fn try_recv_result_request(
         &mut self,
     ) -> RecvResult<(ServerResultSend<T>, GetResultServiceRequest<T>), ()> {
-        let mut header: rcl::rmw_request_id_t = unsafe { MaybeUninit::zeroed().assume_init() };
-        let mut request: GetResultServiceRequest<T> =
-            unsafe { MaybeUninit::zeroed().assume_init() };
+        let mut header: rcl::rmw_request_id_t = unsafe { std::mem::zeroed() };
+        let mut request: GetResultServiceRequest<T> = unsafe { std::mem::zeroed() };
 
         let take_result = {
             let guard = rcl::MT_UNSAFE_FN.lock();

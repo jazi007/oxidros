@@ -1,4 +1,4 @@
-use std::{mem::MaybeUninit, ptr::null_mut, sync::Arc};
+use std::{ptr::null_mut, sync::Arc};
 
 use crate::{
     error::{DynError, RCLResult},
@@ -82,7 +82,7 @@ pub struct Copied<T: TypeSupport> {
 
 impl<T: TypeSupport> Copied<T> {
     pub fn new(publisher: Arc<rcl::rcl_publisher_t>) -> Self {
-        let value: T = unsafe { MaybeUninit::zeroed().assume_init() };
+        let value: T = unsafe { std::mem::zeroed() };
         Self { publisher, value }
     }
 }

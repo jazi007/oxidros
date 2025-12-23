@@ -73,8 +73,8 @@ use crate::{
 use oxidros_core::selector::CallbackResult;
 use pin_project::{pin_project, pinned_drop};
 use std::{
-    ffi::CString, future::Future, marker::PhantomData, mem::MaybeUninit, os::raw::c_void, pin::Pin,
-    sync::Arc, task::Poll, time::Duration,
+    ffi::CString, future::Future, marker::PhantomData, os::raw::c_void, pin::Pin, sync::Arc,
+    task::Poll, time::Duration,
 };
 
 pub(crate) struct ClientData {
@@ -448,8 +448,8 @@ fn rcl_take_response_with_info<T>(
     client: &rcl::rcl_client_t,
     seq: i64,
 ) -> RCLResult<(T, rcl::rmw_service_info_t)> {
-    let mut header: rcl::rmw_service_info_t = unsafe { MaybeUninit::zeroed().assume_init() };
-    let mut ros_response: T = unsafe { MaybeUninit::zeroed().assume_init() };
+    let mut header: rcl::rmw_service_info_t = unsafe { std::mem::zeroed() };
+    let mut ros_response: T = unsafe { std::mem::zeroed() };
 
     header.request_id.sequence_number = seq;
 

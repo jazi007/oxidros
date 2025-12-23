@@ -4,9 +4,7 @@ use oxidros_core::selector::CallbackResult;
 use pin_project::{pin_project, pinned_drop};
 use std::future::Future;
 use std::pin::Pin;
-use std::{
-    ffi::CString, marker::PhantomData, mem::MaybeUninit, sync::Arc, task::Poll, time::Duration,
-};
+use std::{ffi::CString, marker::PhantomData, sync::Arc, task::Poll, time::Duration};
 
 use crate::{
     error::{DynError, RCLActionError, RCLActionResult, RCLError},
@@ -884,8 +882,8 @@ where
 {
     let guard = rcl::MT_UNSAFE_FN.lock();
 
-    let mut header: rcl::rmw_request_id_t = unsafe { MaybeUninit::zeroed().assume_init() };
-    let mut response: SendGoalServiceResponse<T> = unsafe { MaybeUninit::zeroed().assume_init() };
+    let mut header: rcl::rmw_request_id_t = unsafe { std::mem::zeroed() };
+    let mut response: SendGoalServiceResponse<T> = unsafe { std::mem::zeroed() };
     guard.rcl_action_take_goal_response(
         client,
         &mut header,
@@ -900,8 +898,8 @@ fn rcl_action_take_cancel_response(
 ) -> RCLActionResult<(CancelGoal_Response, rcl::rmw_request_id_t)> {
     let guard = rcl::MT_UNSAFE_FN.lock();
 
-    let mut header: rcl::rmw_request_id_t = unsafe { MaybeUninit::zeroed().assume_init() };
-    let mut response: CancelGoal_Response = unsafe { MaybeUninit::zeroed().assume_init() };
+    let mut header: rcl::rmw_request_id_t = unsafe { std::mem::zeroed() };
+    let mut response: CancelGoal_Response = unsafe { std::mem::zeroed() };
     guard.rcl_action_take_cancel_response(
         client,
         &mut header,
@@ -919,8 +917,8 @@ where
 {
     let guard = rcl::MT_UNSAFE_FN.lock();
 
-    let mut header: rcl::rmw_request_id_t = unsafe { MaybeUninit::zeroed().assume_init() };
-    let mut response: GetResultServiceResponse<T> = unsafe { MaybeUninit::zeroed().assume_init() };
+    let mut header: rcl::rmw_request_id_t = unsafe { std::mem::zeroed() };
+    let mut response: GetResultServiceResponse<T> = unsafe { std::mem::zeroed() };
     guard.rcl_action_take_result_response(
         client,
         &mut header,
@@ -936,7 +934,7 @@ where
 {
     let guard = rcl::MT_UNSAFE_FN.lock();
 
-    let mut feedback: <T as ActionMsg>::Feedback = unsafe { MaybeUninit::zeroed().assume_init() };
+    let mut feedback: <T as ActionMsg>::Feedback = unsafe { std::mem::zeroed() };
     guard.rcl_action_take_feedback(client, &mut feedback as *const _ as *mut _)?;
 
     Ok(feedback)

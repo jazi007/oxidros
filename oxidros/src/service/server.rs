@@ -107,8 +107,8 @@ use oxidros_core::selector::CallbackResult;
 use parking_lot::Mutex;
 use pin_project::{pin_project, pinned_drop};
 use std::{
-    ffi::CString, future::Future, marker::PhantomData, mem::MaybeUninit, os::raw::c_void, pin::Pin,
-    sync::Arc, task::Poll,
+    ffi::CString, future::Future, marker::PhantomData, os::raw::c_void, pin::Pin, sync::Arc,
+    task::Poll,
 };
 
 pub(crate) struct ServerData {
@@ -440,8 +440,8 @@ impl<T: ServiceMsg> ServerSend<T> {
 fn rcl_take_request_with_info<T>(
     service: &rcl::rcl_service_t,
 ) -> RCLResult<(T, rcl::rmw_service_info_t)> {
-    let mut header: rcl::rmw_service_info_t = unsafe { MaybeUninit::zeroed().assume_init() };
-    let mut ros_request: T = unsafe { MaybeUninit::zeroed().assume_init() };
+    let mut header: rcl::rmw_service_info_t = unsafe { std::mem::zeroed() };
+    let mut ros_request: T = unsafe { std::mem::zeroed() };
 
     let guard = rcl::MT_UNSAFE_FN.lock();
     guard.rcl_take_request_with_info(
