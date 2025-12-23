@@ -751,8 +751,9 @@ impl Generator {
         self.generate_exprs(&exprs, &mut lines, lib, &rs_type_name, MsgType::Msg);
 
         lines.push_back(gen_impl_for_msg(lib, &rs_type_name).into());
+        lines.push_front("use std::ops::{Deref, DerefMut};\n".into());
         lines.push_front(
-            "use {prefix}oxidros_core::{TryClone, TypeSupport};\n#[allow(unused_imports)]\nuse {prefix}{msg, rcl};"
+            "use {prefix}oxidros_core::{SequenceRaw, TryClone, TypeSupport};\n#[allow(unused_imports)]\nuse {prefix}{msg, rcl};"
                 .into(),
         );
 
@@ -811,9 +812,10 @@ impl Generator {
         );
 
         lines.push_back(gen_impl_for_srv(lib, &rs_type_name).into());
+        lines.push_front("use std::ops::{Deref, DerefMut};\n".into());
         lines.push_front(
             format!(
-                "use {}::{{msg::{{ServiceMsg, TryClone, TypeSupport}}, rcl}};",
+                "use {}::{{msg::{{ServiceMsg, SequenceRaw, TryClone, TypeSupport}}, rcl}};",
                 self.oxidros_path()
             )
             .into(),
@@ -1291,11 +1293,16 @@ impl<const N: usize> PartialEq for {type_name}Seq<N> {{
 }}
 impl<const N: usize> TryClone for {type_name}Seq<N> {{
     fn try_clone(&self) -> Option<Self> {{
-        let result = Self::new(self.size)?;
-        unsafe {{
-            let msg1 = {type_name}SeqRaw{{ data: self.data, size: self.size, capacity: self.capacity }};
-            let mut msg2 = {type_name}SeqRaw{{ data: result.data, size: result.size, capacity: result.capacity }};
+        let mut result = Self::new(self.size)?;
+        let msg1 = {type_name}SeqRaw{{ data: self.data, size: self.size, capacity: self.capacity }};
+        let mut msg2 = {type_name}SeqRaw{{ data: result.data, size: result.size, capacity: result.capacity }};
+        if unsafe {{
             {module_name}__msg__{type_name}__Sequence__copy(&msg1, &mut msg2)
+        }} {{
+            result.0 = msg2;
+            Some(result)
+        }} else {{
+            None
         }}
     }}
 }}
@@ -1383,12 +1390,13 @@ impl TryClone for {type_name}Response {{
 
 impl<const N: usize> TryClone for {type_name}RequestSeq<N> {{
     fn try_clone(&self) -> Option<Self> {{
-        let result = Self::new(self.size)?;
+        let mut result = Self::new(self.size)?;
+        let msg1 = {type_name}RequestSeqRaw{{ data: self.data, size: self.size, capacity: self.capacity }};
+        let mut msg2 = {type_name}RequestSeqRaw{{ data: result.data, size: result.size, capacity: result.capacity }};
         if unsafe {{
-            let msg1 = {type_name}RequestSeqRaw{{ data: self.data, size: self.size, capacity: self.capacity }};
-            let mut msg2 = {type_name}RequestSeqRaw{{ data: result.data, size: result.size, capacity: result.capacity }};
             {module_name}__srv__{type_name}_Request__Sequence__copy(&msg1, &mut msg2)
         }} {{
+            result.0 = msg2;
             Some(result)
         }} else {{
             None
@@ -1398,12 +1406,13 @@ impl<const N: usize> TryClone for {type_name}RequestSeq<N> {{
 
 impl<const N: usize> TryClone for {type_name}ResponseSeq<N> {{
     fn try_clone(&self) -> Option<Self> {{
-        let result = Self::new(self.size)?;
+        let mut result = Self::new(self.size)?;
+        let msg1 = {type_name}ResponseSeqRaw{{ data: self.data, size: self.size, capacity: self.capacity }};
+        let mut msg2 = {type_name}ResponseSeqRaw{{ data: result.data, size: result.size, capacity: result.capacity }};
         if unsafe {{
-            let msg1 = {type_name}ResponseSeqRaw{{ data: self.data, size: self.size, capacity: self.capacity }};
-            let mut msg2 = {type_name}ResponseSeqRaw{{ data: result.data, size: result.size, capacity: result.capacity }};
             {module_name}__srv__{type_name}_Response__Sequence__copy(&msg1, &mut msg2)
         }} {{
+            result.0 = msg2;
             Some(result)
         }} else {{
             None
@@ -1413,12 +1422,13 @@ impl<const N: usize> TryClone for {type_name}ResponseSeq<N> {{
 
 impl<const N: usize> TryClone for {type_name}ResponseSeq<N> {{
     fn try_clone(&self) -> Option<Self> {{
-        let result = Self::new(self.size)?;
+        let mut result = Self::new(self.size)?;
+        let msg1 = {type_name}ResponseSeqRaw{{ data: self.data, size: self.size, capacity: self.capacity }};
+        let mut msg2 = {type_name}ResponseSeqRaw{{ data: result.data, size: result.size, capacity: result.capacity }};
         if unsafe {{
-            let msg1 = {type_name}ResponseSeqRaw{{ data: self.data, size: self.size, capacity: self.capacity }};
-            let mut msg2 = {type_name}ResponseSeqRaw{{ data: result.data, size: result.size, capacity: result.capacity }};
             {module_name}__srv__{type_name}_Response__Sequence__copy(&msg1, &msg2)
         }} {{
+            result.0 = msg2;
             Some(result)
         }} else {{
             None
@@ -1506,14 +1516,14 @@ impl TryClone for {type_name} {{
 
 impl<const N: usize> TryClone for {type_name}Seq<N> {{
     fn try_clone(&self) -> Option<Self> {{
-        let result = Self::new(self.size)?;
+        let mut result = Self::new(self.size)?;
+        let msg1 = {type_name}SeqRaw{{ data: self.data, size: self.size, capacity: self.capacity }};
+        let mut msg2 = {type_name}SeqRaw{{ data: result.data, size: result.size, capacity: result.capacity }};
         if unsafe {{
-            let msg1 = {type_name}SeqRaw{{ data: self.data, size: self.size, capacity: self.capacity }};
-            let mut msg2 = {type_name}SeqRaw{{ data: result.data, size: result.size, capacity: result.capacity }};
             {module_name_1st}__{module_name_2nd}__{type_name}__Sequence__copy(&msg1, &mut msg2)
         }} {{
+            result.0 = msg2;
             Some(result)
-
         }} else {{
             None
         }}
