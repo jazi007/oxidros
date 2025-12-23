@@ -158,7 +158,7 @@ use crate::{
     qos, rcl,
     selector::async_selector::{self, SELECTOR},
     signal_handler::Signaled,
-    subscriber_loaned_message::SubscriberLoanedMessage,
+    topic::subscriber_loaned_message::SubscriberLoanedMessage,
     PhantomUnsync, RecvResult,
 };
 use oxidros_core::selector::CallbackResult;

@@ -70,7 +70,7 @@ impl<T: TypeSupport> std::ops::DerefMut for PublisherLoanedMessage<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         match self {
             PublisherLoanedMessage::Copied(msg) => &mut msg.value,
-            PublisherLoanedMessage::Loaned(inner) => inner.get(),
+            PublisherLoanedMessage::Loaned(inner) => inner.get_mut(),
         }
     }
 }
@@ -109,11 +109,12 @@ impl<T: TypeSupport> Loaned<T> {
         })
     }
 
-    #[allow(clippy::mut_from_ref)]
-    pub(crate) fn get(&self) -> &mut T {
+    pub(crate) fn get(&self) -> &T {
+        unsafe { &*self.chunk }
+    }
+    pub(crate) fn get_mut(&mut self) -> &mut T {
         unsafe { &mut *self.chunk }
     }
-
     pub(crate) fn as_mut_ptr(&self) -> *mut T {
         self.chunk
     }

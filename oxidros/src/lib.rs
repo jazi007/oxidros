@@ -232,11 +232,9 @@ pub mod logger;
 pub mod msg;
 pub mod node;
 pub mod parameter;
-pub mod publisher_loaned_message;
 pub mod rcl;
 pub mod selector;
 pub mod service;
-pub mod subscriber_loaned_message;
 pub mod topic;
 pub use oxidros_core::qos;
 

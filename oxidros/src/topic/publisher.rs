@@ -52,9 +52,9 @@ use crate::{
     get_allocator,
     msg::TypeSupport,
     node::Node,
-    publisher_loaned_message::PublisherLoanedMessage,
     qos, rcl,
     signal_handler::Signaled,
+    topic::publisher_loaned_message::PublisherLoanedMessage,
 };
 use std::{ffi::CString, marker::PhantomData, ptr::null_mut, sync::Arc};
 
