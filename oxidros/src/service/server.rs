@@ -99,13 +99,11 @@ use crate::{
     node::Node,
     qos::Profile,
     rcl::{self, rmw_request_id_t},
-    selector::{
-        async_selector::{self, SELECTOR},
-        CallbackResult,
-    },
+    selector::async_selector::{self, SELECTOR},
     signal_handler::Signaled,
     PhantomUnsync, RecvResult,
 };
+use oxidros_core::selector::CallbackResult;
 use parking_lot::Mutex;
 use pin_project::{pin_project, pinned_drop};
 use std::{

@@ -156,14 +156,12 @@ use crate::{
     msg::TypeSupport,
     node::Node,
     qos, rcl,
-    selector::{
-        async_selector::{self, SELECTOR},
-        CallbackResult,
-    },
+    selector::async_selector::{self, SELECTOR},
     signal_handler::Signaled,
     subscriber_loaned_message::SubscriberLoanedMessage,
     PhantomUnsync, RecvResult,
 };
+use oxidros_core::selector::CallbackResult;
 use pin_project::{pin_project, pinned_drop};
 use std::{
     ffi::CString,
@@ -551,7 +549,7 @@ impl<T> std::ops::DerefMut for TakenMsg<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         match self {
             TakenMsg::Copied(copied) => copied,
-            TakenMsg::Loaned(loaned) => loaned.get(),
+            TakenMsg::Loaned(loaned) => loaned.get_mut(),
         }
     }
 }

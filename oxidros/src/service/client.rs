@@ -65,11 +65,12 @@ use crate::{
     rcl,
     selector::{
         async_selector::{self, SELECTOR},
-        CallbackResult, Selector,
+        Selector,
     },
     signal_handler::Signaled,
     PhantomUnsync, RecvResult, ST,
 };
+use oxidros_core::selector::CallbackResult;
 use pin_project::{pin_project, pinned_drop};
 use std::{
     ffi::CString, future::Future, marker::PhantomData, mem::MaybeUninit, os::raw::c_void, pin::Pin,

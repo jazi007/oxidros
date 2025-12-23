@@ -1,6 +1,7 @@
 //! Action server.
 
 use futures_util::try_join;
+use oxidros_core::selector::CallbackResult;
 use oxidros_core::{
     DurabilityPolicy, HistoryPolicy, LivelinessPolicy, ReliabilityPolicy, TryClone,
 };
@@ -34,10 +35,7 @@ use crate::{
         rcl_action_cancel_request_t, rcl_action_goal_handle_t, rcl_action_server_t,
         rmw_request_id_t, unique_identifier_msgs__msg__UUID,
     },
-    selector::{
-        async_selector::{Command, SELECTOR},
-        CallbackResult,
-    },
+    selector::async_selector::{Command, SELECTOR},
     signal_handler::Signaled,
     RecvResult,
 };

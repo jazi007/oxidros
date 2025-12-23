@@ -1,4 +1,4 @@
-use super::{guard_condition::GuardCondition, CallbackResult};
+use super::guard_condition::GuardCondition;
 use crate::{
     action,
     context::Context,
@@ -9,6 +9,7 @@ use crate::{
 };
 use crossbeam_channel::{Receiver, Sender};
 use once_cell::sync::Lazy;
+use oxidros_core::selector::CallbackResult;
 use parking_lot::Mutex;
 use std::{
     sync::Arc,

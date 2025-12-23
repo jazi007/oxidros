@@ -15,9 +15,10 @@ impl<T> SubscriberLoanedMessage<T> {
             chunk,
         }
     }
-
-    #[allow(clippy::mut_from_ref)]
-    pub(crate) fn get(&self) -> &mut T {
+    pub(crate) fn get(&self) -> &T {
+        unsafe { &*self.chunk }
+    }
+    pub(crate) fn get_mut(&mut self) -> &mut T {
         unsafe { &mut *self.chunk }
     }
 }

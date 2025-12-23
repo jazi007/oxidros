@@ -54,15 +54,15 @@
 //! ```
 
 use self::guard_condition::{GuardCondition, RCLGuardCondition};
+
 use crate::{
     action::{self, handle::GoalHandle, SendGoalServiceRequest},
     context::Context,
-    delta_list::DeltaList,
     error::{DynError, RCLActionResult, RCLError, RCLResult},
     get_allocator,
     logger::{pr_error_in, pr_fatal_in, Logger},
     msg::{interfaces::action_msgs::msg::GoalInfo, ActionMsg, GetUUID, ServiceMsg, TypeSupport},
-    parameter::{ParameterServer, Parameters},
+    parameter::ParameterServer,
     rcl::{self, rcl_action_client_t},
     service::{
         client::{ClientData, ClientRecv},
@@ -72,6 +72,12 @@ use crate::{
     signal_handler::{self, Signaled},
     topic::subscriber::{RCLSubscription, Subscriber, TakenMsg},
     PhantomUnsend, PhantomUnsync, RecvResult, ST,
+};
+use oxidros_core::{
+    delta_list::DeltaList,
+    selector::{
+        ActionHandler, CallbackResult, ConditionHandler, ParameterCallback, ServerCallback,
+    },
 };
 use std::{
     cell::Cell,
@@ -95,24 +101,6 @@ use crate::helper::statistics::{SerializableTimeStat, TimeStatistics};
 
 pub(crate) mod async_selector;
 pub(crate) mod guard_condition;
-
-type ServerCallback<T> =
-    Box<dyn FnMut(<T as ServiceMsg>::Request, Header) -> <T as ServiceMsg>::Response>;
-type ParameterCallback = Box<dyn FnMut(&mut Parameters, BTreeSet<String>)>;
-
-#[derive(Debug, Eq, PartialEq)]
-pub(crate) enum CallbackResult {
-    Ok,
-    Remove,
-}
-
-struct ConditionHandler<T> {
-    is_once: bool,
-    event: T,
-    handler: Option<Box<dyn FnMut() -> CallbackResult>>,
-}
-
-type ActionHandler = Box<dyn FnMut() -> CallbackResult>;
 
 #[cfg_attr(feature = "statistics", allow(dead_code))]
 struct ActionClientConditionHandler {
@@ -460,7 +448,7 @@ impl Selector {
     pub fn add_server<T: ServiceMsg + 'static>(
         &mut self,
         server: Server<T>,
-        mut handler: ServerCallback<T>,
+        mut handler: ServerCallback<T, Header>,
     ) -> bool {
         let context_ptr = {
             let data = server.data.lock();

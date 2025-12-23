@@ -5,6 +5,7 @@
 //! for multiple implementations (real RCL, mock, alternative DDS, etc.).
 
 pub mod action;
+pub mod delta_list;
 pub mod error;
 pub mod helper;
 pub mod msg;

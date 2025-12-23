@@ -240,7 +240,6 @@ pub mod subscriber_loaned_message;
 pub mod topic;
 pub use oxidros_core::qos;
 
-mod delta_list;
 mod signal_handler;
 mod time;
 

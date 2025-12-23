@@ -1,5 +1,6 @@
 //! Action client.
 
+use oxidros_core::selector::CallbackResult;
 use pin_project::{pin_project, pinned_drop};
 use std::future::Future;
 use std::pin::Pin;
@@ -22,7 +23,7 @@ use crate::{
     rcl,
     selector::{
         async_selector::{self, SELECTOR},
-        CallbackResult, Selector,
+        Selector,
     },
     signal_handler::Signaled,
     PhantomUnsync, RecvResult,

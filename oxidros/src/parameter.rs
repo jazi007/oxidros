@@ -190,11 +190,12 @@ use crate::{
     selector::{
         async_selector::{Command, SELECTOR},
         guard_condition::GuardCondition,
-        CallbackResult, Selector,
+        Selector,
     },
     signal_handler::Signaled,
 };
 pub use oxidros_core::parameter::*;
+use oxidros_core::selector::CallbackResult;
 use parking_lot::RwLock;
 use std::{cell::Cell, collections::BTreeSet, future::Future, rc::Rc, sync::Arc, task::Poll};
 
