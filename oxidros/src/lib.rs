@@ -1,8 +1,8 @@
-//! # safe_drive: Formally Specified Rust Bindings for ROS2
+//! # oxidros
 //!
-//! `safe_drive` is a Rust bindings for ROS2.
+//! `oxidros` is a Rust bindings for ROS2.
 //! This library provides formal specifications and tested the specifications by using a model checker.
-//! Therefore, you can clearly understand how the scheduler work and the safeness of it.`safe_drive` is a ROS2 bindings
+//! Therefore, you can clearly understand how the scheduler work and the safeness of it.
 //!
 //! ## Specifications
 //!
@@ -48,7 +48,7 @@
 //!
 //! ## Examples
 //!
-//! `safe_drive` provides single threaded and multi threaded execution methods.
+//! `oxidros` provides single threaded and multi threaded execution methods.
 //! The single threaded execution is based on traditional callback based execution.
 //! You need to register callback functions for subscribers, servers, clients, and timers.
 //!
@@ -131,7 +131,7 @@
 //! ### Multi Threaded Execution
 //!
 //! This code uses `tokio` as a async/await's runtime.
-//! You can use other runtime such as `tokio`.
+//! You can use other runtime
 //!
 //! ```
 //! use oxidros::{
@@ -246,10 +246,7 @@ type PhantomUnsend = PhantomData<MutexGuard<'static, ()>>;
 
 use error::DynError;
 use msg::ServiceMsg;
-use service::{
-    client::{Client, ClientRecv},
-    Header,
-};
+use service::{client::ClientRecv, Header};
 pub use signal_handler::is_halt;
 
 // Re-export oxidros_core so external crates can access traits without direct dependency
@@ -257,9 +254,9 @@ pub use oxidros_core;
 
 /// A type of return values of some receive functions.
 #[derive(Debug)]
-pub enum RecvResult<T, U> {
+pub enum RecvResult<T> {
     Ok(T),
-    RetryLater(U),
+    RetryLater,
     Err(DynError),
 }
 
@@ -296,22 +293,15 @@ impl<T> DerefMut for ST<T> {
     }
 }
 
-impl<T: msg::ServiceMsg> ST<ClientRecv<T>> {
+impl<'a, T: msg::ServiceMsg> ST<ClientRecv<'a, T>> {
     /// This function calls `ClientRecv::try_recv` internally,
     /// but `RecvResult::RetryLater` includes `ST<CleintRecv<T>>` instead of `ClientRecv<T>`.
-    pub fn try_recv(self) -> RecvResult<(Client<T>, <T as ServiceMsg>::Response, Header), Self> {
+    pub fn try_recv(&self) -> RecvResult<(<T as ServiceMsg>::Response, Header)> {
         match self.data.try_recv() {
-            RecvResult::Ok((client, response, header)) => {
-                RecvResult::Ok((client, response, header))
-            }
-            RecvResult::RetryLater(rcv) => RecvResult::RetryLater(ST::new(rcv)),
+            RecvResult::Ok((response, header)) => RecvResult::Ok((response, header)),
+            RecvResult::RetryLater => RecvResult::RetryLater,
             RecvResult::Err(e) => RecvResult::Err(e),
         }
-    }
-
-    /// Consume `ST<ClientRecv<T>>` and return `Client<T>`.
-    pub fn give_up(self) -> Client<T> {
-        self.data.give_up()
     }
 }
 

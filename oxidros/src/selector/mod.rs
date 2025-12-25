@@ -71,7 +71,7 @@ use crate::{
     },
     signal_handler::{self, Signaled},
     topic::subscriber::{RCLSubscription, Subscriber, TakenMsg},
-    PhantomUnsend, PhantomUnsync, RecvResult, ST,
+    PhantomUnsend, PhantomUnsync, RecvResult,
 };
 use oxidros_core::{
     delta_list::DeltaList,
@@ -147,6 +147,7 @@ pub struct Statistics {
     pub wall_timer: BTreeMap<String, SerializableTimeStat>, // wall timers
 }
 
+#[derive(Debug)]
 struct EntitySize {
     subscriptions: usize,
     guard_condititons: usize,
@@ -341,9 +342,9 @@ impl Selector {
                     RecvResult::Ok(n) => {
                         handler(n);
                     }
-                    RecvResult::RetryLater(()) => return CallbackResult::Ok,
+                    RecvResult::RetryLater => return CallbackResult::Ok,
                     RecvResult::Err(e) => {
-                        let logger = Logger::new("safe_drive");
+                        let logger = Logger::new("oxidros");
                         pr_error_in!(logger, "failed try_recv() of subscriber: {}", e);
                         return CallbackResult::Remove;
                     }
@@ -447,7 +448,7 @@ impl Selector {
     /// ```
     pub fn add_server<T: ServiceMsg + 'static>(
         &mut self,
-        server: Server<T>,
+        mut server: Server<T>,
         mut handler: ServerCallback<T, Header>,
     ) -> bool {
         let context_ptr = {
@@ -455,35 +456,29 @@ impl Selector {
             data.node.context.as_ptr()
         };
         let srv = server.data.clone();
-        let mut server = Some(server);
 
         let f = move || {
             let start = SystemTime::now();
             let dur = Duration::from_millis(1);
 
             loop {
-                let s = server.take().unwrap();
-                match s.try_recv() {
+                match server.try_recv() {
                     RecvResult::Ok((server_send, request, header)) => {
                         let result = handler(request, header);
                         match server_send.send(&result) {
-                            Ok(s) => {
-                                server = Some(s);
-                            }
-                            Err((server_send, e)) => {
-                                let logger = Logger::new("safe_drive");
+                            Ok(()) => {}
+                            Err(e) => {
+                                let logger = Logger::new("oxidros");
                                 pr_error_in!(logger, "{e}");
-                                server = Some(server_send.give_up());
                                 return CallbackResult::Ok;
                             }
                         }
                     }
-                    RecvResult::RetryLater(srv) => {
-                        server = Some(srv);
+                    RecvResult::RetryLater => {
                         return CallbackResult::Ok;
                     }
                     RecvResult::Err(e) => {
-                        let logger = Logger::new("safe_drive");
+                        let logger = Logger::new("oxidros");
                         pr_fatal_in!(logger, "failed try_recv() of server: {}", e);
                         return CallbackResult::Remove;
                     }
@@ -530,22 +525,21 @@ impl Selector {
     /// Wait a response from a server.
     /// After waking up, the registered client is removed from the selector.
     /// You have to register every time when you wait events.
-    pub(crate) fn add_client_recv<T>(&mut self, client: &ST<ClientRecv<T>>) {
-        self.add_client_data(client.data.data.clone(), None, true);
+    pub(crate) fn add_client_recv<T: ServiceMsg>(&mut self, client: &ClientRecv<T>) {
+        self.add_client_data(client.data.data.clone(), None);
     }
 
     pub(crate) fn add_client_data(
         &mut self,
         client: Arc<ClientData>,
         handler: Option<Box<dyn FnMut() -> CallbackResult>>,
-        is_once: bool,
     ) {
         self.clients.insert(
             &client.client,
             ConditionHandler {
                 event: client,
                 handler,
-                is_once,
+                is_once: true,
             },
         );
     }
@@ -613,27 +607,22 @@ impl Selector {
                     match server.try_recv_goal_request() {
                         RecvResult::Ok((sender, request)) => {
                             let accepted = goal_handler(request);
-
-                            let s = if accepted {
+                            match if accepted {
                                 sender.accept(&accept_handler)
                             } else {
                                 sender.reject()
-                            };
-
-                            match s {
-                                Ok(s) => *server = s,
-                                Err((_sender, e)) => {
-                                    let logger = Logger::new("safe_drive");
+                            } {
+                                Ok(_) => return CallbackResult::Ok,
+                                Err(e) => {
+                                    let logger = Logger::new("oxidros");
                                     pr_error_in!(logger, "Failed to send goal response: {}", e);
                                     return CallbackResult::Remove;
                                 }
                             }
-
-                            return CallbackResult::Ok;
                         }
-                        RecvResult::RetryLater(()) => {}
+                        RecvResult::RetryLater => {}
                         RecvResult::Err(e) => {
-                            let logger = Logger::new("safe_drive");
+                            let logger = Logger::new("oxidros");
                             pr_error_in!(
                                 logger,
                                 "failed try_recv_goal_request() of action server: {}",
@@ -671,8 +660,8 @@ impl Selector {
 
                             match sender.send(accepted_goals) {
                                 Ok(_) => return CallbackResult::Ok,
-                                Err((_sender, e)) => {
-                                    let logger = Logger::new("safe_drive");
+                                Err(e) => {
+                                    let logger = Logger::new("oxidros");
                                     pr_error_in!(
                                         logger,
                                         "failed to send cancel responses from action server: {e}",
@@ -681,9 +670,9 @@ impl Selector {
                                 }
                             }
                         }
-                        RecvResult::RetryLater(_) => {}
+                        RecvResult::RetryLater => {}
                         RecvResult::Err(e) => {
-                            let logger = Logger::new("safe_drive");
+                            let logger = Logger::new("oxidros");
                             pr_error_in!(
                                 logger,
                                 "failed try_recv_cancel_request() of action server: {}",
@@ -716,8 +705,8 @@ impl Selector {
                         RecvResult::Ok((sender, request)) => {
                             match sender.send(request.get_uuid()) {
                                 Ok(_) => return CallbackResult::Ok,
-                                Err((_sender, e)) => {
-                                    let logger = Logger::new("safe_drive");
+                                Err(e) => {
+                                    let logger = Logger::new("oxidros");
                                     pr_error_in!(
                                         logger,
                                         "failed to send cancel responses from action server: {e}",
@@ -726,9 +715,9 @@ impl Selector {
                                 }
                             }
                         }
-                        RecvResult::RetryLater(_) => {}
+                        RecvResult::RetryLater => {}
                         RecvResult::Err(e) => {
-                            let logger = Logger::new("safe_drive");
+                            let logger = Logger::new("oxidros");
                             pr_error_in!(
                                 logger,
                                 "failed try_recv_result_request() of action server: {}",
@@ -1053,6 +1042,63 @@ impl Selector {
         }
     }
 
+    fn set_rcl_wait(&mut self) -> Result<(), DynError> {
+        let guard = rcl::MT_UNSAFE_FN.lock();
+        guard.rcl_wait_set_clear(&mut self.wait_set)?;
+
+        let entities = self.get_num_entities()?;
+        guard.rcl_wait_set_resize(
+            &mut self.wait_set,
+            entities.subscriptions,
+            entities.guard_condititons,
+            entities.timers,
+            entities.clients,
+            entities.services,
+            entities.events,
+        )?;
+        // set subscriptions
+        for (_, h) in self.subscriptions.iter() {
+            guard.rcl_wait_set_add_subscription(
+                &mut self.wait_set,
+                h.event.subscription.as_ref(),
+                null_mut(),
+            )?;
+        }
+        // set guard conditions
+        for (_, h) in self.cond.iter() {
+            guard.rcl_wait_set_add_guard_condition(
+                &mut self.wait_set,
+                h.event.cond.as_ref(),
+                null_mut(),
+            )?;
+        }
+        // set clients
+        for (_, h) in self.clients.iter() {
+            guard.rcl_wait_set_add_client(&mut self.wait_set, &h.event.client, null_mut())?;
+        }
+        // set services
+        for (_, h) in self.services.iter() {
+            let Some(service) = h.event.try_lock() else {
+                continue;
+            };
+            guard.rcl_wait_set_add_service(&mut self.wait_set, &service.service, null_mut())?;
+        }
+        // set action clients
+        for (_, h) in self.action_clients.iter() {
+            guard.rcl_action_wait_set_add_action_client(
+                &mut self.wait_set,
+                h.client,
+                null_mut(),
+                null_mut(),
+            )?;
+        }
+        // set action servers
+        for (s, _v) in self.action_servers.iter() {
+            guard.rcl_action_wait_set_add_action_server(&mut self.wait_set, *s, null_mut())?;
+        }
+        Ok(())
+    }
+
     /// Wait events and invoke registered callback functions.
     ///
     /// # Example
@@ -1070,67 +1116,8 @@ impl Selector {
     /// }
     /// ```
     pub fn wait(&mut self) -> Result<(), DynError> {
-        {
-            let guard = rcl::MT_UNSAFE_FN.lock();
-            guard.rcl_wait_set_clear(&mut self.wait_set)?;
-
-            let entities = self.get_num_entities()?;
-            guard.rcl_wait_set_resize(
-                &mut self.wait_set,
-                entities.subscriptions,
-                entities.guard_condititons,
-                entities.timers,
-                entities.clients,
-                entities.services,
-                entities.events,
-            )?;
-
-            // set subscriptions
-            for (_, h) in self.subscriptions.iter() {
-                guard.rcl_wait_set_add_subscription(
-                    &mut self.wait_set,
-                    h.event.subscription.as_ref(),
-                    null_mut(),
-                )?;
-            }
-
-            // set guard conditions
-            for (_, h) in self.cond.iter() {
-                guard.rcl_wait_set_add_guard_condition(
-                    &mut self.wait_set,
-                    h.event.cond.as_ref(),
-                    null_mut(),
-                )?;
-            }
-
-            // set clients
-            for (_, h) in self.clients.iter() {
-                guard.rcl_wait_set_add_client(&mut self.wait_set, &h.event.client, null_mut())?;
-            }
-
-            // set services
-            for (_, h) in self.services.iter() {
-                let Some(service) = h.event.try_lock() else {
-                    continue;
-                };
-                guard.rcl_wait_set_add_service(&mut self.wait_set, &service.service, null_mut())?;
-            }
-
-            // set action clients
-            for (_, h) in self.action_clients.iter() {
-                guard.rcl_action_wait_set_add_action_client(
-                    &mut self.wait_set,
-                    h.client,
-                    null_mut(),
-                    null_mut(),
-                )?;
-            }
-
-            // set action servers
-            for (s, _v) in self.action_servers.iter() {
-                guard.rcl_action_wait_set_add_action_server(&mut self.wait_set, *s, null_mut())?;
-            }
-        }
+        // set rcl wait
+        self.set_rcl_wait()?;
 
         // wait events
         self.wait_timer()?;
@@ -1213,7 +1200,7 @@ impl Selector {
 
             let timeout_nanos = timeout.as_nanos();
             let timeout_nanos = if timeout_nanos > i64::MAX as u128 {
-                let logger = Logger::new("safe_drive");
+                let logger = Logger::new("oxidros");
                 pr_error_in!(
                     logger,
                     "timeout value became too big (overflow): timeout = {timeout_nanos}"

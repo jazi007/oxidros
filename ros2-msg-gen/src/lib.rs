@@ -153,18 +153,18 @@ mod tests {
 
     #[test]
     fn std_msgs() {
-        generate(Path::new("/tmp/safe_drive_msg"), &["std_msgs"]).unwrap();
+        generate(Path::new("/tmp/oxidros_msg"), &["std_msgs"]).unwrap();
     }
 
     #[test]
     fn std_srvs() {
-        generate(Path::new("/tmp/safe_drive_msg"), &["std_srvs"]).unwrap();
+        generate(Path::new("/tmp/oxidros_msg"), &["std_srvs"]).unwrap();
     }
 
     #[test]
     fn action_tutorials_interfaces() {
         generate(
-            Path::new("/tmp/safe_drive_msg"),
+            Path::new("/tmp/oxidros_msg"),
             &["action_tutorials_interfaces"],
         )
         .unwrap();

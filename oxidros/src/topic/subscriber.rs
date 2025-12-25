@@ -46,7 +46,7 @@
 //! // Receive the message.
 //! match subscriber.try_recv() {
 //!     RecvResult::Ok(msg) => pr_info!(logger, "msg = {}", msg.data),
-//!     RecvResult::RetryLater(_) => pr_info!(logger, "retry later"),
+//!     RecvResult::RetryLater => pr_info!(logger, "retry later"),
 //!     RecvResult::Err(e) => pr_error!(logger, "error = {}", e),
 //! }
 //! ```
@@ -316,7 +316,7 @@ impl<T: TypeSupport> Subscriber<T> {
     ///     // Receive the message.
     ///     match subscriber.try_recv() {
     ///         RecvResult::Ok(msg) => pr_info!(logger, "msg = {}", msg.data),
-    ///         RecvResult::RetryLater(_) => pr_info!(logger, "retry later"),
+    ///         RecvResult::RetryLater => pr_info!(logger, "retry later"),
     ///         RecvResult::Err(e) => pr_error!(logger, "error = {}", e),
     ///     }
     /// }
@@ -329,7 +329,7 @@ impl<T: TypeSupport> Subscriber<T> {
     /// - `RCLError::BadAlloc if allocating` memory failed, or
     /// - `RCLError::Error` if an unspecified error occurs.
     #[must_use]
-    pub fn try_recv(&self) -> RecvResult<TakenMsg<T>, ()> {
+    pub fn try_recv(&self) -> RecvResult<TakenMsg<T>> {
         #[cfg(feature = "rcl_stat")]
         let start = std::time::SystemTime::now();
 
@@ -345,7 +345,7 @@ impl<T: TypeSupport> Subscriber<T> {
                 #[cfg(feature = "rcl_stat")]
                 self.subscription.measure_latency(start);
 
-                RecvResult::RetryLater(())
+                RecvResult::RetryLater
             }
             Err(e) => RecvResult::Err(e.into()),
         }

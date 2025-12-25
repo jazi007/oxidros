@@ -11,7 +11,7 @@ use tokio::time;
 
 /// RPC Client
 #[allow(missing_debug_implementations)]
-pub struct Client<T>(pub(crate) Option<SdClient<T>>);
+pub struct Client<T: ServiceMsg>(pub(crate) SdClient<T>);
 
 impl<T: ServiceMsg> Client<T>
 where
@@ -23,32 +23,26 @@ where
         &mut self,
         data: &<T as ServiceMsg>::Request,
     ) -> Result<<T as ServiceMsg>::Response> {
-        let client = self.0.take();
-        let Some(mut client) = client else {
-            return Err("Client not yet added".into());
-        };
+        let client = &mut self.0;
         debug!("Waiting for service availability");
         while !client.is_service_available()? {
             time::sleep(Duration::from_millis(100)).await;
         }
         debug!("Request: {:?}", data);
         loop {
-            let mut receiver = client.send(data)?.recv();
+            let receiver = client.send(data)?.recv();
             // Send a request.
-            match time::timeout(Duration::from_secs(1), &mut receiver).await {
-                Ok(Ok((c, response, header))) => {
+            match time::timeout(Duration::from_secs(1), receiver).await {
+                Ok(Ok((response, header))) => {
                     trace!("Header: {header:?}");
                     debug!("Response: {:?}", response);
-                    self.0 = Some(c);
                     return Ok(response);
                 }
                 Ok(Err(e)) => {
-                    self.0 = Some(receiver.give_up());
                     return Err(e);
                 }
                 Err(_) => {
                     log::error!("Timeout retrying ...");
-                    client = receiver.give_up();
                 }
             };
         }
@@ -82,10 +76,9 @@ where
                     let response = callback(request);
                     debug!("Response: {response:?}");
                     match sender.send(&response) {
-                        Ok(s) => server = s, // Get a new server to handle next request.
-                        Err((s, e)) => {
+                        Ok(()) => {} // Get a new server to handle next request.
+                        Err(e) => {
                             error!("Failed to send response {:?}", e);
-                            server = s.give_up();
                         }
                     }
                 }

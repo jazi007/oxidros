@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{sync::atomic::AtomicUsize, time::Duration};
 
 use oxidros::{
     context::Context,
@@ -6,27 +6,48 @@ use oxidros::{
     logger::Logger,
     msg::common_interfaces::example_interfaces::srv::{AddTwoInts, AddTwoInts_Request},
     pr_info,
+    service::client::Client,
 };
 
-#[tokio::main]
-async fn main() -> Result<(), DynError> {
-    let logger = Logger::new("simple");
-    let ctx = Context::new()?;
-    let node = ctx.create_node("simple", None, Default::default())?;
-    let mut client = node.create_client::<AddTwoInts>("add_two_ints", None)?;
+static COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+async fn client_handler(mut client: Client<AddTwoInts>) -> Result<(), DynError> {
+    let client_n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+    // if client_n > 0 {
+    //     tokio::time::sleep(Duration::from_secs(3)).await;
+    // }
+    let name = format!("client{client_n}");
+    let logger = Logger::new(&name);
     while !client.is_service_available()? {
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
     let mut req = AddTwoInts_Request::new().unwrap();
-    let mut index = 0;
+    let mut index = client_n as i64 * 1000;
     loop {
         req.a = index;
         req.b = index + 1;
         index += 1;
-        let crcv = client.send(&req)?;
-        let resp = crcv.recv().await?;
-        client = resp.0;
-        pr_info!(logger, "{:?}", resp.1);
+        let resp = client.send(&req)?.recv().await?;
+        pr_info!(logger, "REQ {} => {}", resp.1.get_sequence(), resp.0.sum);
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), DynError> {
+    let ctx = Context::new()?;
+    let node = ctx.create_node("simple", None, Default::default())?;
+    let mut set = tokio::task::JoinSet::new();
+    for _ in 0..2 {
+        let client = node.create_client::<AddTwoInts>("add_two_ints", None)?;
+        set.spawn(client_handler(client));
+    }
+    let ctrl_c = tokio::signal::ctrl_c();
+    tokio::select! {
+        res = set.join_all() => {
+            res.into_iter().collect::<Result<Vec<()>, DynError>>()?;
+        },
+        _ = ctrl_c => {},
+    }
+    Ok(())
 }

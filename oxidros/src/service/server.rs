@@ -72,8 +72,8 @@
 //!             Ok((sender, request, _header)) => {
 //!                 let response = std_srvs::srv::Empty_Response::new().unwrap();
 //!                 match sender.send(&response) {
-//!                     Ok(s) => server = s,                  // Get a new server to handle next request.
-//!                     Err((s, _e)) => server = s.give_up(), // Failed to send.
+//!                     Ok(()) => {},                  // Get a new server to handle next request.
+//!                     Err(_e) => {}, // Failed to send.
 //!                 }
 //!             }
 //!             Err(e) => {
@@ -222,7 +222,7 @@ impl<T: ServiceMsg> Server<T> {
 
     /// Receive a request.
     /// `try_recv` is a non-blocking function, and
-    /// this returns `RecvResult::RetryLater(self)` if there is no available data.
+    /// this returns `RecvResult::RetryLater` if there is no available data.
     /// So, please retry later if this error is returned.
     ///
     /// # Return value
@@ -246,13 +246,12 @@ impl<T: ServiceMsg> Server<T> {
     ///                 pr_info!(logger, "received: header = {:?}", header);
     ///                 let msg = std_srvs::srv::Empty_Response::new().unwrap();
     ///                 match sender.send(&msg) {
-    ///                     Ok(s) => server = s,                  // Get a new server to handle next request.
-    ///                     Err((s, _e)) => server = s.give_up(), // Failed to send.
+    ///                     Ok(()) => {},                  // Get a new server to handle next request.
+    ///                     Err(_e) => {}, // Failed to send.
     ///                 }
     ///             }
-    ///             RecvResult::RetryLater(s) => {
+    ///             RecvResult::RetryLater => {
     ///                 pr_info!(logger, "retry later");
-    ///                 server = s;
     ///             }
     ///             RecvResult::Err(e) => {
     ///                 pr_error!(logger, "error: {e}");
@@ -270,24 +269,24 @@ impl<T: ServiceMsg> Server<T> {
     /// - `RCLError::BadAlloc` if allocating memory failed, or
     /// - `RCLError::Error` if an unspecified error occurs.
     #[must_use]
-    pub fn try_recv(self) -> RecvResult<(ServerSend<T>, <T as ServiceMsg>::Request, Header), Self> {
+    pub fn try_recv(
+        &mut self,
+    ) -> RecvResult<(ServerSend<'_, T>, <T as ServiceMsg>::Request, Header)> {
         let data = self.data.lock();
-
         let (request, header) =
             match rcl_take_request_with_info::<<T as ServiceMsg>::Request>(&data.service) {
                 Ok(data) => data,
                 Err(RCLError::ServiceTakeFailed) => {
                     drop(data);
-                    return RecvResult::RetryLater(self);
+                    return RecvResult::RetryLater;
                 }
                 Err(e) => return RecvResult::Err(e.into()),
             };
 
         drop(data);
-
         RecvResult::Ok((
             ServerSend {
-                data: self.data,
+                data: self.data.clone(),
                 request_id: header.request_id,
                 _phantom: Default::default(),
                 _unsync: Default::default(),
@@ -321,8 +320,8 @@ impl<T: ServiceMsg> Server<T> {
     ///                 pr_info!(logger, "recv: header = {:?}", header);
     ///                 let response = std_srvs::srv::Empty_Response::new().unwrap();
     ///                 match sender.send(&response) {
-    ///                     Ok(s) => server = s,                  // Get a new server to handle next request.
-    ///                     Err((s, _e)) => server = s.give_up(), // Failed to send.
+    ///                     Ok(()) => {},                  // Get a new server to handle next request.
+    ///                     Err(_e) => {}, // Failed to send.
     ///                 }
     ///             }
     ///             Err(e) => {
@@ -341,8 +340,8 @@ impl<T: ServiceMsg> Server<T> {
     /// - `RCLError::BadAlloc` if allocating memory failed, or
     /// - `RCLError::Error` if an unspecified error occurs.
     pub async fn recv(
-        self,
-    ) -> Result<(ServerSend<T>, <T as ServiceMsg>::Request, Header), DynError> {
+        &mut self,
+    ) -> Result<(ServerSend<'_, T>, <T as ServiceMsg>::Request, Header), DynError> {
         AsyncReceiver {
             server: self,
             is_waiting: false,
@@ -355,14 +354,14 @@ unsafe impl<T> Send for Server<T> {}
 
 /// Sender to send a response.
 #[must_use]
-pub struct ServerSend<T> {
+pub struct ServerSend<'a, T> {
     data: Arc<Mutex<ServerData>>,
     request_id: rmw_request_id_t,
-    _phantom: PhantomData<T>,
+    _phantom: PhantomData<&'a T>,
     _unsync: PhantomUnsync,
 }
 
-impl<T: ServiceMsg> ServerSend<T> {
+impl<'a, T: ServiceMsg> ServerSend<'a, T> {
     /// Send a response to the client.
     ///
     /// # Errors
@@ -386,8 +385,8 @@ impl<T: ServiceMsg> ServerSend<T> {
     ///             Ok((sender, request, _header)) => {
     ///                 let response = std_srvs::srv::Empty_Response::new().unwrap();
     ///                 match sender.send(&response) {
-    ///                     Ok(s) => server = s,                  // Get a new server to handle next request.
-    ///                     Err((s, _e)) => server = s.give_up(), // Failed to send.
+    ///                     Ok(()) => {},                  // Get a new server to handle next request.
+    ///                     Err(_e) => {}, // Failed to send.
     ///                 }
     ///             }
     ///             Err(e) => {
@@ -404,36 +403,13 @@ impl<T: ServiceMsg> ServerSend<T> {
     /// `data` should be immutable, but `rcl_send_response` provided
     /// by ROS2 takes normal pointers instead of `const` pointers.
     /// So, currently, `send` takes `data` as mutable.
-    pub fn send(
-        mut self,
-        data: &<T as ServiceMsg>::Response,
-    ) -> Result<Server<T>, (Self, RCLError)> {
+    pub fn send(mut self, data: &<T as ServiceMsg>::Response) -> Result<(), RCLError> {
         let server_data = self.data.lock();
-
-        if let Err(e) = rcl::MTSafeFn::rcl_send_response(
+        rcl::MTSafeFn::rcl_send_response(
             &server_data.service,
             &mut self.request_id,
             data as *const _ as *mut c_void,
-        ) {
-            drop(server_data);
-            return Err((self, e));
-        }
-
-        drop(server_data);
-
-        Ok(Server {
-            data: self.data,
-            _phantom: Default::default(),
-            _unsync: Default::default(),
-        })
-    }
-
-    pub fn give_up(self) -> Server<T> {
-        Server {
-            data: self.data,
-            _phantom: Default::default(),
-            _unsync: Default::default(),
-        }
+        )
     }
 }
 
@@ -456,13 +432,13 @@ fn rcl_take_request_with_info<T>(
 /// Receiver to receive a request asynchronously.
 #[pin_project(PinnedDrop)]
 #[must_use]
-pub struct AsyncReceiver<T> {
-    server: Server<T>,
+pub struct AsyncReceiver<'a, T> {
+    server: &'a mut Server<T>,
     is_waiting: bool,
 }
 
-impl<T: ServiceMsg> Future for AsyncReceiver<T> {
-    type Output = Result<(ServerSend<T>, <T as ServiceMsg>::Request, Header), DynError>;
+impl<'a, T: ServiceMsg> Future for AsyncReceiver<'a, T> {
+    type Output = Result<(ServerSend<'a, T>, <T as ServiceMsg>::Request, Header), DynError>;
 
     fn poll(
         self: std::pin::Pin<&mut Self>,
@@ -519,7 +495,7 @@ impl<T: ServiceMsg> Future for AsyncReceiver<T> {
 }
 
 #[pinned_drop]
-impl<T> PinnedDrop for AsyncReceiver<T> {
+impl<'a, T> PinnedDrop for AsyncReceiver<'a, T> {
     fn drop(self: Pin<&mut Self>) {
         if self.is_waiting {
             let cloned = self.server.data.clone();

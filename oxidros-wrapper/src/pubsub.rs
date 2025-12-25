@@ -56,7 +56,7 @@ impl<T: TypeSupport + Send + 'static> Subscribe<T> for Subscriber<T> {
             match self.try_recv() {
                 RecvResult::Ok(msg) => results.push(msg),
                 RecvResult::Err(e) => return Err(e),
-                RecvResult::RetryLater(_) => break,
+                RecvResult::RetryLater => break,
             }
         }
 

@@ -21,7 +21,7 @@
 //!     .unwrap();
 //!
 //! // Create a client.
-//! let client = node
+//! let mut client = node
 //!     .create_client::<std_srvs::srv::Empty>("service_name1", None)
 //!     .unwrap();
 //!
@@ -33,11 +33,10 @@
 //!
 //!     for _ in 0..5 {
 //!         let request = std_srvs::srv::Empty_Request::new().unwrap();
-//!         let mut receiver = client.send(&request).unwrap().recv();
-//!         match tokio::time::timeout(dur, &mut receiver).await {
-//!             Ok(Ok((c, response, _header))) => {
+//!         let receiver = client.send(&request).unwrap().recv();
+//!         match tokio::time::timeout(dur, receiver).await {
+//!             Ok(Ok((response, _header))) => {
 //!                 pr_info!(logger, "received: {:?}", response);
-//!                 client = c;
 //!             }
 //!             Ok(Err(e)) => {
 //!                 pr_error!(logger, "error: {e}");
@@ -45,7 +44,6 @@
 //!             }
 //!             Err(_) => {
 //!                 pr_warn!(logger, "timeout");
-//!                 client = receiver.give_up();
 //!             }
 //!         }
 //!     }
@@ -68,7 +66,7 @@ use crate::{
         Selector,
     },
     signal_handler::Signaled,
-    PhantomUnsync, RecvResult, ST,
+    RecvResult,
 };
 use oxidros_core::selector::CallbackResult;
 use pin_project::{pin_project, pinned_drop};
@@ -93,10 +91,9 @@ unsafe impl Sync for ClientData {}
 unsafe impl Send for ClientData {}
 
 /// Client.
-pub struct Client<T> {
-    data: Arc<ClientData>,
+pub struct Client<T: ServiceMsg> {
+    pub(crate) data: Arc<ClientData>,
     _phantom: PhantomData<T>,
-    _unsync: PhantomUnsync,
 }
 
 impl<T: ServiceMsg> Client<T> {
@@ -125,7 +122,6 @@ impl<T: ServiceMsg> Client<T> {
         Ok(Client {
             data: Arc::new(ClientData { client, node }),
             _phantom: Default::default(),
-            _unsync: Default::default(),
         })
     }
 
@@ -155,11 +151,10 @@ impl<T: ServiceMsg> Client<T> {
     ///
     ///     loop {
     ///         let request = std_srvs::srv::Empty_Request::new().unwrap();
-    ///         let mut receiver = client.send(&request).unwrap().recv();
-    ///         match tokio::time::timeout(dur, &mut receiver).await {
-    ///             Ok(Ok((c, response, _header))) => {
+    ///         let receiver = client.send(&request).unwrap().recv();
+    ///         match tokio::time::timeout(dur, receiver).await {
+    ///             Ok(Ok((response, _header))) => {
     ///                 pr_info!(logger, "received: {:?}", response);
-    ///                 client = c;
     ///             }
     ///             Ok(Err(e)) => {
     ///                 pr_error!(logger, "error: {e}");
@@ -167,7 +162,6 @@ impl<T: ServiceMsg> Client<T> {
     ///             }
     ///             Err(_) => {
     ///                 pr_warn!(logger, "timeout");
-    ///                 client = receiver.give_up();
     ///             }
     ///         }
     ///     }
@@ -179,7 +173,7 @@ impl<T: ServiceMsg> Client<T> {
     /// - `RCLError::InvalidArgument` if any arguments are invalid, or
     /// - `RCLError::ClientInvalid` if the client is invalid, or
     /// - `RCLError::Error` if an unspecified error occurs.
-    pub fn send(self, data: &<T as ServiceMsg>::Request) -> RCLResult<ClientRecv<T>> {
+    pub fn send(&mut self, data: &<T as ServiceMsg>::Request) -> RCLResult<ClientRecv<'_, T>> {
         let (s, _) = self.send_ret_seq(data)?;
         Ok(s)
     }
@@ -201,12 +195,11 @@ impl<T: ServiceMsg> Client<T> {
     ///     loop {
     ///         let request = std_srvs::srv::Empty_Request::new().unwrap();
     ///         let (receiver, sequence) = client.send_ret_seq(&request).unwrap();
-    ///         let mut receiver = receiver.recv();
+    ///         let receiver = receiver.recv();
     ///         pr_info!(logger, "sent: sequence = {sequence}");
-    ///         match tokio::time::timeout(dur, &mut receiver).await {
-    ///             Ok(Ok((c, response, _header))) => {
+    ///         match tokio::time::timeout(dur, receiver).await {
+    ///             Ok(Ok((response, _header))) => {
     ///                 pr_info!(logger, "received: {:?}", response);
-    ///                 client = c;
     ///             }
     ///             Ok(Err(e)) => {
     ///                 pr_error!(logger, "error: {e}");
@@ -214,7 +207,6 @@ impl<T: ServiceMsg> Client<T> {
     ///             }
     ///             Err(_) => {
     ///                 pr_warn!(logger, "timeout");
-    ///                 client = receiver.give_up();
     ///             }
     ///         }
     ///     }
@@ -227,42 +219,30 @@ impl<T: ServiceMsg> Client<T> {
     /// - `RCLError::ClientInvalid` if the client is invalid, or
     /// - `RCLError::Error` if an unspecified error occurs.
     pub fn send_ret_seq(
-        self,
+        &mut self,
         data: &<T as ServiceMsg>::Request,
-    ) -> RCLResult<(ClientRecv<T>, i64)> {
+    ) -> RCLResult<(ClientRecv<'_, T>, i64)> {
         let mut seq: i64 = 0;
         rcl::MTSafeFn::rcl_send_request(
             &self.data.client,
             data as *const _ as *const c_void,
             &mut seq,
         )?;
-
-        Ok((
-            ClientRecv {
-                data: self.data,
-                seq,
-                _phantom: Default::default(),
-                _unsync: Default::default(),
-            },
-            seq,
-        ))
+        Ok((ClientRecv { data: self, seq }, seq))
     }
 }
 
 /// Receiver to receive a response.
-#[derive(Clone)]
 #[must_use]
-pub struct ClientRecv<T> {
-    pub(crate) data: Arc<ClientData>,
-    seq: i64,
-    _phantom: PhantomData<T>,
-    _unsync: PhantomUnsync,
+pub struct ClientRecv<'a, T: ServiceMsg> {
+    pub(crate) data: &'a mut Client<T>,
+    pub(crate) seq: i64,
 }
 
-impl<T: ServiceMsg> ClientRecv<T> {
+impl<'a, T: ServiceMsg> ClientRecv<'a, T> {
     /// Receive a message.
     /// `try_recv` is a non-blocking function, and this
-    /// returns `RecvResult::RetryLater(self)`.
+    /// returns `RecvResult::RetryLater`.
     /// So, please retry later if this value is returned.
     ///
     /// # Errors
@@ -270,29 +250,21 @@ impl<T: ServiceMsg> ClientRecv<T> {
     /// - `RCLError::InvalidArgument` if any arguments are invalid, or
     /// - `RCLError::ClientInvalid` if the client is invalid, or
     /// - `RCLError::Error` if an unspecified error occurs.
-    pub fn try_recv(self) -> RecvResult<(Client<T>, <T as ServiceMsg>::Response, Header), Self> {
+    pub fn try_recv(&self) -> RecvResult<(<T as ServiceMsg>::Response, Header)> {
         let (response, header) = match rcl_take_response_with_info::<<T as ServiceMsg>::Response>(
-            &self.data.client,
+            &self.data.data.client,
             self.seq,
         ) {
             Ok(data) => data,
-            Err(RCLError::ClientTakeFailed) => return RecvResult::RetryLater(self),
+            Err(RCLError::ClientTakeFailed) => return RecvResult::RetryLater,
             Err(e) => return RecvResult::Err(e.into()),
         };
 
         if header.request_id.sequence_number != self.seq {
-            return RecvResult::RetryLater(self);
+            return RecvResult::RetryLater;
         }
 
-        RecvResult::Ok((
-            Client {
-                data: self.data,
-                _phantom: Default::default(),
-                _unsync: Default::default(),
-            },
-            response,
-            Header { header },
-        ))
+        RecvResult::Ok((response, Header { header }))
     }
 
     /// Receive a response asynchronously.
@@ -311,11 +283,10 @@ impl<T: ServiceMsg> ClientRecv<T> {
     ///
     ///     loop {
     ///         let request = std_srvs::srv::Empty_Request::new().unwrap();
-    ///         let mut receiver = client.send(&request).unwrap().recv();
-    ///         match tokio::time::timeout(dur, &mut receiver).await {
-    ///             Ok(Ok((c, response, header))) => {
+    ///         let receiver = client.send(&request).unwrap().recv();
+    ///         match tokio::time::timeout(dur, receiver).await {
+    ///             Ok(Ok((response, header))) => {
     ///                 pr_info!(logger, "received: header = {:?}", header);
-    ///                 client = c;
     ///             }
     ///             Ok(Err(e)) => {
     ///                 pr_error!(logger, "error: {e}");
@@ -323,7 +294,6 @@ impl<T: ServiceMsg> ClientRecv<T> {
     ///             }
     ///             Err(_) => {
     ///                 pr_warn!(logger, "timeout");
-    ///                 client = receiver.give_up();
     ///             }
     ///         }
     ///     }
@@ -335,11 +305,12 @@ impl<T: ServiceMsg> ClientRecv<T> {
     /// - `RCLError::InvalidArgument` if any arguments are invalid, or
     /// - `RCLError::ClientInvalid` if the client is invalid, or
     /// - `RCLError::Error` if an unspecified error occurs.
-    pub fn recv(self) -> AsyncReceiver<T> {
+    pub async fn recv(self) -> Result<(<T as ServiceMsg>::Response, Header), DynError> {
         AsyncReceiver {
             client: self,
             is_waiting: false,
         }
+        .await
     }
 
     /// Receive a message.
@@ -363,26 +334,20 @@ impl<T: ServiceMsg> ClientRecv<T> {
     ///     mut selector: Selector,
     ///     mut selector_client: Selector,
     ///     subscriber: Subscriber<std_msgs::msg::Empty>,
-    ///     client: Client<std_srvs::srv::Empty>,
+    ///     mut client: Client<std_srvs::srv::Empty>,
     /// ) -> Result<(), DynError> {
-    ///     let mut client = Some(client);
     ///     let logger = Logger::new("listen_client");
     ///
     ///     selector.add_subscriber(
     ///         subscriber,
     ///         Box::new(move |_msg| {
-    ///             // Take the client.
-    ///             let c = client.take().unwrap();
-    ///
     ///             let request = std_srvs::srv::Empty_Request::new().unwrap();
-    ///
     ///             // Send a request.
-    ///             let receiver = c.send(&request).unwrap();
-    ///
+    ///             let receiver = client.send(&request).unwrap();
     ///             // Receive a response.
     ///             match receiver.recv_timeout(Duration::from_millis(20), &mut selector_client) {
-    ///                 RecvResult::Ok((c, _response, _header)) => client = Some(c),
-    ///                 RecvResult::RetryLater(r) => client = Some(r.give_up()),
+    ///                 RecvResult::Ok((_response, _header)) => {},
+    ///                 RecvResult::RetryLater => {},
     ///                 RecvResult::Err(e) => {
     ///                     pr_fatal!(logger, "{e}");
     ///                     panic!()
@@ -397,25 +362,22 @@ impl<T: ServiceMsg> ClientRecv<T> {
     /// }
     /// ```
     pub fn recv_timeout(
-        self,
+        &self,
         t: Duration,
         selector: &mut Selector,
-    ) -> RecvResult<(Client<T>, <T as ServiceMsg>::Response, Header), Self> {
-        let receiver = ST::new(self);
-
+    ) -> RecvResult<(<T as ServiceMsg>::Response, Header)> {
         // Add the receiver.
-        selector.add_client_recv(&receiver);
-
+        selector.add_client_recv(self);
         // Wait a response with timeout.
         match selector.wait_timeout(t) {
-            Ok(true) => match receiver.try_recv() {
-                RecvResult::Ok((c, response, header)) => {
+            Ok(true) => match self.try_recv() {
+                RecvResult::Ok((response, header)) => {
                     // Received a response.
-                    RecvResult::Ok((c, response, header))
+                    RecvResult::Ok((response, header))
                 }
-                RecvResult::RetryLater(receiver) => {
+                RecvResult::RetryLater => {
                     // No correspondent response.
-                    RecvResult::RetryLater(receiver.unwrap())
+                    RecvResult::RetryLater
                 }
                 RecvResult::Err(e) => {
                     // Failed to receive.
@@ -424,22 +386,12 @@ impl<T: ServiceMsg> ClientRecv<T> {
             },
             Ok(false) => {
                 // Timeout.
-                RecvResult::RetryLater(receiver.unwrap())
+                RecvResult::RetryLater
             }
             Err(e) => {
                 // Failed to wait.
                 RecvResult::Err(e)
             }
-        }
-    }
-
-    /// Give up to receive a response.
-    /// If there is no server, nobody responds requests.
-    pub fn give_up(self) -> Client<T> {
-        Client {
-            data: self.data,
-            _phantom: Default::default(),
-            _unsync: Default::default(),
         }
     }
 }
@@ -466,23 +418,13 @@ fn rcl_take_response_with_info<T>(
 /// Receiver to receive a response asynchronously.
 #[pin_project(PinnedDrop)]
 #[must_use]
-pub struct AsyncReceiver<T> {
-    client: ClientRecv<T>,
+pub struct AsyncReceiver<'a, T: ServiceMsg> {
+    client: ClientRecv<'a, T>,
     is_waiting: bool,
 }
 
-impl<T: ServiceMsg> AsyncReceiver<T> {
-    pub fn give_up(self) -> Client<T> {
-        Client {
-            data: self.client.data.clone(),
-            _phantom: Default::default(),
-            _unsync: Default::default(),
-        }
-    }
-}
-
-impl<T: ServiceMsg> Future for AsyncReceiver<T> {
-    type Output = Result<(Client<T>, <T as ServiceMsg>::Response, Header), DynError>;
+impl<'a, T: ServiceMsg> Future for AsyncReceiver<'a, T> {
+    type Output = Result<(<T as ServiceMsg>::Response, Header), DynError>;
 
     fn poll(
         self: std::pin::Pin<&mut Self>,
@@ -491,36 +433,20 @@ impl<T: ServiceMsg> Future for AsyncReceiver<T> {
         if is_halt() {
             return Poll::Ready(Err(Signaled.into()));
         }
-
         let this = self.project();
-
         *this.is_waiting = false;
-
-        match rcl_take_response_with_info(&this.client.data.client, this.client.seq) {
-            Ok((val, header)) => {
-                if header.request_id.sequence_number == this.client.seq {
-                    return Poll::Ready(Ok((
-                        Client {
-                            data: this.client.data.clone(),
-                            _phantom: Default::default(),
-                            _unsync: Default::default(),
-                        },
-                        val,
-                        Header { header },
-                    )));
-                }
-            }
-            Err(RCLError::ClientTakeFailed) => (),
-            Err(e) => return Poll::Ready(Err(e.into())),
+        match this.client.try_recv() {
+            RecvResult::Ok(v) => return Poll::Ready(Ok(v)),
+            RecvResult::RetryLater => (),
+            RecvResult::Err(e) => return Poll::Ready(Err(e)),
         }
-
         // wait message arrival
         let mut waker = Some(cx.waker().clone());
         let mut guard = SELECTOR.lock();
         if let Err(e) = guard.send_command(
-            &this.client.data.node.context,
+            &this.client.data.data.node.context,
             async_selector::Command::Client(
-                this.client.data.clone(),
+                this.client.data.data.clone(),
                 Box::new(move || {
                     let w = waker.take().unwrap();
                     w.wake();
@@ -530,20 +456,19 @@ impl<T: ServiceMsg> Future for AsyncReceiver<T> {
         ) {
             return Poll::Ready(Err(e));
         }
-
         *this.is_waiting = true;
         Poll::Pending
     }
 }
 
 #[pinned_drop]
-impl<T> PinnedDrop for AsyncReceiver<T> {
+impl<'a, T: ServiceMsg> PinnedDrop for AsyncReceiver<'a, T> {
     fn drop(self: Pin<&mut Self>) {
         if self.is_waiting {
             let mut guard = SELECTOR.lock();
             let _ = guard.send_command(
-                &self.client.data.node.context,
-                async_selector::Command::RemoveClient(self.client.data.clone()),
+                &self.client.data.data.node.context,
+                async_selector::Command::RemoveClient(self.client.data.data.clone()),
             );
         }
     }

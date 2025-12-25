@@ -356,7 +356,7 @@ fn param_server(
             selector.wait()?;
         }
     } else {
-        let logger = Logger::new("safe_drive");
+        let logger = Logger::new("oxidros");
         pr_error_in!(logger, "failed to start a parameter server");
     }
 
@@ -433,7 +433,7 @@ fn add_srv_set(
             }
 
             if updated > 0 && cond_callback.trigger().is_err() {
-                let logger = Logger::new("safe_drive");
+                let logger = Logger::new("oxidros");
                 pr_fatal_in!(
                     logger,
                     "{}:{}: failed to trigger a condition variable",
@@ -522,7 +522,7 @@ fn add_srv_set_atomic(
             }
 
             if updated > 0 && cond_callback.trigger().is_err() {
-                let logger = Logger::new("safe_drive");
+                let logger = Logger::new("oxidros");
                 pr_fatal_in!(
                     logger,
                     "{}:{}: failed to trigger a condition variable",

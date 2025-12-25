@@ -18,14 +18,14 @@ fn test_no_server() -> Result<(), DynError> {
     let node_server = ctx.create_node("test_server_no_server_node", None, Default::default())?;
 
     // create a server and a client
-    let client = common::create_client(node_client, SERVICE_NAME3)?;
-    let server = common::create_server(node_server, SERVICE_NAME3)?;
+    let mut client = common::create_client(node_client, SERVICE_NAME3)?;
+    let mut server = common::create_server(node_server, SERVICE_NAME3)?;
 
     std::thread::sleep(Duration::from_millis(500));
 
     let req = AddTwoInts_Request { a: 1, b: 7 };
-    let (client, seq) = client.send_ret_seq(&req).unwrap();
-    println!("clinet:send: seq = {seq}");
+    let (_receiver, seq) = client.send_ret_seq(&req).unwrap();
+    println!("client: send: seq = {seq}");
 
     std::thread::sleep(Duration::from_millis(500));
 
@@ -37,17 +37,15 @@ fn test_no_server() -> Result<(), DynError> {
             srv = s;
             request = req;
         }
-        RecvResult::RetryLater(_) => panic!("server:try_recv: retry later"),
+        RecvResult::RetryLater => panic!("server:try_recv: retry later"),
         RecvResult::Err(e) => panic!("server:try_recv:error: {e}"),
     }
 
     std::thread::sleep(Duration::from_millis(50));
-
-    let client = client.give_up();
     println!("client: gave up!");
 
     let req = AddTwoInts_Request { a: 4, b: 18 };
-    let (client, seq) = client.send_ret_seq(&req).unwrap();
+    let (receiver, seq) = client.send_ret_seq(&req).unwrap();
     println!("clinet:send: seq = {seq}");
 
     std::thread::sleep(Duration::from_millis(50));
@@ -59,8 +57,8 @@ fn test_no_server() -> Result<(), DynError> {
 
     std::thread::sleep(Duration::from_millis(50));
 
-    match client.try_recv() {
-        RecvResult::Ok((_, msg, header)) => {
+    match receiver.try_recv() {
+        RecvResult::Ok((msg, header)) => {
             panic!(
                 "try_recv: msg = {:?}, seq = {:?}",
                 msg,
@@ -70,7 +68,7 @@ fn test_no_server() -> Result<(), DynError> {
         RecvResult::Err(_e) => {
             panic!("try_recv: error");
         }
-        RecvResult::RetryLater(_) => {
+        RecvResult::RetryLater => {
             println!("try_recv: retry later");
         }
     }

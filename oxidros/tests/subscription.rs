@@ -14,7 +14,7 @@ fn test_subscription() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
     let subscription = node.create_subscriber::<Int64>("test_subscription", Default::default())?;
 
     match subscription.try_recv() {
-        RecvResult::RetryLater(_) => Ok(()), // must fail because there is no publisher
+        RecvResult::RetryLater => Ok(()), // must fail because there is no publisher
         _ => panic!(),
     }
 }

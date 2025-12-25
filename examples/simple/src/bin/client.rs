@@ -27,15 +27,13 @@ fn main() -> Result<(), DynError> {
             let crcv = client.send(&req)?;
             let resp = crcv.recv_timeout(Duration::from_secs(1), &mut selector);
             match resp {
-                RecvResult::Ok((c, v, _)) => {
+                RecvResult::Ok((v, _)) => {
                     pr_info!(logger, "{v:?}");
-                    client = c;
                     break;
                 }
                 RecvResult::Err(e) => return Err(e),
-                RecvResult::RetryLater(c) => {
+                RecvResult::RetryLater => {
                     pr_info!(logger, "server unavailabe");
-                    client = c.give_up();
                 }
             };
         }

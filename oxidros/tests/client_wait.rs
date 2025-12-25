@@ -21,7 +21,7 @@ fn test_client_wait() -> Result<(), DynError> {
 
     // create a server and a client
     let server = common::create_server(node_server, SERVICE_NAME2)?;
-    let client = common::create_client(node_client, SERVICE_NAME2)?;
+    let mut client = common::create_client(node_client, SERVICE_NAME2)?;
 
     // create a selector
     let mut selector = ctx.create_selector()?;
@@ -56,11 +56,11 @@ fn test_client_wait() -> Result<(), DynError> {
     std::thread::sleep(Duration::from_millis(1));
 
     match rcv_client.recv_timeout(Duration::from_millis(20), &mut selector) {
-        RecvResult::Ok((_client, response, _)) => {
+        RecvResult::Ok((response, _)) => {
             println!("received: {}", response.sum);
             Ok(())
         }
-        RecvResult::RetryLater(_rcv) => {
+        RecvResult::RetryLater => {
             println!("retry later");
             Ok(())
         }

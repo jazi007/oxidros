@@ -78,7 +78,7 @@ fn accept_handler(handle: GoalHandle<Fibonacci>) {
 fn test_action() -> Result<(), DynError> {
     let ctx = Context::new()?;
 
-    let client = create_client(&ctx, "test_action_client", "test_action")?;
+    let mut client = create_client(&ctx, "test_action_client", "test_action")?;
 
     let mut selector = ctx.create_selector()?;
     let server = create_server(&ctx, "test_action_server", "test_action", None)?;
@@ -87,7 +87,7 @@ fn test_action() -> Result<(), DynError> {
     let uuid: [u8; 16] = rand::random();
     let uuid_ = uuid;
     let goal = Fibonacci_Goal { order: 10 };
-    let mut recv = client.send_goal_with_uuid(goal, uuid)?;
+    let recv = client.send_goal_with_uuid(goal, uuid)?;
 
     thread::sleep(Duration::from_millis(100));
 
@@ -101,22 +101,21 @@ fn test_action() -> Result<(), DynError> {
     );
     selector.wait()?;
 
-    let client = loop {
+    loop {
         match recv.recv_timeout(Duration::from_secs(3), &mut selector) {
-            RecvResult::Ok((client, data, header)) => {
+            RecvResult::Ok((data, header)) => {
                 println!(
                     "received goal response: accepted = {:?}, seq = {}",
                     data.accepted, header.sequence_number
                 );
-                break client;
+                break;
             }
-            RecvResult::RetryLater(receiver) => {
+            RecvResult::RetryLater => {
                 println!("did not receive goal response, retrying");
-                recv = receiver;
             }
             RecvResult::Err(e) => panic!("{}", e),
         }
-    };
+    }
 
     // wait for five feedback messages
     let mut received = 0;
@@ -126,7 +125,7 @@ fn test_action() -> Result<(), DynError> {
                 println!("received feedback: {:?}", feedback);
                 received += 1;
             }
-            RecvResult::RetryLater(()) => {}
+            RecvResult::RetryLater => {}
             RecvResult::Err(e) => panic!("{}", e),
         }
     }
@@ -134,22 +133,20 @@ fn test_action() -> Result<(), DynError> {
     let mut goal_id = UUID::new().unwrap();
     goal_id.uuid = uuid_;
     let result_req = Fibonacci_GetResult_Request { goal_id };
-    let mut recv = client.send_result_request(&result_req)?;
+    let recv = client.send_result_request(&result_req)?;
 
     selector.wait()?;
 
     loop {
         match recv.recv_timeout(Duration::from_secs(3), &mut selector) {
-            RecvResult::Ok((_, data, header)) => {
+            RecvResult::Ok((data, header)) => {
                 println!(
                     "received result: result = {:?} status = {:?}, seq = {}",
                     data.result, data.status, header.sequence_number
                 );
                 break;
             }
-            RecvResult::RetryLater(receiver) => {
-                recv = receiver;
-            }
+            RecvResult::RetryLater => {}
             RecvResult::Err(e) => panic!("{}", e),
         };
     }
@@ -161,7 +158,7 @@ fn test_action() -> Result<(), DynError> {
 fn test_action_cancel() -> Result<(), DynError> {
     let ctx = Context::new()?;
 
-    let client = create_client(&ctx, "test_action_cancel_client", "test_action_cancel")?;
+    let mut client = create_client(&ctx, "test_action_cancel_client", "test_action_cancel")?;
 
     let mut selector = ctx.create_selector()?;
     let server = create_server(
@@ -174,7 +171,7 @@ fn test_action_cancel() -> Result<(), DynError> {
     // send goal request
     let uuid: [u8; 16] = rand::random();
     let goal = Fibonacci_Goal { order: 10 };
-    let mut recv = client.send_goal_with_uuid(goal, uuid)?;
+    let recv = client.send_goal_with_uuid(goal, uuid)?;
 
     thread::sleep(Duration::from_millis(100));
 
@@ -189,21 +186,19 @@ fn test_action_cancel() -> Result<(), DynError> {
     );
     selector.wait()?;
 
-    let client = loop {
+    loop {
         match recv.recv_timeout(Duration::from_secs(3), &mut selector) {
-            RecvResult::Ok((client, data, header)) => {
+            RecvResult::Ok((data, header)) => {
                 println!(
                     "received goal response: accepted = {:?}, seq = {}",
                     data.accepted, header.sequence_number
                 );
-                break client;
+                break;
             }
-            RecvResult::RetryLater(receiver) => {
-                recv = receiver;
-            }
+            RecvResult::RetryLater => {}
             RecvResult::Err(e) => panic!("{}", e),
         }
-    };
+    }
 
     let request = CancelGoal_Request {
         goal_info: GoalInfo {
@@ -211,20 +206,19 @@ fn test_action_cancel() -> Result<(), DynError> {
             stamp: oxidros_msg::interfaces::builtin_interfaces::msg::Time { sec: 0, nanosec: 0 },
         },
     };
-    let mut recv = client.send_cancel_request(&request)?;
+    let recv = client.send_cancel_request(&request)?;
 
     loop {
         match recv.recv_timeout(Duration::from_secs(3), &mut selector) {
-            RecvResult::Ok((_client, data, header)) => {
+            RecvResult::Ok((data, header)) => {
                 println!(
                     "received cancel goal response: data = {:?}, seq = {}",
                     data, header.sequence_number
                 );
                 break;
             }
-            RecvResult::RetryLater(receiver) => {
+            RecvResult::RetryLater => {
                 println!("retrying");
-                recv = receiver;
             }
             RecvResult::Err(e) => panic!("{}", e),
         }
@@ -237,7 +231,7 @@ fn test_action_cancel() -> Result<(), DynError> {
 fn test_action_status() -> Result<(), DynError> {
     let ctx = Context::new()?;
 
-    let client = create_client(&ctx, "test_action_status_client", "test_action_status")?;
+    let mut client = create_client(&ctx, "test_action_status_client", "test_action_status")?;
 
     let mut selector = ctx.create_selector()?;
     let server = create_server(
@@ -250,28 +244,26 @@ fn test_action_status() -> Result<(), DynError> {
     // send goal request
     let uuid: [u8; 16] = rand::random();
     let goal = Fibonacci_Goal { order: 0 };
-    let mut recv = client.send_goal_with_uuid(goal, uuid)?;
+    let recv = client.send_goal_with_uuid(goal, uuid)?;
 
     thread::sleep(Duration::from_millis(100));
 
     selector.add_action_server(server, |_| true, accept_handler, move |_goal| true);
     selector.wait()?;
 
-    let client = loop {
+    loop {
         match recv.recv_timeout(Duration::from_secs(3), &mut selector) {
-            RecvResult::Ok((client, data, header)) => {
+            RecvResult::Ok((data, header)) => {
                 println!(
                     "received goal response: accepted = {:?}, seq = {}",
                     data.accepted, header.sequence_number
                 );
-                break client;
+                break;
             }
-            RecvResult::RetryLater(receiver) => {
-                recv = receiver;
-            }
+            RecvResult::RetryLater => {}
             RecvResult::Err(e) => panic!("{}", e),
         }
-    };
+    }
 
     // get status
     loop {
@@ -288,7 +280,7 @@ fn test_action_status() -> Result<(), DynError> {
                     }
                 }
             }
-            RecvResult::RetryLater(()) => {}
+            RecvResult::RetryLater => {}
             RecvResult::Err(e) => panic!("{}", e),
         }
     }

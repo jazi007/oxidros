@@ -37,6 +37,6 @@ impl Communicate for Arc<Node> {
     }
     fn new_client<T: ServiceMsg>(&self, attributes: &Attributes) -> Result<Client<T>> {
         let client = self.create_client(attributes.name, attributes.qos.clone())?;
-        Ok(Client(Some(client)))
+        Ok(Client(client))
     }
 }

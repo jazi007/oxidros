@@ -23,7 +23,7 @@ fn test_service() -> Result<(), DynError> {
 
     // create a server and a client
     let server = common::create_server(node_server, SERVICE_NAME1)?;
-    let client = common::create_client(node_client, SERVICE_NAME1)?;
+    let mut client = common::create_client(node_client, SERVICE_NAME1)?;
 
     // create a selector
     let mut selector = ctx.create_selector()?;
@@ -59,12 +59,12 @@ fn test_service() -> Result<(), DynError> {
 
     // Client: receive the response
     match rcv_client.try_recv() {
-        RecvResult::Ok((_, data, header)) => {
+        RecvResult::Ok((data, header)) => {
             println!("Client: sum = {}, header = {:?}", data.sum, header);
             assert_eq!(data.sum, 8);
             Ok(())
         }
-        RecvResult::RetryLater(_) => {
+        RecvResult::RetryLater => {
             println!("should retry");
             Ok(())
         }

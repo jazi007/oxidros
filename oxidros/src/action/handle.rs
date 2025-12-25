@@ -124,7 +124,7 @@ where
                 ) {
                     Ok(()) => {}
                     Err(e) => {
-                        let logger = Logger::new("safe_drive");
+                        let logger = Logger::new("oxidros");
                         pr_error_in!(
                             logger,
                             "failed to send result response from action server: {}",

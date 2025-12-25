@@ -58,8 +58,8 @@ async fn run_server(mut server: Server<AddTwoInts>) -> Result<(), DynError> {
         // send returns a new server to receive the next request
         println!("Server: response = {:?}", response);
         match sender.send(&response) {
-            Ok(s) => server = s,
-            Err((s, _e)) => server = s.give_up(),
+            Ok(()) => {}
+            Err(_e) => {}
         }
     }
 
@@ -74,27 +74,22 @@ async fn run_client(mut client: Client<AddTwoInts>) -> Result<(), DynError> {
 
         // send a request
         println!("Client: request = {:?}", data);
-        let receiver = client.send(&data)?;
+        let receiver = client.send(&data)?.recv();
 
         // Create a logger.
         let logger = Logger::new("test_async_service::run_client");
 
         // receive a response
-        let mut receiver = receiver.recv();
-        match tokio::time::timeout(dur, &mut receiver).await {
-            Ok(Ok((c, response, _header))) => {
+        match tokio::time::timeout(dur, receiver).await {
+            Ok(Ok((response, _header))) => {
                 pr_info!(logger, "received: {:?}", response);
                 assert_eq!(response.sum, n + n * 10);
-
-                // got a new client to send the next request
-                client = c;
             }
             Ok(Err(e)) => {
                 pr_error!(logger, "error: {e}");
                 break;
             }
             Err(_) => {
-                client = receiver.give_up();
                 continue;
             }
         }
@@ -130,13 +125,12 @@ async fn test_client_rs() {
 
         loop {
             let request = std_srvs::srv::Empty_Request::new().unwrap();
-            let mut receiver = client.send(&request).unwrap().recv();
+            let receiver = client.send(&request).unwrap().recv();
 
             pr_info!(logger, "receiving");
-            match tokio::time::timeout(dur, &mut receiver).await {
-                Ok(Ok((c, response, _header))) => {
+            match tokio::time::timeout(dur, receiver).await {
+                Ok(Ok((response, _header))) => {
                     pr_info!(logger, "received: {:?}", response);
-                    client = c;
                 }
                 Ok(Err(e)) => {
                     pr_error!(logger, "error: {e}");
@@ -148,7 +142,6 @@ async fn test_client_rs() {
                     if n_timeout > 10 {
                         return;
                     }
-                    client = receiver.give_up();
                 }
             }
         }

@@ -1,8 +1,6 @@
 //! The delta list was originally introduced by [Operating System Design, The Xinu Approach](https://xinu.cs.purdue.edu/)'s
 //! Chapter 13.
 //!
-//! We specified the delta list by using TLA+.
-//! See [the specification](https://github.com/tier4/safe_drive/tree/main/specifications/callback).
 
 use std::{cell::UnsafeCell, time::Duration};
 

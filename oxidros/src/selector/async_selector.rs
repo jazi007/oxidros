@@ -137,7 +137,7 @@ fn select(
                 Command::RemoveSubscription(s) => selector.remove_rcl_subscription(&s),
                 Command::Server(s, h) => selector.add_server_data(s, Some(h), true),
                 Command::RemoveServer(s) => selector.remove_server_data(&s),
-                Command::Client(c, h) => selector.add_client_data(c, Some(h), true),
+                Command::Client(c, h) => selector.add_client_data(c, Some(h)),
                 Command::RemoveClient(c) => selector.remove_client_data(&c),
                 Command::ActionClient {
                     data,

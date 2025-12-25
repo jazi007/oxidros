@@ -1873,7 +1873,7 @@ module example_msg {
         }
 
         let mut g = Generator::new(None);
-        g.generate_idl(Path::new("/tmp/safe_drive_msg"), idl_path, "example_msg")
+        g.generate_idl(Path::new("/tmp/oxidros_msg"), idl_path, "example_msg")
             .unwrap();
     }
 
@@ -1910,7 +1910,7 @@ module example_msg {
         }
 
         let mut g = Generator::new(None);
-        g.generate_idl(Path::new("/tmp/safe_drive_msg"), idl_path, "example_msg")
+        g.generate_idl(Path::new("/tmp/oxidros_msg"), idl_path, "example_msg")
             .unwrap();
     }
 
@@ -2046,7 +2046,7 @@ module example_msg {
         }
 
         let mut g = Generator::new(None);
-        g.generate_idl(Path::new("/tmp/safe_drive_msg"), idl_path, "example_msg")
+        g.generate_idl(Path::new("/tmp/oxidros_msg"), idl_path, "example_msg")
             .unwrap();
     }
 }

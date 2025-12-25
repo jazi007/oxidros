@@ -129,7 +129,7 @@ fn handler(mut signals: SignalsInfo) {
                     c.trigger().unwrap();
                 }
 
-                let logger = Logger::new("safe_drive");
+                let logger = Logger::new("oxidros");
                 pr_info_in!(logger, "Received signal: {signal}");
             }
             _ => unreachable!(),
@@ -140,6 +140,6 @@ fn handler(mut signals: SignalsInfo) {
 #[cfg(target_os = "windows")]
 fn handler(term: Arc<AtomicBool>) {
     while !term.load(Ordering::Relaxed) {}
-    let logger = Logger::new("safe_drive");
+    let logger = Logger::new("oxidros");
     pr_info_in!(logger, "Received signal");
 }

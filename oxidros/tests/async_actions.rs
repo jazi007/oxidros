@@ -42,15 +42,14 @@ fn create_client(
     Client::new(node_client, action, None).map_err(|e| e.into())
 }
 
-async fn assert_status(client: Client<Fibonacci>, expected: GoalStatus) -> Client<Fibonacci> {
+async fn assert_status(client: &mut Client<Fibonacci>, expected: GoalStatus) {
     let recv = client.recv_status();
     match tokio::time::timeout(Duration::from_secs(3), recv).await {
-        Ok(Ok((c, status_array))) => {
+        Ok(Ok(status_array)) => {
             let list = status_array.status_list.as_slice();
             assert!(!list.is_empty());
             let status = list.last().unwrap().status;
             assert_eq!(status, expected as i8);
-            c
         }
         Ok(Err(e)) => panic!("{e:?}"),
         Err(_) => panic!("timed out"),
@@ -116,8 +115,7 @@ async fn run_server(server: Server<Fibonacci>, abort: bool) -> Result<(), DynErr
 
     let goal = move |sender: ServerGoalSend<Fibonacci>, req| {
         println!("server: goal received: {:?}", req);
-
-        let s = sender
+        sender
             .accept(|handle| {
                 if abort {
                     spawn_worker_abort(handle)
@@ -125,79 +123,64 @@ async fn run_server(server: Server<Fibonacci>, abort: bool) -> Result<(), DynErr
                     spawn_worker(handle)
                 }
             })
-            .map_err(|(_sender, err)| err)
             .expect("could not accept");
         // let s = sender.reject().map_err(|(_sender, err)| err)?;
-
         println!("server: goal response sent");
-
-        s
     };
 
     let cancel = move |sender: ServerCancelSend<Fibonacci>, candidates| {
         println!("server: received cancel request for: {:?}", candidates);
-
         let accepted = candidates; // filter requests here if needed
-
-        // return cancel response
-        let s = sender
+                                   // return cancel response
+        sender
             .send(accepted)
-            .map_err(|(_s, err)| err)
             .expect("could not send cancel response");
-
         // perform shutdown operations for the goals here if needed
-
         println!("server: cancel response sent");
-
-        s
     };
 
     server.listen(goal, cancel).await
 }
 
-async fn receive_goal_response(receiver: ClientGoalRecv<Fibonacci>) -> Client<Fibonacci> {
+async fn receive_goal_response(receiver: ClientGoalRecv<'_, Fibonacci>) {
     let recv = receiver.recv();
     match tokio::time::timeout(Duration::from_secs(3), recv).await {
-        Ok(Ok((c, response, _header))) => {
+        Ok(Ok((response, _header))) => {
             println!("client: goal response received: {:?}", response);
-            c
         }
         Ok(Err(e)) => panic!("{e:?}"),
         Err(_) => panic!("timed out"),
     }
 }
 
-async fn receive_result_response(receiver: ClientResultRecv<Fibonacci>) -> Client<Fibonacci> {
+async fn receive_result_response(receiver: ClientResultRecv<'_, Fibonacci>) {
     let recv = receiver.recv();
     match tokio::time::timeout(Duration::from_secs(3), recv).await {
-        Ok(Ok((c, response, _header))) => {
+        Ok(Ok((response, _header))) => {
             println!("client: result response received: {:?}", response);
-            c
         }
         Ok(Err(e)) => panic!("{e:?}"),
         Err(_) => panic!("timed out"),
     }
 }
 
-async fn run_client(client: Client<Fibonacci>) -> Result<(), DynError> {
+async fn run_client(mut client: Client<Fibonacci>) -> Result<(), DynError> {
     let uuid: [u8; 16] = rand::random();
     let goal = Fibonacci_Goal { order: 10 };
     let receiver = client.send_goal_with_uuid(goal, uuid)?;
 
-    let mut client = receive_goal_response(receiver).await;
+    receive_goal_response(receiver).await;
 
     // receive feedback
     loop {
         let recv = client.recv_feedback();
-        client = match tokio::time::timeout(Duration::from_secs(3), recv).await {
-            Ok(Ok((c, feedback))) => {
+        match tokio::time::timeout(Duration::from_secs(3), recv).await {
+            Ok(Ok(feedback)) => {
                 println!("client: feedback received: {:?}", feedback);
 
                 if feedback.feedback.sequence.len() >= 6 {
-                    client = c;
                     break;
                 }
-                c
             }
             Ok(Err(e)) => panic!("{e:?}"),
             Err(_) => panic!("timed out"),
@@ -217,12 +200,12 @@ async fn run_client(client: Client<Fibonacci>) -> Result<(), DynError> {
     Ok(())
 }
 
-async fn run_client_cancel(client: Client<Fibonacci>) -> Result<(), DynError> {
+async fn run_client_cancel(mut client: Client<Fibonacci>) -> Result<(), DynError> {
     let uuid: [u8; 16] = rand::random();
     let goal = Fibonacci_Goal { order: 10 };
     let receiver = client.send_goal_with_uuid(goal, uuid)?;
 
-    let client = receive_goal_response(receiver).await;
+    receive_goal_response(receiver).await;
     thread::sleep(Duration::from_secs(1));
 
     // send a cancel request
@@ -234,50 +217,49 @@ async fn run_client_cancel(client: Client<Fibonacci>) -> Result<(), DynError> {
     })?;
     println!("client: cancel request sent");
 
-    let client = match receiver.recv().await {
-        Ok((c, resp, _header)) => {
+    match receiver.recv().await {
+        Ok((resp, _header)) => {
             println!("client: cancel response received: {:?}", resp);
-            c
         }
         Err(e) => panic!("client: could not cancel the goal: {e:?}"),
     };
 
     std::thread::sleep(Duration::from_secs(2));
 
-    let _ = assert_status(client, GoalStatus::Canceled).await;
+    assert_status(&mut client, GoalStatus::Canceled).await;
 
     Ok(())
 }
 
-async fn run_client_status(client: Client<Fibonacci>) -> Result<(), DynError> {
+async fn run_client_status(mut client: Client<Fibonacci>) -> Result<(), DynError> {
     let uuid: [u8; 16] = rand::random();
     let goal = Fibonacci_Goal { order: 10 };
     let receiver = client.send_goal_with_uuid(goal, uuid)?;
 
-    let client = receive_goal_response(receiver).await;
+    receive_goal_response(receiver).await;
     std::thread::sleep(Duration::from_secs(1));
 
     // wait for the task to finish
-    let client = assert_status(client, GoalStatus::Executing).await;
+    assert_status(&mut client, GoalStatus::Executing).await;
     std::thread::sleep(Duration::from_secs(10));
 
-    let _ = assert_status(client, GoalStatus::Succeeded).await;
+    assert_status(&mut client, GoalStatus::Succeeded).await;
 
     Ok(())
 }
 
-async fn run_client_abort(client: Client<Fibonacci>) -> Result<(), DynError> {
+async fn run_client_abort(mut client: Client<Fibonacci>) -> Result<(), DynError> {
     let uuid: [u8; 16] = rand::random();
     let goal = Fibonacci_Goal { order: 10 };
     let receiver = client.send_goal_with_uuid(goal, uuid)?;
 
-    let client = receive_goal_response(receiver).await;
+    receive_goal_response(receiver).await;
     std::thread::sleep(Duration::from_secs(1));
 
-    let client = assert_status(client, GoalStatus::Executing).await;
+    assert_status(&mut client, GoalStatus::Executing).await;
     std::thread::sleep(Duration::from_secs(3));
 
-    let _ = assert_status(client, GoalStatus::Aborted).await;
+    assert_status(&mut client, GoalStatus::Aborted).await;
 
     Ok(())
 }

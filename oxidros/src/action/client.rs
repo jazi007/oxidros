@@ -24,7 +24,7 @@ use crate::{
         Selector,
     },
     signal_handler::Signaled,
-    PhantomUnsync, RecvResult,
+    RecvResult,
 };
 
 use super::{
@@ -73,6 +73,7 @@ unsafe impl Send for ClientData {}
 /// Consult `examples/action_client.rs` for a working example.
 pub struct Client<T: ActionMsg> {
     data: Arc<ClientData>,
+    // TODO: do like server::Client add Dbs
     _phantom: PhantomData<T>,
 }
 
@@ -112,7 +113,6 @@ where
     /// Returns true if the corresponding action server is available.
     pub fn is_server_available(&self) -> RCLActionResult<bool> {
         let guard = rcl::MT_UNSAFE_FN.lock();
-
         let mut is_available = false;
         match guard.rcl_action_server_is_available(
             self.data.node.as_ptr(),
@@ -132,19 +132,19 @@ where
     /// Send a goal request to the server with given uuid. the uuid can be any 16-bit slice [u8; 16] i.e. does not have to
     /// conform to the UUID v4 standard. Use the returned [`ClientGoalRecv<T>`] to receive the response.
     pub fn send_goal_with_uuid(
-        self,
+        &mut self,
         goal: <T as ActionMsg>::GoalContent,
         uuid: [u8; 16],
-    ) -> Result<ClientGoalRecv<T>, DynError> {
+    ) -> Result<ClientGoalRecv<'_, T>, DynError> {
         let request = <T as ActionMsg>::new_goal_request(goal, uuid);
         self.send_goal_request(&request)
     }
 
     /// Send a goal request. Use the returned [`ClientGoalRecv<T>`] to receive the response.
     fn send_goal_request(
-        self,
+        &mut self,
         data: &SendGoalServiceRequest<T>,
-    ) -> Result<ClientGoalRecv<T>, DynError> {
+    ) -> Result<ClientGoalRecv<'_, T>, DynError> {
         if crate::is_halt() {
             return Err(Signaled.into());
         }
@@ -157,16 +157,16 @@ where
         )?;
 
         Ok(ClientGoalRecv {
-            inner: ClientRecv::new(self.data),
+            inner: ClientRecv::new(self),
             seq,
         })
     }
 
     /// Send a result request to the server. Use the returned [`ClientResultRecv<T>`] to receive the response.
     pub fn send_result_request(
-        self,
+        &mut self,
         data: &GetResultServiceRequest<T>,
-    ) -> Result<ClientResultRecv<T>, DynError> {
+    ) -> Result<ClientResultRecv<'_, T>, DynError> {
         let mut seq: i64 = 0;
         rcl::MTSafeFn::rcl_action_send_result_request(
             &self.data.client,
@@ -175,16 +175,16 @@ where
         )?;
 
         Ok(ClientResultRecv {
-            inner: ClientRecv::new(self.data),
+            inner: ClientRecv::new(self),
             seq,
         })
     }
 
     /// Send a cancel request. Use the returned [`ClientCancelRecv<T>`] to receive the response.
     pub fn send_cancel_request(
-        self,
+        &mut self,
         request: &CancelGoal_Request,
-    ) -> Result<ClientCancelRecv<T>, DynError> {
+    ) -> Result<ClientCancelRecv<'_, T>, DynError> {
         let guard = rcl::MT_UNSAFE_FN.lock();
 
         let mut seq: i64 = 0;
@@ -195,38 +195,38 @@ where
         )?;
 
         Ok(ClientCancelRecv {
-            inner: ClientRecv::new(self.data),
+            inner: ClientRecv::new(self),
             seq,
         })
     }
 
     /// Takes a feedback for the goal. If there is no feedback, it returns [`RecvResult::RetryLater`].
-    pub fn try_recv_feedback(&self) -> RecvResult<<T as ActionMsg>::Feedback, ()> {
+    pub fn try_recv_feedback(&mut self) -> RecvResult<<T as ActionMsg>::Feedback> {
         match rcl_action_take_feedback::<T>(&self.data.client) {
             Ok(feedback) => RecvResult::Ok(feedback),
-            Err(RCLActionError::ClientTakeFailed) => RecvResult::RetryLater(()),
+            Err(RCLActionError::ClientTakeFailed) => RecvResult::RetryLater,
             Err(e) => RecvResult::Err(e.into()),
         }
     }
 
     /// Wait until the client receives a feedback message or the duration `t` elapses.
     pub fn recv_feedback_timeout(
-        &self,
+        &mut self,
         t: Duration,
         selector: &mut Selector,
-    ) -> RecvResult<<T as ActionMsg>::Feedback, ()> {
+    ) -> RecvResult<<T as ActionMsg>::Feedback> {
         selector.add_action_client(self.data.clone(), None, None, None, None, None);
         match selector.wait_timeout(t) {
             Ok(true) => self.try_recv_feedback(),
-            Ok(false) => RecvResult::RetryLater(()),
+            Ok(false) => RecvResult::RetryLater,
             Err(e) => RecvResult::Err(e),
         }
     }
 
     /// Asynchronously receive a feedback message.
-    pub async fn recv_feedback(self) -> Result<(Self, <T as ActionMsg>::Feedback), DynError> {
+    pub async fn recv_feedback(&mut self) -> Result<<T as ActionMsg>::Feedback, DynError> {
         AsyncFeedbackReceiver {
-            data: self.data.clone(),
+            client: self,
             is_waiting: false,
             _phantom: Default::default(),
         }
@@ -234,32 +234,32 @@ where
     }
 
     /// Takes a status message for all the ongoing goals.
-    pub fn try_recv_status(&self) -> RecvResult<GoalStatusArray, ()> {
+    pub fn try_recv_status(&mut self) -> RecvResult<GoalStatusArray> {
         match rcl_action_take_status(&self.data.client) {
             Ok(status_array) => RecvResult::Ok(status_array),
-            Err(RCLActionError::ClientTakeFailed) => RecvResult::RetryLater(()),
+            Err(RCLActionError::ClientTakeFailed) => RecvResult::RetryLater,
             Err(e) => RecvResult::Err(e.into()),
         }
     }
 
     /// Wait until the client receives a status message or the duration `t` elapses.
     pub fn recv_status_timeout(
-        &self,
+        &mut self,
         t: Duration,
         selector: &mut Selector,
-    ) -> RecvResult<GoalStatusArray, ()> {
+    ) -> RecvResult<GoalStatusArray> {
         selector.add_action_client(self.data.clone(), None, None, None, None, None);
         match selector.wait_timeout(t) {
             Ok(true) => self.try_recv_status(),
-            Ok(false) => RecvResult::RetryLater(()),
+            Ok(false) => RecvResult::RetryLater,
             Err(e) => RecvResult::Err(e),
         }
     }
 
     /// Asynchronously receive a status message.
-    pub async fn recv_status(self) -> Result<(Self, GoalStatusArray), DynError> {
+    pub async fn recv_status(&mut self) -> Result<GoalStatusArray, DynError> {
         AsyncStatusReceiver {
-            data: self.data.clone(),
+            client: self,
             is_waiting: false,
             _phantom: Default::default(),
         }
@@ -267,19 +267,16 @@ where
     }
 }
 
-#[derive(Clone)]
-pub(crate) struct ClientRecv<T> {
-    data: Arc<ClientData>,
+pub(crate) struct ClientRecv<'a, T: ActionMsg> {
+    client: &'a mut Client<T>,
     _phantom: PhantomData<T>,
-    _unsync: PhantomUnsync,
 }
 
-impl<T: ActionMsg> ClientRecv<T> {
-    fn new(data: Arc<ClientData>) -> Self {
+impl<'a, T: ActionMsg> ClientRecv<'a, T> {
+    fn new(client: &'a mut Client<T>) -> Self {
         Self {
-            data,
+            client,
             _phantom: Default::default(),
-            _unsync: Default::default(),
         }
     }
 }
@@ -287,45 +284,38 @@ impl<T: ActionMsg> ClientRecv<T> {
 /// A receiver for the response of the goal request, usually returned by [`Client::send_goal_with_uuid`].
 ///
 /// Use one of [`ClientGoalRecv::try_recv`], [`ClientGoalRecv::recv_timeout`], or [`ClientGoalRecv::recv`] to receive the response. The action client [`Client<T>`] is returned together with the response so that another request can be made.
-#[derive(Clone)]
-pub struct ClientGoalRecv<T> {
-    pub(crate) inner: ClientRecv<T>,
+pub struct ClientGoalRecv<'a, T: ActionMsg> {
+    pub(crate) inner: ClientRecv<'a, T>,
     seq: i64,
 }
 
-impl<T: ActionMsg> ClientGoalRecv<T> {
+impl<'a, T: ActionMsg> ClientGoalRecv<'a, T> {
     /// Returns a response if available. If there is no response, it returns [`RecvResult::RetryLater`].
-    pub fn try_recv(
-        self,
-    ) -> RecvResult<(Client<T>, SendGoalServiceResponse<T>, rcl::rmw_request_id_t), Self> {
-        match rcl_action_take_goal_response::<T>(&self.inner.data.client) {
+    pub fn try_recv(&self) -> RecvResult<(SendGoalServiceResponse<T>, rcl::rmw_request_id_t)> {
+        match rcl_action_take_goal_response::<T>(&self.inner.client.data.client) {
             Ok((response, header)) => {
                 if header.sequence_number == self.seq {
-                    let client = Client {
-                        data: self.inner.data,
-                        _phantom: Default::default(),
-                    };
-                    RecvResult::Ok((client, response, header))
+                    RecvResult::Ok((response, header))
                 } else {
-                    RecvResult::RetryLater(self)
+                    RecvResult::RetryLater
                 }
             }
-            Err(RCLActionError::ClientTakeFailed) => RecvResult::RetryLater(self),
+            Err(RCLActionError::ClientTakeFailed) => RecvResult::RetryLater,
             Err(e) => RecvResult::Err(e.into()),
         }
     }
 
     /// Wait until the client receives a response or the duration `t` elapses.
     pub fn recv_timeout(
-        self,
+        &self,
         t: Duration,
         selector: &mut Selector,
-    ) -> RecvResult<(Client<T>, SendGoalServiceResponse<T>, rcl::rmw_request_id_t), Self> {
-        selector.add_action_client(self.inner.data.clone(), None, None, None, None, None);
+    ) -> RecvResult<(SendGoalServiceResponse<T>, rcl::rmw_request_id_t)> {
+        selector.add_action_client(self.inner.client.data.clone(), None, None, None, None, None);
 
         match selector.wait_timeout(t) {
             Ok(true) => self.try_recv(),
-            Ok(false) => RecvResult::RetryLater(self),
+            Ok(false) => RecvResult::RetryLater,
             Err(e) => RecvResult::Err(e),
         }
     }
@@ -333,7 +323,7 @@ impl<T: ActionMsg> ClientGoalRecv<T> {
     /// Asynchronously receive the response.
     pub async fn recv(
         self,
-    ) -> Result<(Client<T>, SendGoalServiceResponse<T>, rcl::rmw_request_id_t), DynError> {
+    ) -> Result<(SendGoalServiceResponse<T>, rcl::rmw_request_id_t), DynError> {
         AsyncGoalReceiver {
             client: self,
             is_waiting: false,
@@ -343,35 +333,26 @@ impl<T: ActionMsg> ClientGoalRecv<T> {
 }
 
 #[pin_project(PinnedDrop)]
-pub struct AsyncGoalReceiver<T: ActionMsg> {
-    client: ClientGoalRecv<T>,
+pub struct AsyncGoalReceiver<'a, T: ActionMsg> {
+    client: ClientGoalRecv<'a, T>,
     is_waiting: bool,
 }
 
-impl<T: ActionMsg> AsyncGoalReceiver<T> {
-    pub fn give_up(self) -> Client<T> {
-        Client {
-            data: self.client.inner.data.clone(),
-            _phantom: Default::default(),
-        }
-    }
-}
-
 #[pinned_drop]
-impl<T: ActionMsg> PinnedDrop for AsyncGoalReceiver<T> {
+impl<'a, T: ActionMsg> PinnedDrop for AsyncGoalReceiver<'a, T> {
     fn drop(self: Pin<&mut Self>) {
         if self.is_waiting {
             let mut guard = SELECTOR.lock();
             let _ = guard.send_command(
-                &self.client.inner.data.node.context,
-                async_selector::Command::RemoveActionClient(self.client.inner.data.clone()),
+                &self.client.inner.client.data.node.context,
+                async_selector::Command::RemoveActionClient(self.client.inner.client.data.clone()),
             );
         }
     }
 }
 
-impl<T: ActionMsg> Future for AsyncGoalReceiver<T> {
-    type Output = Result<(Client<T>, SendGoalServiceResponse<T>, rcl::rmw_request_id_t), DynError>;
+impl<'a, T: ActionMsg> Future for AsyncGoalReceiver<'a, T> {
+    type Output = Result<(SendGoalServiceResponse<T>, rcl::rmw_request_id_t), DynError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         if is_halt() {
@@ -381,14 +362,10 @@ impl<T: ActionMsg> Future for AsyncGoalReceiver<T> {
         let this = self.project();
         *this.is_waiting = false;
 
-        match rcl_action_take_goal_response::<T>(&this.client.inner.data.client) {
+        match rcl_action_take_goal_response::<T>(&this.client.inner.client.data.client) {
             Ok((response, header)) => {
                 if header.sequence_number == this.client.seq {
-                    let client = Client {
-                        data: this.client.inner.data.clone(),
-                        _phantom: Default::default(),
-                    };
-                    return Poll::Ready(Ok((client, response, header)));
+                    return Poll::Ready(Ok((response, header)));
                 }
             }
             Err(RCLActionError::ClientTakeFailed) => {}
@@ -399,9 +376,9 @@ impl<T: ActionMsg> Future for AsyncGoalReceiver<T> {
         let mut guard = SELECTOR.lock();
 
         match guard.send_command(
-            &this.client.inner.data.node.context,
+            &this.client.inner.client.data.node.context,
             async_selector::Command::ActionClient {
-                data: this.client.inner.data.clone(),
+                data: this.client.inner.client.data.clone(),
                 feedback: Box::new(|| CallbackResult::Ok),
                 status: Box::new(|| CallbackResult::Ok),
                 goal: Box::new(move || {
@@ -422,51 +399,41 @@ impl<T: ActionMsg> Future for AsyncGoalReceiver<T> {
     }
 }
 
-#[derive(Clone)]
-pub struct ClientCancelRecv<T> {
-    pub(crate) inner: ClientRecv<T>,
+pub struct ClientCancelRecv<'a, T: ActionMsg> {
+    pub(crate) inner: ClientRecv<'a, T>,
     seq: i64,
 }
 
-impl<T: ActionMsg> ClientCancelRecv<T> {
-    pub fn try_recv(
-        self,
-    ) -> RecvResult<(Client<T>, CancelGoal_Response, rcl::rmw_request_id_t), Self> {
-        match rcl_action_take_cancel_response(&self.inner.data.client) {
+impl<'a, T: ActionMsg> ClientCancelRecv<'a, T> {
+    pub fn try_recv(&self) -> RecvResult<(CancelGoal_Response, rcl::rmw_request_id_t)> {
+        match rcl_action_take_cancel_response(&self.inner.client.data.client) {
             Ok((response, header)) => {
                 if header.sequence_number == self.seq {
-                    let client = Client {
-                        data: self.inner.data,
-                        _phantom: Default::default(),
-                    };
-                    RecvResult::Ok((client, response, header))
+                    RecvResult::Ok((response, header))
                 } else {
-                    RecvResult::RetryLater(self)
+                    RecvResult::RetryLater
                 }
             }
-            Err(RCLActionError::ClientTakeFailed) => RecvResult::RetryLater(self),
+            Err(RCLActionError::ClientTakeFailed) => RecvResult::RetryLater,
             Err(e) => RecvResult::Err(e.into()),
         }
     }
 
     /// Wait until the client receives a response or the duration `t` elapses.
     pub fn recv_timeout(
-        self,
+        &self,
         t: Duration,
         selector: &mut Selector,
-    ) -> RecvResult<(Client<T>, CancelGoal_Response, rcl::rmw_request_id_t), Self> {
-        selector.add_action_client(self.inner.data.clone(), None, None, None, None, None);
-
+    ) -> RecvResult<(CancelGoal_Response, rcl::rmw_request_id_t)> {
+        selector.add_action_client(self.inner.client.data.clone(), None, None, None, None, None);
         match selector.wait_timeout(t) {
             Ok(true) => self.try_recv(),
-            Ok(false) => RecvResult::RetryLater(self),
+            Ok(false) => RecvResult::RetryLater,
             Err(e) => RecvResult::Err(e),
         }
     }
 
-    pub async fn recv(
-        self,
-    ) -> Result<(Client<T>, CancelGoal_Response, rcl::rmw_request_id_t), DynError> {
+    pub async fn recv(self) -> Result<(CancelGoal_Response, rcl::rmw_request_id_t), DynError> {
         AsyncCancelReceiver {
             client: self,
             is_waiting: false,
@@ -476,35 +443,26 @@ impl<T: ActionMsg> ClientCancelRecv<T> {
 }
 
 #[pin_project(PinnedDrop)]
-pub struct AsyncCancelReceiver<T: ActionMsg> {
-    client: ClientCancelRecv<T>,
+pub struct AsyncCancelReceiver<'a, T: ActionMsg> {
+    client: ClientCancelRecv<'a, T>,
     is_waiting: bool,
 }
 
-impl<T: ActionMsg> AsyncCancelReceiver<T> {
-    pub fn give_up(self) -> Client<T> {
-        Client {
-            data: self.client.inner.data.clone(),
-            _phantom: Default::default(),
-        }
-    }
-}
-
 #[pinned_drop]
-impl<T: ActionMsg> PinnedDrop for AsyncCancelReceiver<T> {
+impl<'a, T: ActionMsg> PinnedDrop for AsyncCancelReceiver<'a, T> {
     fn drop(self: Pin<&mut Self>) {
         if self.is_waiting {
             let mut guard = SELECTOR.lock();
             let _ = guard.send_command(
-                &self.client.inner.data.node.context,
-                async_selector::Command::RemoveActionClient(self.client.inner.data.clone()),
+                &self.client.inner.client.data.node.context,
+                async_selector::Command::RemoveActionClient(self.client.inner.client.data.clone()),
             );
         }
     }
 }
 
-impl<T: ActionMsg> Future for AsyncCancelReceiver<T> {
-    type Output = Result<(Client<T>, CancelGoal_Response, rcl::rmw_request_id_t), DynError>;
+impl<'a, T: ActionMsg> Future for AsyncCancelReceiver<'a, T> {
+    type Output = Result<(CancelGoal_Response, rcl::rmw_request_id_t), DynError>;
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         if is_halt() {
@@ -514,14 +472,10 @@ impl<T: ActionMsg> Future for AsyncCancelReceiver<T> {
         let this = self.project();
         *this.is_waiting = false;
 
-        match rcl_action_take_cancel_response(&this.client.inner.data.client) {
+        match rcl_action_take_cancel_response(&this.client.inner.client.data.client) {
             Ok((response, header)) => {
                 if header.sequence_number == this.client.seq {
-                    let client = Client {
-                        data: this.client.inner.data.clone(),
-                        _phantom: Default::default(),
-                    };
-                    return Poll::Ready(Ok((client, response, header)));
+                    return Poll::Ready(Ok((response, header)));
                 }
             }
             Err(RCLActionError::ClientTakeFailed) => {}
@@ -532,9 +486,9 @@ impl<T: ActionMsg> Future for AsyncCancelReceiver<T> {
         let mut guard = SELECTOR.lock();
 
         match guard.send_command(
-            &this.client.inner.data.node.context,
+            &this.client.inner.client.data.node.context,
             async_selector::Command::ActionClient {
-                data: this.client.inner.data.clone(),
+                data: this.client.inner.client.data.clone(),
                 feedback: Box::new(|| CallbackResult::Ok),
                 status: Box::new(|| CallbackResult::Ok),
                 goal: Box::new(|| CallbackResult::Ok),
@@ -555,72 +509,44 @@ impl<T: ActionMsg> Future for AsyncCancelReceiver<T> {
     }
 }
 
-#[derive(Clone)]
-pub struct ClientResultRecv<T> {
-    pub(crate) inner: ClientRecv<T>,
+pub struct ClientResultRecv<'a, T: ActionMsg> {
+    pub(crate) inner: ClientRecv<'a, T>,
     seq: i64,
 }
 
-impl<T: ActionMsg> ClientResultRecv<T> {
-    pub fn try_recv(
-        self,
-    ) -> RecvResult<
-        (
-            Client<T>,
-            GetResultServiceResponse<T>,
-            rcl::rmw_request_id_t,
-        ),
-        Self,
-    > {
-        match rcl_action_take_result_response::<T>(&self.inner.data.client) {
+impl<'a, T: ActionMsg> ClientResultRecv<'a, T> {
+    pub fn try_recv(&self) -> RecvResult<(GetResultServiceResponse<T>, rcl::rmw_request_id_t)> {
+        match rcl_action_take_result_response::<T>(&self.inner.client.data.client) {
             Ok((response, header)) => {
                 if header.sequence_number == self.seq {
-                    let client = Client {
-                        data: self.inner.data,
-                        _phantom: Default::default(),
-                    };
-                    RecvResult::Ok((client, response, header))
+                    RecvResult::Ok((response, header))
                 } else {
-                    RecvResult::RetryLater(self)
+                    RecvResult::RetryLater
                 }
             }
-            Err(RCLActionError::ClientTakeFailed) => RecvResult::RetryLater(self),
+            Err(RCLActionError::ClientTakeFailed) => RecvResult::RetryLater,
             Err(e) => RecvResult::Err(e.into()),
         }
     }
 
     /// Wait until the client receives a response or the duration `t` elapses.
     pub fn recv_timeout(
-        self,
+        &self,
         t: Duration,
         selector: &mut Selector,
-    ) -> RecvResult<
-        (
-            Client<T>,
-            GetResultServiceResponse<T>,
-            rcl::rmw_request_id_t,
-        ),
-        Self,
-    > {
-        selector.add_action_client(self.inner.data.clone(), None, None, None, None, None);
+    ) -> RecvResult<(GetResultServiceResponse<T>, rcl::rmw_request_id_t)> {
+        selector.add_action_client(self.inner.client.data.clone(), None, None, None, None, None);
 
         match selector.wait_timeout(t) {
             Ok(true) => self.try_recv(),
-            Ok(false) => RecvResult::RetryLater(self),
+            Ok(false) => RecvResult::RetryLater,
             Err(e) => RecvResult::Err(e),
         }
     }
 
     pub async fn recv(
         self,
-    ) -> Result<
-        (
-            Client<T>,
-            GetResultServiceResponse<T>,
-            rcl::rmw_request_id_t,
-        ),
-        DynError,
-    > {
+    ) -> Result<(GetResultServiceResponse<T>, rcl::rmw_request_id_t), DynError> {
         AsyncResultReceiver {
             client: self,
             is_waiting: false,
@@ -630,42 +556,26 @@ impl<T: ActionMsg> ClientResultRecv<T> {
 }
 
 #[pin_project(PinnedDrop)]
-pub struct AsyncResultReceiver<T: ActionMsg> {
-    client: ClientResultRecv<T>,
+pub struct AsyncResultReceiver<'a, T: ActionMsg> {
+    client: ClientResultRecv<'a, T>,
     is_waiting: bool,
 }
 
-impl<T: ActionMsg> AsyncResultReceiver<T> {
-    pub fn give_up(self) -> Client<T> {
-        Client {
-            data: self.client.inner.data.clone(),
-            _phantom: Default::default(),
-        }
-    }
-}
-
 #[pinned_drop]
-impl<T: ActionMsg> PinnedDrop for AsyncResultReceiver<T> {
+impl<'a, T: ActionMsg> PinnedDrop for AsyncResultReceiver<'a, T> {
     fn drop(self: Pin<&mut Self>) {
         if self.is_waiting {
             let mut guard = SELECTOR.lock();
             let _ = guard.send_command(
-                &self.client.inner.data.node.context,
-                async_selector::Command::RemoveActionClient(self.client.inner.data.clone()),
+                &self.client.inner.client.data.node.context,
+                async_selector::Command::RemoveActionClient(self.client.inner.client.data.clone()),
             );
         }
     }
 }
 
-impl<T: ActionMsg> Future for AsyncResultReceiver<T> {
-    type Output = Result<
-        (
-            Client<T>,
-            GetResultServiceResponse<T>,
-            rcl::rmw_request_id_t,
-        ),
-        DynError,
-    >;
+impl<'a, T: ActionMsg> Future for AsyncResultReceiver<'a, T> {
+    type Output = Result<(GetResultServiceResponse<T>, rcl::rmw_request_id_t), DynError>;
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         if is_halt() {
@@ -675,14 +585,10 @@ impl<T: ActionMsg> Future for AsyncResultReceiver<T> {
         let this = self.project();
         *this.is_waiting = false;
 
-        match rcl_action_take_result_response::<T>(&this.client.inner.data.client) {
+        match rcl_action_take_result_response::<T>(&this.client.inner.client.data.client) {
             Ok((response, header)) => {
                 if header.sequence_number == this.client.seq {
-                    let client = Client {
-                        data: this.client.inner.data.clone(),
-                        _phantom: Default::default(),
-                    };
-                    return Poll::Ready(Ok((client, response, header)));
+                    return Poll::Ready(Ok((response, header)));
                 }
             }
             Err(RCLActionError::ClientTakeFailed) => {}
@@ -693,9 +599,9 @@ impl<T: ActionMsg> Future for AsyncResultReceiver<T> {
         let mut guard = SELECTOR.lock();
 
         match guard.send_command(
-            &this.client.inner.data.node.context,
+            &this.client.inner.client.data.node.context,
             async_selector::Command::ActionClient {
-                data: this.client.inner.data.clone(),
+                data: this.client.inner.client.data.clone(),
                 feedback: Box::new(|| CallbackResult::Ok),
                 status: Box::new(|| CallbackResult::Ok),
                 goal: Box::new(|| CallbackResult::Ok),
@@ -717,36 +623,27 @@ impl<T: ActionMsg> Future for AsyncResultReceiver<T> {
 }
 
 #[pin_project(PinnedDrop)]
-pub struct AsyncFeedbackReceiver<T: ActionMsg> {
-    data: Arc<ClientData>,
+pub struct AsyncFeedbackReceiver<'a, T: ActionMsg> {
+    client: &'a mut Client<T>,
     is_waiting: bool,
     _phantom: PhantomData<T>,
 }
 
-impl<T: ActionMsg> AsyncFeedbackReceiver<T> {
-    pub fn give_up(self) -> Client<T> {
-        Client {
-            data: self.data.clone(),
-            _phantom: Default::default(),
-        }
-    }
-}
-
 #[pinned_drop]
-impl<T: ActionMsg> PinnedDrop for AsyncFeedbackReceiver<T> {
+impl<'a, T: ActionMsg> PinnedDrop for AsyncFeedbackReceiver<'a, T> {
     fn drop(self: Pin<&mut Self>) {
         if self.is_waiting {
             let mut guard = SELECTOR.lock();
             let _ = guard.send_command(
-                &self.data.node.context,
-                async_selector::Command::RemoveActionClient(self.data.clone()),
+                &self.client.data.node.context,
+                async_selector::Command::RemoveActionClient(self.client.data.clone()),
             );
         }
     }
 }
 
-impl<T: ActionMsg> Future for AsyncFeedbackReceiver<T> {
-    type Output = Result<(Client<T>, <T as ActionMsg>::Feedback), DynError>;
+impl<'a, T: ActionMsg> Future for AsyncFeedbackReceiver<'a, T> {
+    type Output = Result<<T as ActionMsg>::Feedback, DynError>;
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         if is_halt() {
@@ -756,13 +653,9 @@ impl<T: ActionMsg> Future for AsyncFeedbackReceiver<T> {
         let this = self.project();
         *this.is_waiting = false;
 
-        match rcl_action_take_feedback::<T>(&this.data.client) {
+        match rcl_action_take_feedback::<T>(&this.client.data.client) {
             Ok(feedback) => {
-                let client = Client {
-                    data: this.data.clone(),
-                    _phantom: Default::default(),
-                };
-                return Poll::Ready(Ok((client, feedback)));
+                return Poll::Ready(Ok(feedback));
             }
             Err(RCLActionError::ClientTakeFailed) => {}
             Err(e) => return Poll::Ready(Err(e.into())),
@@ -772,9 +665,9 @@ impl<T: ActionMsg> Future for AsyncFeedbackReceiver<T> {
         let mut guard = SELECTOR.lock();
 
         match guard.send_command(
-            &this.data.node.context,
+            &this.client.data.node.context,
             async_selector::Command::ActionClient {
-                data: this.data.clone(),
+                data: this.client.data.clone(),
                 feedback: Box::new(move || {
                     let w = waker.take().unwrap();
                     w.wake();
@@ -796,36 +689,27 @@ impl<T: ActionMsg> Future for AsyncFeedbackReceiver<T> {
 }
 
 #[pin_project(PinnedDrop)]
-pub struct AsyncStatusReceiver<T: ActionMsg> {
-    data: Arc<ClientData>,
+pub struct AsyncStatusReceiver<'a, T: ActionMsg> {
+    client: &'a mut Client<T>,
     is_waiting: bool,
     _phantom: PhantomData<T>,
 }
 
-impl<T: ActionMsg> AsyncStatusReceiver<T> {
-    pub fn give_up(self) -> Client<T> {
-        Client {
-            data: self.data.clone(),
-            _phantom: Default::default(),
-        }
-    }
-}
-
 #[pinned_drop]
-impl<T: ActionMsg> PinnedDrop for AsyncStatusReceiver<T> {
+impl<'a, T: ActionMsg> PinnedDrop for AsyncStatusReceiver<'a, T> {
     fn drop(self: Pin<&mut Self>) {
         if self.is_waiting {
             let mut guard = SELECTOR.lock();
             let _ = guard.send_command(
-                &self.data.node.context,
-                async_selector::Command::RemoveActionClient(self.data.clone()),
+                &self.client.data.node.context,
+                async_selector::Command::RemoveActionClient(self.client.data.clone()),
             );
         }
     }
 }
 
-impl<T: ActionMsg> Future for AsyncStatusReceiver<T> {
-    type Output = Result<(Client<T>, GoalStatusArray), DynError>;
+impl<'a, T: ActionMsg> Future for AsyncStatusReceiver<'a, T> {
+    type Output = Result<GoalStatusArray, DynError>;
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         if is_halt() {
@@ -835,13 +719,9 @@ impl<T: ActionMsg> Future for AsyncStatusReceiver<T> {
         let this = self.project();
         *this.is_waiting = false;
 
-        match rcl_action_take_status(&this.data.client) {
+        match rcl_action_take_status(&this.client.data.client) {
             Ok(status_array) => {
-                let client = Client {
-                    data: this.data.clone(),
-                    _phantom: Default::default(),
-                };
-                return Poll::Ready(Ok((client, status_array)));
+                return Poll::Ready(Ok(status_array));
             }
             Err(RCLActionError::ClientTakeFailed) => {}
             Err(e) => return Poll::Ready(Err(e.into())),
@@ -851,9 +731,9 @@ impl<T: ActionMsg> Future for AsyncStatusReceiver<T> {
         let mut guard = SELECTOR.lock();
 
         match guard.send_command(
-            &this.data.node.context,
+            &this.client.data.node.context,
             async_selector::Command::ActionClient {
-                data: this.data.clone(),
+                data: this.client.data.clone(),
                 feedback: Box::new(|| CallbackResult::Ok),
                 status: Box::new(move || {
                     let w = waker.take().unwrap();
