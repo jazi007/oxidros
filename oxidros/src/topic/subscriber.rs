@@ -350,6 +350,26 @@ impl<T: TypeSupport> Subscriber<T> {
             Err(e) => RecvResult::Err(e.into()),
         }
     }
+    /// Blocking receive.
+    ///
+    /// # Errors
+    ///
+    /// - `RCLError::InvalidArgument` if any arguments are invalid, or
+    /// - `RCLError::SubscriptionInvalid` if the subscription is invalid, or
+    /// - `RCLError::BadAlloc if allocating` memory failed, or
+    /// - `RCLError::Error` if an unspecified error occurs.
+    pub fn recv_blocking(&self) -> Result<TakenMsg<T>, DynError> {
+        let mut selector = self.subscription.node.context.create_selector()?;
+        selector.add_rcl_subscription(self.subscription.clone(), None, false);
+        loop {
+            match self.try_recv() {
+                RecvResult::Ok(msg) => return Ok(msg),
+                RecvResult::Err(e) => return Err(e),
+                RecvResult::RetryLater => {}
+            }
+            selector.wait()?;
+        }
+    }
 
     /// Receive a message asynchronously.
     ///
