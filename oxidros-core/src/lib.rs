@@ -8,6 +8,7 @@ pub mod action;
 pub mod delta_list;
 pub mod error;
 pub mod helper;
+pub mod message;
 pub mod msg;
 pub mod parameter;
 pub mod qos;

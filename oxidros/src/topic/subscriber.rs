@@ -152,7 +152,9 @@
 
 use crate::{
     error::{DynError, RCLError, RCLResult},
-    get_allocator, is_halt,
+    get_allocator,
+    helper::is_unpin,
+    is_halt,
     msg::TypeSupport,
     node::Node,
     qos, rcl,
@@ -161,8 +163,8 @@ use crate::{
     topic::subscriber_loaned_message::SubscriberLoanedMessage,
     PhantomUnsync, RecvResult,
 };
+pub use oxidros_core::message::TakenMsg;
 use oxidros_core::selector::CallbackResult;
-use pin_project::{pin_project, pinned_drop};
 use std::{
     ffi::CString,
     future::Future,
@@ -182,9 +184,7 @@ use parking_lot::Mutex;
 
 pub(crate) struct RCLSubscription {
     pub subscription: Box<rcl::rcl_subscription_t>,
-
     topic_name: String,
-
     #[cfg(feature = "rcl_stat")]
     pub latency_take: Mutex<TimeStatistics<4096>>,
     pub node: Arc<Node>,
@@ -262,12 +262,9 @@ impl<T: TypeSupport> Subscriber<T> {
         qos: Option<qos::Profile>,
     ) -> RCLResult<Self> {
         let mut subscription = Box::new(rcl::MTSafeFn::rcl_get_zero_initialized_subscription());
-
         let topic_name_c = CString::new(topic_name).unwrap_or_default();
-
         let mut options = Options::new(&qos.unwrap_or_default());
         options.disable_loaned_message();
-
         {
             let guard = rcl::MT_UNSAFE_FN.lock();
 
@@ -279,7 +276,6 @@ impl<T: TypeSupport> Subscriber<T> {
                 options.as_ptr(),
             )?;
         }
-
         Ok(Subscriber {
             subscription: Arc::new(RCLSubscription {
                 subscription,
@@ -416,9 +412,8 @@ impl<T: TypeSupport> Subscriber<T> {
     /// - `RCLError::Error` if an unspecified error occurs.
     pub async fn recv(&mut self) -> Result<TakenMsg<T>, DynError> {
         AsyncReceiver {
-            subscription: &mut self.subscription,
+            subscriber: self,
             is_waiting: false,
-            _phantom: Default::default(),
         }
         .await
     }
@@ -433,51 +428,41 @@ impl<T: TypeSupport> Subscriber<T> {
 }
 
 /// Asynchronous receiver of subscribers.
-#[pin_project(PinnedDrop)]
 pub struct AsyncReceiver<'a, T> {
-    subscription: &'a mut Arc<RCLSubscription>,
+    subscriber: &'a mut Subscriber<T>,
     is_waiting: bool,
-    _phantom: PhantomData<T>,
 }
 
-impl<'a, T> Future for AsyncReceiver<'a, T> {
+impl<'a, T> AsyncReceiver<'a, T> {
+    fn project(self: std::pin::Pin<&mut Self>) -> (&mut Subscriber<T>, &mut bool) {
+        // Safety: Arc<RCLSubscription> is Unpin
+        is_unpin::<&mut Subscriber<T>>();
+        unsafe {
+            let this = self.get_unchecked_mut();
+            (this.subscriber, &mut this.is_waiting)
+        }
+    }
+}
+
+impl<'a, T: TypeSupport> Future for AsyncReceiver<'a, T> {
     type Output = Result<TakenMsg<T>, DynError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
         if is_halt() {
             return Poll::Ready(Err(Signaled.into()));
         }
-
-        let this = self.project();
-
-        let s = this.subscription.clone();
-
-        // let is_waiting = this.is_waiting;
-        // let subscription = this.subscription;
-        *this.is_waiting = false;
-
-        #[cfg(feature = "rcl_stat")]
-        let start = std::time::SystemTime::now();
-
-        // try to take 1 message
-        match take::<T>(&s) {
-            Ok(value) => {
-                #[cfg(feature = "rcl_stat")]
-                s.measure_latency(start);
-
-                Poll::Ready(Ok(value))
-            } // got
-            Err(RCLError::SubscriptionTakeFailed) => {
-                #[cfg(feature = "rcl_stat")]
-                s.measure_latency(start);
-
+        let (subscriber, is_waiting) = self.project();
+        *is_waiting = false;
+        match subscriber.try_recv() {
+            RecvResult::Ok(v) => Poll::Ready(Ok(v)),
+            RecvResult::Err(e) => Poll::Ready(Err(e)),
+            RecvResult::RetryLater => {
                 let mut guard = SELECTOR.lock();
                 let mut waker = Some(cx.waker().clone());
-
                 guard.send_command(
-                    &this.subscription.node.context,
+                    &subscriber.subscription.node.context,
                     async_selector::Command::Subscription(
-                        this.subscription.clone(),
+                        subscriber.subscription.clone(),
                         Box::new(move || {
                             let w = waker.take();
                             w.unwrap().wake();
@@ -485,23 +470,20 @@ impl<'a, T> Future for AsyncReceiver<'a, T> {
                         }),
                     ),
                 )?;
-
-                *this.is_waiting = true;
+                *is_waiting = true;
                 Poll::Pending
             }
-            Err(e) => Poll::Ready(Err(e.into())), // error
         }
     }
 }
 
-#[pinned_drop]
-impl<T> PinnedDrop for AsyncReceiver<'_, T> {
-    fn drop(self: Pin<&mut Self>) {
+impl<T> Drop for AsyncReceiver<'_, T> {
+    fn drop(&mut self) {
         if self.is_waiting {
             let mut guard = SELECTOR.lock();
             let _ = guard.send_command(
-                &self.subscription.node.context,
-                async_selector::Command::RemoveSubscription(self.subscription.clone()),
+                &self.subscriber.subscription.node.context,
+                async_selector::Command::RemoveSubscription(self.subscriber.subscription.clone()),
             );
         }
     }
@@ -537,48 +519,9 @@ impl Options {
     }
 }
 
-/// A smart pointer for the message taken from the topic with `rcl_take` or `rcl_take_loaned_message`.
-pub enum TakenMsg<T> {
-    Copied(T),
-    Loaned(SubscriberLoanedMessage<T>),
-}
-
-impl<T> TakenMsg<T> {
-    // Returns the owned message without cloning if the subscriber owns the memory region and its data. None is returned when it does not own the memory region (i.e. the message is loaned).
-    pub fn get_owned(self) -> Option<T> {
-        match self {
-            TakenMsg::Copied(inner) => Some(inner),
-            TakenMsg::Loaned(_) => None,
-        }
-    }
-}
-
-impl<T> std::ops::Deref for TakenMsg<T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        match self {
-            TakenMsg::Copied(copied) => copied,
-            TakenMsg::Loaned(loaned) => loaned.get(),
-        }
-    }
-}
-
-impl<T> std::ops::DerefMut for TakenMsg<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        match self {
-            TakenMsg::Copied(copied) => copied,
-            TakenMsg::Loaned(loaned) => loaned.get_mut(),
-        }
-    }
-}
-
-unsafe impl<T> Sync for TakenMsg<T> {}
-unsafe impl<T> Send for TakenMsg<T> {}
-
-fn take<T>(subscription: &Arc<RCLSubscription>) -> RCLResult<TakenMsg<T>> {
+fn take<T: 'static>(subscription: &Arc<RCLSubscription>) -> RCLResult<TakenMsg<T>> {
     if rcl::MTSafeFn::rcl_subscription_can_loan_messages(subscription.subscription.as_ref()) {
-        take_loaned_message(subscription.clone()).map(TakenMsg::Loaned)
+        take_loaned_message(subscription.clone()).map(move |x| TakenMsg::Loaned(Box::new(x)))
     } else {
         rcl_take(subscription.subscription.as_ref()).map(TakenMsg::Copied)
     }

@@ -13,7 +13,7 @@ pub trait TryClone: Sized {
 ///
 /// This allows the runtime to understand the structure of messages
 /// for serialization and deserialization.
-pub trait TypeSupport {
+pub trait TypeSupport: 'static {
     /// Returns an opaque pointer to the type support structure.
     ///
     /// The actual type of this pointer depends on the implementation

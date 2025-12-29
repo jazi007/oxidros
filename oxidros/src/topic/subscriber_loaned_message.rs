@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 use crate::{rcl, topic::subscriber::RCLSubscription};
 
@@ -15,10 +18,17 @@ impl<T> SubscriberLoanedMessage<T> {
             chunk,
         }
     }
-    pub(crate) fn get(&self) -> &T {
+}
+
+impl<T> Deref for SubscriberLoanedMessage<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
         unsafe { &*self.chunk }
     }
-    pub(crate) fn get_mut(&mut self) -> &mut T {
+}
+
+impl<T> DerefMut for SubscriberLoanedMessage<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { &mut *self.chunk }
     }
 }

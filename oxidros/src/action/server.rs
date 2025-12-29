@@ -10,11 +10,10 @@ use oxidros_msg::interfaces::action_msgs::srv::CancelGoal_Response_Constants::{
 };
 use oxidros_msg::interfaces::unique_identifier_msgs::msg::UUID;
 use parking_lot::Mutex;
-use pin_project::{pin_project, pinned_drop};
 use std::future::Future;
-use std::marker::PhantomData;
-use std::{collections::BTreeMap, ffi::CString, pin::Pin, sync::Arc, task::Poll, time::Duration};
+use std::{collections::BTreeMap, ffi::CString, sync::Arc, task::Poll, time::Duration};
 
+use crate::helper::is_unpin;
 use crate::logger::{pr_error_in, Logger};
 use crate::msg::GetUUID;
 use crate::PhantomUnsync;
@@ -187,14 +186,13 @@ where
 
     pub fn try_recv_goal_request(
         &mut self,
-    ) -> RecvResult<(ServerGoalSend<'_, T>, SendGoalServiceRequest<T>)> {
+    ) -> RecvResult<(ServerGoalSend<T>, SendGoalServiceRequest<T>)> {
         match rcl_action_take_goal_request::<T>(&self.data.server) {
             Ok((header, request)) => {
                 let sender = ServerGoalSend {
                     server: self.clone(),
                     goal_id: *request.get_uuid(),
                     request_id: header,
-                    _phantom: PhantomData,
                     _unsync: Default::default(),
                 };
                 RecvResult::Ok((sender, request))
@@ -207,7 +205,7 @@ where
     pub fn try_recv_cancel_request(
         &mut self,
     ) -> RecvResult<(
-        ServerCancelSend<'_, T>,
+        ServerCancelSend<T>,
         rcl_action_cancel_request_t,
         Vec<GoalInfo>,
     )> {
@@ -217,7 +215,6 @@ where
                 let sender = ServerCancelSend {
                     server: self.clone(),
                     request_id: header,
-                    _phantom: PhantomData,
                     _unsync: Default::default(),
                 };
                 RecvResult::Ok((sender, request, goals))
@@ -229,13 +226,12 @@ where
 
     pub fn try_recv_result_request(
         &mut self,
-    ) -> RecvResult<(ServerResultSend<'_, T>, GetResultServiceRequest<T>)> {
+    ) -> RecvResult<(ServerResultSend<T>, GetResultServiceRequest<T>)> {
         match rcl_action_take_result_request::<T>(&self.data.server) {
             Ok((header, request)) => {
                 let sender = ServerResultSend {
                     server: self.clone(),
                     request_id: header,
-                    _phantom: PhantomData,
                     _unsync: Default::default(),
                 };
                 RecvResult::Ok((sender, request))
@@ -252,7 +248,7 @@ where
 
     pub async fn recv_goal_request(
         &mut self,
-    ) -> Result<(ServerGoalSend<'_, T>, SendGoalServiceRequest<T>), DynError> {
+    ) -> Result<(ServerGoalSend<T>, SendGoalServiceRequest<T>), DynError> {
         AsyncGoalReceiver {
             server: self,
             is_waiting: false,
@@ -262,7 +258,7 @@ where
 
     pub async fn recv_cancel_request(
         &mut self,
-    ) -> Result<(ServerCancelSend<'_, T>, Vec<GoalInfo>), DynError> {
+    ) -> Result<(ServerCancelSend<T>, Vec<GoalInfo>), DynError> {
         AsyncCancelReceiver {
             server: self,
             is_waiting: false,
@@ -272,7 +268,7 @@ where
 
     pub async fn recv_result_request(
         &mut self,
-    ) -> Result<(ServerResultSend<'_, T>, GetResultServiceRequest<T>), DynError> {
+    ) -> Result<(ServerResultSend<T>, GetResultServiceRequest<T>), DynError> {
         AsyncResultReceiver {
             server: self,
             is_waiting: false,
@@ -281,15 +277,14 @@ where
     }
 }
 
-pub struct ServerGoalSend<'a, T: ActionMsg> {
+pub struct ServerGoalSend<T: ActionMsg> {
     server: Server<T>,
     request_id: rmw_request_id_t,
     goal_id: [u8; 16],
-    _phantom: PhantomData<&'a T>,
     _unsync: PhantomUnsync,
 }
 
-impl<'a, T: ActionMsg> ServerGoalSend<'a, T> {
+impl<T: ActionMsg> ServerGoalSend<T> {
     /// Accept the goal request.
     pub fn accept<F>(self, handler: F) -> Result<(), DynError>
     where
@@ -354,15 +349,24 @@ impl<'a, T: ActionMsg> ServerGoalSend<'a, T> {
     }
 }
 
-#[pin_project(PinnedDrop)]
 #[must_use]
 pub struct AsyncGoalReceiver<'a, T: ActionMsg> {
     server: &'a mut Server<T>,
     is_waiting: bool,
 }
+impl<'a, T: ActionMsg> AsyncGoalReceiver<'a, T> {
+    fn project(self: std::pin::Pin<&mut Self>) -> (&mut Server<T>, &mut bool) {
+        // Safety: Server is Unpin
+        is_unpin::<&mut Server<T>>();
+        unsafe {
+            let this = self.get_unchecked_mut();
+            (this.server, &mut this.is_waiting)
+        }
+    }
+}
 
 impl<'a, T: ActionMsg> Future for AsyncGoalReceiver<'a, T> {
-    type Output = Result<(ServerGoalSend<'a, T>, SendGoalServiceRequest<T>), DynError>;
+    type Output = Result<(ServerGoalSend<T>, SendGoalServiceRequest<T>), DynError>;
 
     fn poll(
         self: std::pin::Pin<&mut Self>,
@@ -371,27 +375,17 @@ impl<'a, T: ActionMsg> Future for AsyncGoalReceiver<'a, T> {
         if is_halt() {
             return Poll::Ready(Err(Signaled.into()));
         }
-
-        let this = self.project();
-        *this.is_waiting = false;
-
-        match rcl_action_take_goal_request::<T>(&this.server.data.server) {
-            Ok((header, request)) => {
-                let sender = ServerGoalSend {
-                    server: this.server.clone(),
-                    goal_id: *request.get_uuid(),
-                    request_id: header,
-                    _phantom: PhantomData,
-                    _unsync: Default::default(),
-                };
-                Poll::Ready(Ok((sender, request)))
-            }
-            Err(RCLActionError::ServerTakeFailed) => {
+        let (server, is_waiting) = self.project();
+        *is_waiting = false;
+        match server.try_recv_goal_request() {
+            RecvResult::Ok(v) => Poll::Ready(Ok(v)),
+            RecvResult::Err(e) => Poll::Ready(Err(e)),
+            RecvResult::RetryLater => {
                 let mut waker = Some(cx.waker().clone());
                 let mut guard = SELECTOR.lock();
 
                 let cmd = Command::ActionServer {
-                    data: this.server.data.clone(),
+                    data: server.data.clone(),
                     goal: Box::new(move || {
                         let w = waker.take().unwrap();
                         w.wake();
@@ -400,22 +394,20 @@ impl<'a, T: ActionMsg> Future for AsyncGoalReceiver<'a, T> {
                     cancel: Box::new(move || CallbackResult::Ok),
                     result: Box::new(move || CallbackResult::Ok),
                 };
-                match guard.send_command(&this.server.data.node.context, cmd) {
+                match guard.send_command(&server.data.node.context, cmd) {
                     Ok(_) => {
-                        *this.is_waiting = true;
+                        *is_waiting = true;
                         Poll::Pending
                     }
                     Err(e) => Poll::Ready(Err(e)),
                 }
             }
-            Err(e) => Poll::Ready(Err(e.into())),
         }
     }
 }
 
-#[pinned_drop]
-impl<'a, T: ActionMsg> PinnedDrop for AsyncGoalReceiver<'a, T> {
-    fn drop(self: Pin<&mut Self>) {
+impl<'a, T: ActionMsg> Drop for AsyncGoalReceiver<'a, T> {
+    fn drop(&mut self) {
         if self.is_waiting {
             let mut guard = SELECTOR.lock();
             let _ = guard.send_command(
@@ -426,14 +418,13 @@ impl<'a, T: ActionMsg> PinnedDrop for AsyncGoalReceiver<'a, T> {
     }
 }
 
-pub struct ServerCancelSend<'a, T: ActionMsg> {
+pub struct ServerCancelSend<T: ActionMsg> {
     server: Server<T>,
     request_id: rmw_request_id_t,
-    _phantom: PhantomData<&'a T>,
     _unsync: PhantomUnsync,
 }
 
-impl<'a, T: ActionMsg> ServerCancelSend<'a, T> {
+impl<T: ActionMsg> ServerCancelSend<T> {
     /// Accept the cancel requests for accepted_goals and set them to CANCELING state.
     /// `accepted_goals` can be empty if no goals are to be canceled.
     /// The shutdown operation fo each goal should be performed after calling send(),
@@ -497,15 +488,25 @@ impl<'a, T: ActionMsg> ServerCancelSend<'a, T> {
     }
 }
 
-#[pin_project(PinnedDrop)]
 #[must_use]
 pub struct AsyncCancelReceiver<'a, T: ActionMsg> {
     server: &'a mut Server<T>,
     is_waiting: bool,
 }
 
+impl<'a, T: ActionMsg> AsyncCancelReceiver<'a, T> {
+    fn project(self: std::pin::Pin<&mut Self>) -> (&mut Server<T>, &mut bool) {
+        // Safety: Server is Unpin
+        is_unpin::<&mut Server<T>>();
+        unsafe {
+            let this = self.get_unchecked_mut();
+            (this.server, &mut this.is_waiting)
+        }
+    }
+}
+
 impl<'a, T: ActionMsg> Future for AsyncCancelReceiver<'a, T> {
-    type Output = Result<(ServerCancelSend<'a, T>, Vec<GoalInfo>), DynError>;
+    type Output = Result<(ServerCancelSend<T>, Vec<GoalInfo>), DynError>;
 
     fn poll(
         self: std::pin::Pin<&mut Self>,
@@ -515,26 +516,19 @@ impl<'a, T: ActionMsg> Future for AsyncCancelReceiver<'a, T> {
             return Poll::Ready(Err(Signaled.into()));
         }
 
-        let this = self.project();
-        *this.is_waiting = false;
-        match rcl_recv_cancel_request(&this.server.data.server) {
-            Ok((header, _req, goals)) => {
-                let sender = ServerCancelSend {
-                    server: this.server.clone(),
-                    request_id: header,
-                    _phantom: PhantomData,
-                    _unsync: Default::default(),
-                };
-                Poll::Ready(Ok((sender, goals)))
-            }
-            Err(RCLActionError::ServerTakeFailed) => {
+        let (server, is_waiting) = self.project();
+        *is_waiting = false;
+        match server.try_recv_cancel_request() {
+            RecvResult::Ok((s, _, g)) => Poll::Ready(Ok((s, g))),
+            RecvResult::Err(e) => Poll::Ready(Err(e)),
+            RecvResult::RetryLater => {
                 let mut waker = Some(cx.waker().clone());
                 let mut guard = SELECTOR.lock();
 
                 match guard.send_command(
-                    &this.server.data.node.context,
+                    &server.data.node.context,
                     Command::ActionServer {
-                        data: this.server.data.clone(),
+                        data: server.data.clone(),
                         goal: Box::new(move || CallbackResult::Ok),
                         cancel: Box::new(move || {
                             let w = waker.take().unwrap();
@@ -545,20 +539,18 @@ impl<'a, T: ActionMsg> Future for AsyncCancelReceiver<'a, T> {
                     },
                 ) {
                     Ok(_) => {
-                        *this.is_waiting = true;
+                        *is_waiting = true;
                         Poll::Pending
                     }
                     Err(e) => Poll::Ready(Err(e)),
                 }
             }
-            Err(e) => Poll::Ready(Err(e.into())),
         }
     }
 }
 
-#[pinned_drop]
-impl<'a, T: ActionMsg> PinnedDrop for AsyncCancelReceiver<'a, T> {
-    fn drop(self: Pin<&mut Self>) {
+impl<'a, T: ActionMsg> Drop for AsyncCancelReceiver<'a, T> {
+    fn drop(&mut self) {
         if self.is_waiting {
             let mut guard = SELECTOR.lock();
             let _ = guard.send_command(
@@ -569,14 +561,13 @@ impl<'a, T: ActionMsg> PinnedDrop for AsyncCancelReceiver<'a, T> {
     }
 }
 
-pub struct ServerResultSend<'a, T: ActionMsg> {
+pub struct ServerResultSend<T: ActionMsg> {
     server: Server<T>,
     request_id: rmw_request_id_t,
-    _phantom: PhantomData<&'a T>,
     _unsync: PhantomUnsync,
 }
 
-impl<'a, T: ActionMsg> ServerResultSend<'a, T> {
+impl<T: ActionMsg> ServerResultSend<T> {
     pub fn send(mut self, uuid: &[u8; 16]) -> Result<(), DynError> {
         let res = {
             let results = self.server.results.lock();
@@ -610,15 +601,25 @@ impl<'a, T: ActionMsg> ServerResultSend<'a, T> {
     }
 }
 
-#[pin_project(PinnedDrop)]
 #[must_use]
 pub struct AsyncResultReceiver<'a, T: ActionMsg> {
     server: &'a mut Server<T>,
     is_waiting: bool,
 }
 
+impl<'a, T: ActionMsg> AsyncResultReceiver<'a, T> {
+    fn project(self: std::pin::Pin<&mut Self>) -> (&mut Server<T>, &mut bool) {
+        // Safety: Server is Unpin
+        is_unpin::<&mut Server<T>>();
+        unsafe {
+            let this = self.get_unchecked_mut();
+            (this.server, &mut this.is_waiting)
+        }
+    }
+}
+
 impl<'a, T: ActionMsg> Future for AsyncResultReceiver<'a, T> {
-    type Output = Result<(ServerResultSend<'a, T>, GetResultServiceRequest<T>), DynError>;
+    type Output = Result<(ServerResultSend<T>, GetResultServiceRequest<T>), DynError>;
 
     fn poll(
         self: std::pin::Pin<&mut Self>,
@@ -628,25 +629,16 @@ impl<'a, T: ActionMsg> Future for AsyncResultReceiver<'a, T> {
             return Poll::Ready(Err(Signaled.into()));
         }
 
-        let this = self.project();
-        *this.is_waiting = false;
-
-        match rcl_action_take_result_request::<T>(&this.server.data.server) {
-            Ok((header, request)) => {
-                let sender = ServerResultSend {
-                    server: this.server.clone(),
-                    request_id: header,
-                    _phantom: PhantomData,
-                    _unsync: Default::default(),
-                };
-                Poll::Ready(Ok((sender, request)))
-            }
-            Err(RCLActionError::ServerTakeFailed) => {
+        let (server, is_waiting) = self.project();
+        *is_waiting = false;
+        match server.try_recv_result_request() {
+            RecvResult::Ok(v) => Poll::Ready(Ok(v)),
+            RecvResult::Err(e) => Poll::Ready(Err(e)),
+            RecvResult::RetryLater => {
                 let mut waker = Some(cx.waker().clone());
                 let mut guard = SELECTOR.lock();
-
                 let cmd = Command::ActionServer {
-                    data: this.server.data.clone(),
+                    data: server.data.clone(),
                     goal: Box::new(move || CallbackResult::Ok),
                     cancel: Box::new(move || CallbackResult::Ok),
                     result: Box::new(move || {
@@ -655,22 +647,20 @@ impl<'a, T: ActionMsg> Future for AsyncResultReceiver<'a, T> {
                         CallbackResult::Remove
                     }),
                 };
-                match guard.send_command(&this.server.data.node.context, cmd) {
+                match guard.send_command(&server.data.node.context, cmd) {
                     Ok(_) => {
-                        *this.is_waiting = true;
+                        *is_waiting = true;
                         Poll::Pending
                     }
                     Err(e) => Poll::Ready(Err(e)),
                 }
             }
-            Err(e) => Poll::Ready(Err(e.into())),
         }
     }
 }
 
-#[pinned_drop]
-impl<'a, T: ActionMsg> PinnedDrop for AsyncResultReceiver<'a, T> {
-    fn drop(self: Pin<&mut Self>) {
+impl<'a, T: ActionMsg> Drop for AsyncResultReceiver<'a, T> {
+    fn drop(&mut self) {
         if self.is_waiting {
             let mut guard = SELECTOR.lock();
             let _ = guard.send_command(

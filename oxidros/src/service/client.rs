@@ -69,10 +69,9 @@ use crate::{
     RecvResult,
 };
 use oxidros_core::selector::CallbackResult;
-use pin_project::{pin_project, pinned_drop};
 use std::{
-    ffi::CString, future::Future, marker::PhantomData, os::raw::c_void, pin::Pin, sync::Arc,
-    task::Poll, time::Duration,
+    ffi::CString, future::Future, marker::PhantomData, os::raw::c_void, sync::Arc, task::Poll,
+    time::Duration,
 };
 
 pub(crate) struct ClientData {
@@ -416,7 +415,6 @@ fn rcl_take_response_with_info<T>(
 }
 
 /// Receiver to receive a response asynchronously.
-#[pin_project(PinnedDrop)]
 #[must_use]
 pub struct AsyncReceiver<'a, T: ServiceMsg> {
     client: ClientRecv<'a, T>,
@@ -427,14 +425,14 @@ impl<'a, T: ServiceMsg> Future for AsyncReceiver<'a, T> {
     type Output = Result<(<T as ServiceMsg>::Response, Header), DynError>;
 
     fn poll(
-        self: std::pin::Pin<&mut Self>,
+        mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
         if is_halt() {
             return Poll::Ready(Err(Signaled.into()));
         }
-        let this = self.project();
-        *this.is_waiting = false;
+        let mut this = self.as_mut();
+        this.is_waiting = false;
         match this.client.try_recv() {
             RecvResult::Ok(v) => return Poll::Ready(Ok(v)),
             RecvResult::RetryLater => (),
@@ -456,14 +454,13 @@ impl<'a, T: ServiceMsg> Future for AsyncReceiver<'a, T> {
         ) {
             return Poll::Ready(Err(e));
         }
-        *this.is_waiting = true;
+        this.is_waiting = true;
         Poll::Pending
     }
 }
 
-#[pinned_drop]
-impl<'a, T: ServiceMsg> PinnedDrop for AsyncReceiver<'a, T> {
-    fn drop(self: Pin<&mut Self>) {
+impl<'a, T: ServiceMsg> Drop for AsyncReceiver<'a, T> {
+    fn drop(&mut self) {
         if self.is_waiting {
             let mut guard = SELECTOR.lock();
             let _ = guard.send_command(

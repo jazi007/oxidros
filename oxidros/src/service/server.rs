@@ -94,7 +94,9 @@ use super::Header;
 use crate::msg::interfaces::rosgraph_msgs::msg::Clock;
 use crate::{
     error::{DynError, RCLError, RCLResult},
-    get_allocator, is_halt,
+    get_allocator,
+    helper::is_unpin,
+    is_halt,
     msg::ServiceMsg,
     node::Node,
     qos::Profile,
@@ -105,10 +107,8 @@ use crate::{
 };
 use oxidros_core::selector::CallbackResult;
 use parking_lot::Mutex;
-use pin_project::{pin_project, pinned_drop};
 use std::{
-    ffi::CString, future::Future, marker::PhantomData, os::raw::c_void, pin::Pin, sync::Arc,
-    task::Poll,
+    ffi::CString, future::Future, marker::PhantomData, os::raw::c_void, sync::Arc, task::Poll,
 };
 
 pub(crate) struct ServerData {
@@ -269,9 +269,7 @@ impl<T: ServiceMsg> Server<T> {
     /// - `RCLError::BadAlloc` if allocating memory failed, or
     /// - `RCLError::Error` if an unspecified error occurs.
     #[must_use]
-    pub fn try_recv(
-        &mut self,
-    ) -> RecvResult<(ServerSend<'_, T>, <T as ServiceMsg>::Request, Header)> {
+    pub fn try_recv(&mut self) -> RecvResult<(ServerSend<T>, <T as ServiceMsg>::Request, Header)> {
         let data = self.data.lock();
         let (request, header) =
             match rcl_take_request_with_info::<<T as ServiceMsg>::Request>(&data.service) {
@@ -341,7 +339,7 @@ impl<T: ServiceMsg> Server<T> {
     /// - `RCLError::Error` if an unspecified error occurs.
     pub async fn recv(
         &mut self,
-    ) -> Result<(ServerSend<'_, T>, <T as ServiceMsg>::Request, Header), DynError> {
+    ) -> Result<(ServerSend<T>, <T as ServiceMsg>::Request, Header), DynError> {
         AsyncReceiver {
             server: self,
             is_waiting: false,
@@ -354,14 +352,14 @@ unsafe impl<T> Send for Server<T> {}
 
 /// Sender to send a response.
 #[must_use]
-pub struct ServerSend<'a, T> {
+pub struct ServerSend<T> {
     data: Arc<Mutex<ServerData>>,
     request_id: rmw_request_id_t,
-    _phantom: PhantomData<&'a T>,
+    _phantom: PhantomData<T>,
     _unsync: PhantomUnsync,
 }
 
-impl<'a, T: ServiceMsg> ServerSend<'a, T> {
+impl<T: ServiceMsg> ServerSend<T> {
     /// Send a response to the client.
     ///
     /// # Errors
@@ -430,15 +428,25 @@ fn rcl_take_request_with_info<T>(
 }
 
 /// Receiver to receive a request asynchronously.
-#[pin_project(PinnedDrop)]
 #[must_use]
 pub struct AsyncReceiver<'a, T> {
     server: &'a mut Server<T>,
     is_waiting: bool,
 }
 
+impl<'a, T> AsyncReceiver<'a, T> {
+    fn project(self: std::pin::Pin<&mut Self>) -> (&mut Server<T>, &mut bool) {
+        // Safety: Server is Unpin
+        is_unpin::<&mut Server<T>>();
+        unsafe {
+            let this = self.get_unchecked_mut();
+            (this.server, &mut this.is_waiting)
+        }
+    }
+}
+
 impl<'a, T: ServiceMsg> Future for AsyncReceiver<'a, T> {
-    type Output = Result<(ServerSend<'a, T>, <T as ServiceMsg>::Request, Header), DynError>;
+    type Output = Result<(ServerSend<T>, <T as ServiceMsg>::Request, Header), DynError>;
 
     fn poll(
         self: std::pin::Pin<&mut Self>,
@@ -448,34 +456,19 @@ impl<'a, T: ServiceMsg> Future for AsyncReceiver<'a, T> {
             return Poll::Ready(Err(Signaled.into()));
         }
 
-        let this = self.project();
-
-        // let (server, is_waiting) = unsafe {
-        //     let this = self.get_unchecked_mut();
-        //     (&this.server, &mut this.is_waiting)
-        // };
-        *this.is_waiting = false;
-
-        let data = this.server.data.lock();
-
-        match rcl_take_request_with_info::<<T as ServiceMsg>::Request>(&data.service) {
-            Ok((request, header)) => Poll::Ready(Ok((
-                ServerSend {
-                    data: this.server.data.clone(),
-                    request_id: header.request_id,
-                    _phantom: Default::default(),
-                    _unsync: Default::default(),
-                },
-                request,
-                Header { header },
-            ))),
-            Err(RCLError::ServiceTakeFailed) => {
+        let (server, is_waiting) = self.project();
+        *is_waiting = false;
+        let data = server.data.clone();
+        match server.try_recv() {
+            RecvResult::Ok(v) => Poll::Ready(Ok(v)),
+            RecvResult::Err(e) => Poll::Ready(Err(e)),
+            RecvResult::RetryLater => {
                 let mut waker = Some(cx.waker().clone());
                 let mut guard = SELECTOR.lock();
                 if let Err(e) = guard.send_command(
-                    &data.node.context,
+                    &data.lock().node.context,
                     async_selector::Command::Server(
-                        this.server.data.clone(),
+                        data.clone(),
                         Box::new(move || {
                             let w = waker.take().unwrap();
                             w.wake();
@@ -485,18 +478,15 @@ impl<'a, T: ServiceMsg> Future for AsyncReceiver<'a, T> {
                 ) {
                     return Poll::Ready(Err(e));
                 }
-
-                *this.is_waiting = true;
+                *is_waiting = true;
                 Poll::Pending
             }
-            Err(e) => Poll::Ready(Err(e.into())),
         }
     }
 }
 
-#[pinned_drop]
-impl<'a, T> PinnedDrop for AsyncReceiver<'a, T> {
-    fn drop(self: Pin<&mut Self>) {
+impl<'a, T> Drop for AsyncReceiver<'a, T> {
+    fn drop(&mut self) {
         if self.is_waiting {
             let cloned = self.server.data.clone();
             let data = self.server.data.lock();

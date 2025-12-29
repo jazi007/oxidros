@@ -1,11 +1,11 @@
 //! Action client.
 
 use oxidros_core::selector::CallbackResult;
-use pin_project::{pin_project, pinned_drop};
 use std::future::Future;
 use std::pin::Pin;
 use std::{ffi::CString, marker::PhantomData, sync::Arc, task::Poll, time::Duration};
 
+use crate::helper::is_unpin;
 use crate::{
     error::{DynError, RCLActionError, RCLActionResult, RCLError},
     get_allocator, is_halt,
@@ -332,15 +332,22 @@ impl<'a, T: ActionMsg> ClientGoalRecv<'a, T> {
     }
 }
 
-#[pin_project(PinnedDrop)]
 pub struct AsyncGoalReceiver<'a, T: ActionMsg> {
     client: ClientGoalRecv<'a, T>,
     is_waiting: bool,
 }
 
-#[pinned_drop]
-impl<'a, T: ActionMsg> PinnedDrop for AsyncGoalReceiver<'a, T> {
-    fn drop(self: Pin<&mut Self>) {
+impl<'a, T: ActionMsg> AsyncGoalReceiver<'a, T> {
+    fn project(self: std::pin::Pin<&mut Self>) -> (&ClientGoalRecv<'a, T>, &mut bool) {
+        unsafe {
+            let this = self.get_unchecked_mut();
+            (&this.client, &mut this.is_waiting)
+        }
+    }
+}
+
+impl<'a, T: ActionMsg> Drop for AsyncGoalReceiver<'a, T> {
+    fn drop(&mut self) {
         if self.is_waiting {
             let mut guard = SELECTOR.lock();
             let _ = guard.send_command(
@@ -359,42 +366,36 @@ impl<'a, T: ActionMsg> Future for AsyncGoalReceiver<'a, T> {
             return Poll::Ready(Err(Signaled.into()));
         }
 
-        let this = self.project();
-        *this.is_waiting = false;
-
-        match rcl_action_take_goal_response::<T>(&this.client.inner.client.data.client) {
-            Ok((response, header)) => {
-                if header.sequence_number == this.client.seq {
-                    return Poll::Ready(Ok((response, header)));
+        let (client, is_waiting) = self.project();
+        *is_waiting = false;
+        match client.try_recv() {
+            RecvResult::Ok(v) => Poll::Ready(Ok(v)),
+            RecvResult::Err(e) => Poll::Ready(Err(e)),
+            RecvResult::RetryLater => {
+                let mut waker = Some(cx.waker().clone());
+                let mut guard = SELECTOR.lock();
+                match guard.send_command(
+                    &client.inner.client.data.node.context,
+                    async_selector::Command::ActionClient {
+                        data: client.inner.client.data.clone(),
+                        feedback: Box::new(|| CallbackResult::Ok),
+                        status: Box::new(|| CallbackResult::Ok),
+                        goal: Box::new(move || {
+                            let w = waker.take().unwrap();
+                            w.wake();
+                            CallbackResult::Remove
+                        }),
+                        cancel: Box::new(|| CallbackResult::Ok),
+                        result: Box::new(|| CallbackResult::Ok),
+                    },
+                ) {
+                    Ok(_) => {
+                        *is_waiting = true;
+                        Poll::Pending
+                    }
+                    Err(e) => Poll::Ready(Err(e)),
                 }
             }
-            Err(RCLActionError::ClientTakeFailed) => {}
-            Err(e) => return Poll::Ready(Err(e.into())),
-        }
-
-        let mut waker = Some(cx.waker().clone());
-        let mut guard = SELECTOR.lock();
-
-        match guard.send_command(
-            &this.client.inner.client.data.node.context,
-            async_selector::Command::ActionClient {
-                data: this.client.inner.client.data.clone(),
-                feedback: Box::new(|| CallbackResult::Ok),
-                status: Box::new(|| CallbackResult::Ok),
-                goal: Box::new(move || {
-                    let w = waker.take().unwrap();
-                    w.wake();
-                    CallbackResult::Remove
-                }),
-                cancel: Box::new(|| CallbackResult::Ok),
-                result: Box::new(|| CallbackResult::Ok),
-            },
-        ) {
-            Ok(_) => {
-                *this.is_waiting = true;
-                Poll::Pending
-            }
-            Err(e) => Poll::Ready(Err(e)),
         }
     }
 }
@@ -442,15 +443,22 @@ impl<'a, T: ActionMsg> ClientCancelRecv<'a, T> {
     }
 }
 
-#[pin_project(PinnedDrop)]
 pub struct AsyncCancelReceiver<'a, T: ActionMsg> {
     client: ClientCancelRecv<'a, T>,
     is_waiting: bool,
 }
 
-#[pinned_drop]
-impl<'a, T: ActionMsg> PinnedDrop for AsyncCancelReceiver<'a, T> {
-    fn drop(self: Pin<&mut Self>) {
+impl<'a, T: ActionMsg> AsyncCancelReceiver<'a, T> {
+    fn project(self: std::pin::Pin<&mut Self>) -> (&ClientCancelRecv<'a, T>, &mut bool) {
+        unsafe {
+            let this = self.get_unchecked_mut();
+            (&this.client, &mut this.is_waiting)
+        }
+    }
+}
+
+impl<'a, T: ActionMsg> Drop for AsyncCancelReceiver<'a, T> {
+    fn drop(&mut self) {
         if self.is_waiting {
             let mut guard = SELECTOR.lock();
             let _ = guard.send_command(
@@ -469,42 +477,37 @@ impl<'a, T: ActionMsg> Future for AsyncCancelReceiver<'a, T> {
             return Poll::Ready(Err(Signaled.into()));
         }
 
-        let this = self.project();
-        *this.is_waiting = false;
+        let (client, is_waiting) = self.project();
+        *is_waiting = false;
+        match client.try_recv() {
+            RecvResult::Ok(v) => Poll::Ready(Ok(v)),
+            RecvResult::Err(e) => Poll::Ready(Err(e)),
+            RecvResult::RetryLater => {
+                let mut waker = Some(cx.waker().clone());
+                let mut guard = SELECTOR.lock();
 
-        match rcl_action_take_cancel_response(&this.client.inner.client.data.client) {
-            Ok((response, header)) => {
-                if header.sequence_number == this.client.seq {
-                    return Poll::Ready(Ok((response, header)));
+                match guard.send_command(
+                    &client.inner.client.data.node.context,
+                    async_selector::Command::ActionClient {
+                        data: client.inner.client.data.clone(),
+                        feedback: Box::new(|| CallbackResult::Ok),
+                        status: Box::new(|| CallbackResult::Ok),
+                        goal: Box::new(|| CallbackResult::Ok),
+                        cancel: Box::new(move || {
+                            let w = waker.take().unwrap();
+                            w.wake();
+                            CallbackResult::Remove
+                        }),
+                        result: Box::new(|| CallbackResult::Ok),
+                    },
+                ) {
+                    Ok(_) => {
+                        *is_waiting = true;
+                        Poll::Pending
+                    }
+                    Err(e) => Poll::Ready(Err(e)),
                 }
             }
-            Err(RCLActionError::ClientTakeFailed) => {}
-            Err(e) => return Poll::Ready(Err(e.into())),
-        }
-
-        let mut waker = Some(cx.waker().clone());
-        let mut guard = SELECTOR.lock();
-
-        match guard.send_command(
-            &this.client.inner.client.data.node.context,
-            async_selector::Command::ActionClient {
-                data: this.client.inner.client.data.clone(),
-                feedback: Box::new(|| CallbackResult::Ok),
-                status: Box::new(|| CallbackResult::Ok),
-                goal: Box::new(|| CallbackResult::Ok),
-                cancel: Box::new(move || {
-                    let w = waker.take().unwrap();
-                    w.wake();
-                    CallbackResult::Remove
-                }),
-                result: Box::new(|| CallbackResult::Ok),
-            },
-        ) {
-            Ok(_) => {
-                *this.is_waiting = true;
-                Poll::Pending
-            }
-            Err(e) => Poll::Ready(Err(e)),
         }
     }
 }
@@ -555,15 +558,22 @@ impl<'a, T: ActionMsg> ClientResultRecv<'a, T> {
     }
 }
 
-#[pin_project(PinnedDrop)]
 pub struct AsyncResultReceiver<'a, T: ActionMsg> {
     client: ClientResultRecv<'a, T>,
     is_waiting: bool,
 }
 
-#[pinned_drop]
-impl<'a, T: ActionMsg> PinnedDrop for AsyncResultReceiver<'a, T> {
-    fn drop(self: Pin<&mut Self>) {
+impl<'a, T: ActionMsg> AsyncResultReceiver<'a, T> {
+    fn project(self: std::pin::Pin<&mut Self>) -> (&ClientResultRecv<'a, T>, &mut bool) {
+        unsafe {
+            let this = self.get_unchecked_mut();
+            (&this.client, &mut this.is_waiting)
+        }
+    }
+}
+
+impl<'a, T: ActionMsg> Drop for AsyncResultReceiver<'a, T> {
+    fn drop(&mut self) {
         if self.is_waiting {
             let mut guard = SELECTOR.lock();
             let _ = guard.send_command(
@@ -582,56 +592,58 @@ impl<'a, T: ActionMsg> Future for AsyncResultReceiver<'a, T> {
             return Poll::Ready(Err(Signaled.into()));
         }
 
-        let this = self.project();
-        *this.is_waiting = false;
-
-        match rcl_action_take_result_response::<T>(&this.client.inner.client.data.client) {
-            Ok((response, header)) => {
-                if header.sequence_number == this.client.seq {
-                    return Poll::Ready(Ok((response, header)));
+        let (client, is_waiting) = self.project();
+        *is_waiting = false;
+        match client.try_recv() {
+            RecvResult::Ok(v) => Poll::Ready(Ok(v)),
+            RecvResult::Err(e) => Poll::Ready(Err(e)),
+            RecvResult::RetryLater => {
+                let mut waker = Some(cx.waker().clone());
+                let mut guard = SELECTOR.lock();
+                match guard.send_command(
+                    &client.inner.client.data.node.context,
+                    async_selector::Command::ActionClient {
+                        data: client.inner.client.data.clone(),
+                        feedback: Box::new(|| CallbackResult::Ok),
+                        status: Box::new(|| CallbackResult::Ok),
+                        goal: Box::new(|| CallbackResult::Ok),
+                        cancel: Box::new(|| CallbackResult::Ok),
+                        result: Box::new(move || {
+                            let w = waker.take().unwrap();
+                            w.wake();
+                            CallbackResult::Remove
+                        }),
+                    },
+                ) {
+                    Ok(_) => {
+                        *is_waiting = true;
+                        Poll::Pending
+                    }
+                    Err(e) => Poll::Ready(Err(e)),
                 }
             }
-            Err(RCLActionError::ClientTakeFailed) => {}
-            Err(e) => return Poll::Ready(Err(e.into())),
-        }
-
-        let mut waker = Some(cx.waker().clone());
-        let mut guard = SELECTOR.lock();
-
-        match guard.send_command(
-            &this.client.inner.client.data.node.context,
-            async_selector::Command::ActionClient {
-                data: this.client.inner.client.data.clone(),
-                feedback: Box::new(|| CallbackResult::Ok),
-                status: Box::new(|| CallbackResult::Ok),
-                goal: Box::new(|| CallbackResult::Ok),
-                cancel: Box::new(|| CallbackResult::Ok),
-                result: Box::new(move || {
-                    let w = waker.take().unwrap();
-                    w.wake();
-                    CallbackResult::Remove
-                }),
-            },
-        ) {
-            Ok(_) => {
-                *this.is_waiting = true;
-                Poll::Pending
-            }
-            Err(e) => Poll::Ready(Err(e)),
         }
     }
 }
 
-#[pin_project(PinnedDrop)]
 pub struct AsyncFeedbackReceiver<'a, T: ActionMsg> {
     client: &'a mut Client<T>,
     is_waiting: bool,
     _phantom: PhantomData<T>,
 }
 
-#[pinned_drop]
-impl<'a, T: ActionMsg> PinnedDrop for AsyncFeedbackReceiver<'a, T> {
-    fn drop(self: Pin<&mut Self>) {
+impl<'a, T: ActionMsg> AsyncFeedbackReceiver<'a, T> {
+    fn project(self: std::pin::Pin<&mut Self>) -> (&mut Client<T>, &mut bool) {
+        is_unpin::<&mut Client<T>>();
+        unsafe {
+            let this = self.get_unchecked_mut();
+            (&mut this.client, &mut this.is_waiting)
+        }
+    }
+}
+
+impl<'a, T: ActionMsg> Drop for AsyncFeedbackReceiver<'a, T> {
+    fn drop(&mut self) {
         if self.is_waiting {
             let mut guard = SELECTOR.lock();
             let _ = guard.send_command(
@@ -650,54 +662,59 @@ impl<'a, T: ActionMsg> Future for AsyncFeedbackReceiver<'a, T> {
             return Poll::Ready(Err(Signaled.into()));
         }
 
-        let this = self.project();
-        *this.is_waiting = false;
+        let (client, is_waiting) = self.project();
+        *is_waiting = false;
+        match client.try_recv_feedback() {
+            RecvResult::Ok(v) => Poll::Ready(Ok(v)),
+            RecvResult::Err(e) => Poll::Ready(Err(e)),
+            RecvResult::RetryLater => {
+                let mut waker = Some(cx.waker().clone());
+                let mut guard = SELECTOR.lock();
 
-        match rcl_action_take_feedback::<T>(&this.client.data.client) {
-            Ok(feedback) => {
-                return Poll::Ready(Ok(feedback));
+                match guard.send_command(
+                    &client.data.node.context,
+                    async_selector::Command::ActionClient {
+                        data: client.data.clone(),
+                        feedback: Box::new(move || {
+                            let w = waker.take().unwrap();
+                            w.wake();
+                            CallbackResult::Remove
+                        }),
+                        status: Box::new(|| CallbackResult::Ok),
+                        goal: Box::new(|| CallbackResult::Ok),
+                        cancel: Box::new(|| CallbackResult::Ok),
+                        result: Box::new(|| CallbackResult::Ok),
+                    },
+                ) {
+                    Ok(_) => {
+                        *is_waiting = true;
+                        Poll::Pending
+                    }
+                    Err(e) => Poll::Ready(Err(e)),
+                }
             }
-            Err(RCLActionError::ClientTakeFailed) => {}
-            Err(e) => return Poll::Ready(Err(e.into())),
-        }
-
-        let mut waker = Some(cx.waker().clone());
-        let mut guard = SELECTOR.lock();
-
-        match guard.send_command(
-            &this.client.data.node.context,
-            async_selector::Command::ActionClient {
-                data: this.client.data.clone(),
-                feedback: Box::new(move || {
-                    let w = waker.take().unwrap();
-                    w.wake();
-                    CallbackResult::Remove
-                }),
-                status: Box::new(|| CallbackResult::Ok),
-                goal: Box::new(|| CallbackResult::Ok),
-                cancel: Box::new(|| CallbackResult::Ok),
-                result: Box::new(|| CallbackResult::Ok),
-            },
-        ) {
-            Ok(_) => {
-                *this.is_waiting = true;
-                Poll::Pending
-            }
-            Err(e) => Poll::Ready(Err(e)),
         }
     }
 }
 
-#[pin_project(PinnedDrop)]
 pub struct AsyncStatusReceiver<'a, T: ActionMsg> {
     client: &'a mut Client<T>,
     is_waiting: bool,
     _phantom: PhantomData<T>,
 }
 
-#[pinned_drop]
-impl<'a, T: ActionMsg> PinnedDrop for AsyncStatusReceiver<'a, T> {
-    fn drop(self: Pin<&mut Self>) {
+impl<'a, T: ActionMsg> AsyncStatusReceiver<'a, T> {
+    fn project(self: std::pin::Pin<&mut Self>) -> (&mut Client<T>, &mut bool) {
+        is_unpin::<&mut Client<T>>();
+        unsafe {
+            let this = self.get_unchecked_mut();
+            (&mut this.client, &mut this.is_waiting)
+        }
+    }
+}
+
+impl<'a, T: ActionMsg> Drop for AsyncStatusReceiver<'a, T> {
+    fn drop(&mut self) {
         if self.is_waiting {
             let mut guard = SELECTOR.lock();
             let _ = guard.send_command(
@@ -716,40 +733,37 @@ impl<'a, T: ActionMsg> Future for AsyncStatusReceiver<'a, T> {
             return Poll::Ready(Err(Signaled.into()));
         }
 
-        let this = self.project();
-        *this.is_waiting = false;
+        let (client, is_waiting) = self.project();
+        *is_waiting = false;
+        match client.try_recv_status() {
+            RecvResult::Ok(v) => Poll::Ready(Ok(v)),
+            RecvResult::Err(e) => Poll::Ready(Err(e)),
+            RecvResult::RetryLater => {
+                let mut waker = Some(cx.waker().clone());
+                let mut guard = SELECTOR.lock();
 
-        match rcl_action_take_status(&this.client.data.client) {
-            Ok(status_array) => {
-                return Poll::Ready(Ok(status_array));
+                match guard.send_command(
+                    &client.data.node.context,
+                    async_selector::Command::ActionClient {
+                        data: client.data.clone(),
+                        feedback: Box::new(|| CallbackResult::Ok),
+                        status: Box::new(move || {
+                            let w = waker.take().unwrap();
+                            w.wake();
+                            CallbackResult::Remove
+                        }),
+                        goal: Box::new(|| CallbackResult::Ok),
+                        cancel: Box::new(|| CallbackResult::Ok),
+                        result: Box::new(|| CallbackResult::Ok),
+                    },
+                ) {
+                    Ok(_) => {
+                        *is_waiting = true;
+                        Poll::Pending
+                    }
+                    Err(e) => Poll::Ready(Err(e)),
+                }
             }
-            Err(RCLActionError::ClientTakeFailed) => {}
-            Err(e) => return Poll::Ready(Err(e.into())),
-        }
-
-        let mut waker = Some(cx.waker().clone());
-        let mut guard = SELECTOR.lock();
-
-        match guard.send_command(
-            &this.client.data.node.context,
-            async_selector::Command::ActionClient {
-                data: this.client.data.clone(),
-                feedback: Box::new(|| CallbackResult::Ok),
-                status: Box::new(move || {
-                    let w = waker.take().unwrap();
-                    w.wake();
-                    CallbackResult::Remove
-                }),
-                goal: Box::new(|| CallbackResult::Ok),
-                cancel: Box::new(|| CallbackResult::Ok),
-                result: Box::new(|| CallbackResult::Ok),
-            },
-        ) {
-            Ok(_) => {
-                *this.is_waiting = true;
-                Poll::Pending
-            }
-            Err(e) => Poll::Ready(Err(e)),
         }
     }
 }

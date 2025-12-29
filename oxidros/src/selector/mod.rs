@@ -70,11 +70,12 @@ use crate::{
         Header,
     },
     signal_handler::{self, Signaled},
-    topic::subscriber::{RCLSubscription, Subscriber, TakenMsg},
+    topic::subscriber::{RCLSubscription, Subscriber},
     PhantomUnsend, PhantomUnsync, RecvResult,
 };
 use oxidros_core::{
     delta_list::DeltaList,
+    message::TakenMsg,
     selector::{
         ActionHandler, CallbackResult, ConditionHandler, ParameterCallback, ServerCallback,
     },

@@ -1,3 +1,5 @@
+pub(crate) const fn is_unpin<T: Unpin>() {}
+
 #[cfg(feature = "statistics")]
 pub(crate) mod statistics {
     use serde::Serialize;
