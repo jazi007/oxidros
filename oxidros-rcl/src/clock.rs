@@ -1,4 +1,4 @@
-use crate::{error::RCLResult, get_allocator, rcl};
+use crate::{error::OResult, get_allocator, rcl};
 
 /// A clock. For now only SystemTime/ROSTime is implemented.
 #[derive(Debug)]
@@ -8,7 +8,7 @@ pub struct Clock {
 
 impl Clock {
     /// Create a clock.
-    pub fn new() -> RCLResult<Self> {
+    pub fn new() -> OResult<Self> {
         let mut clock = unsafe { std::mem::zeroed() };
 
         let guard = rcl::MT_UNSAFE_FN.lock();
@@ -24,7 +24,7 @@ impl Clock {
         self.clock
     }
 
-    pub fn get_now(&mut self) -> RCLResult<rcl::rcl_time_point_value_t> {
+    pub fn get_now(&mut self) -> OResult<rcl::rcl_time_point_value_t> {
         let mut now = unsafe { std::mem::zeroed() };
         rcl::MTSafeFn::rcl_clock_get_now(self.clock, &mut now)?;
         Ok(now)

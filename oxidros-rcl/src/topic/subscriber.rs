@@ -151,7 +151,7 @@
 //! `None` of the 2nd argument of `create_subscriber` is equivalent to `Some(Profile::default())`.
 
 use crate::{
-    error::{DynError, RCLError, RCLResult},
+    error::{DynError, OError, OResult},
     get_allocator,
     helper::is_unpin,
     is_halt,
@@ -223,7 +223,7 @@ impl<T: TypeSupport> Subscriber<T> {
         node: Arc<Node>,
         topic_name: &str,
         qos: Option<qos::Profile>,
-    ) -> RCLResult<Self> {
+    ) -> OResult<Self> {
         let mut subscription = Box::new(rcl::MTSafeFn::rcl_get_zero_initialized_subscription());
 
         let topic_name_c = CString::new(topic_name).unwrap_or_default();
@@ -260,7 +260,7 @@ impl<T: TypeSupport> Subscriber<T> {
         node: Arc<Node>,
         topic_name: &str,
         qos: Option<qos::Profile>,
-    ) -> RCLResult<Self> {
+    ) -> OResult<Self> {
         let mut subscription = Box::new(rcl::MTSafeFn::rcl_get_zero_initialized_subscription());
         let topic_name_c = CString::new(topic_name).unwrap_or_default();
         let mut options = Options::new(&qos.unwrap_or_default());
@@ -337,7 +337,7 @@ impl<T: TypeSupport> Subscriber<T> {
 
                 RecvResult::Ok(n)
             }
-            Err(RCLError::SubscriptionTakeFailed) => {
+            Err(OError::SubscriptionTakeFailed) => {
                 #[cfg(feature = "rcl_stat")]
                 self.subscription.measure_latency(start);
 
@@ -519,7 +519,7 @@ impl Options {
     }
 }
 
-fn take<T: 'static>(subscription: &Arc<RCLSubscription>) -> RCLResult<TakenMsg<T>> {
+fn take<T: 'static>(subscription: &Arc<RCLSubscription>) -> OResult<TakenMsg<T>> {
     if rcl::MTSafeFn::rcl_subscription_can_loan_messages(subscription.subscription.as_ref()) {
         take_loaned_message(subscription.clone()).map(move |x| TakenMsg::Loaned(Box::new(x)))
     } else {
@@ -529,7 +529,7 @@ fn take<T: 'static>(subscription: &Arc<RCLSubscription>) -> RCLResult<TakenMsg<T
 
 fn take_loaned_message<T>(
     subscription: Arc<RCLSubscription>,
-) -> RCLResult<SubscriberLoanedMessage<T>> {
+) -> OResult<SubscriberLoanedMessage<T>> {
     let guard = rcl::MT_UNSAFE_FN.lock();
     let message: *mut T = null_mut();
     guard
@@ -542,7 +542,7 @@ fn take_loaned_message<T>(
         .map(|_| SubscriberLoanedMessage::new(subscription, message))
 }
 
-fn rcl_take<T>(subscription: &rcl::rcl_subscription_t) -> RCLResult<T> {
+fn rcl_take<T>(subscription: &rcl::rcl_subscription_t) -> OResult<T> {
     let guard = rcl::MT_UNSAFE_FN.lock();
     let mut ros_message: T = unsafe { std::mem::zeroed() };
     match guard.rcl_take(

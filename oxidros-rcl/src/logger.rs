@@ -64,13 +64,13 @@
 //! ```
 
 use crate::{
-    error::{DynError, RCLResult},
+    error::{DynError, OResult},
     rcl,
 };
 use num_derive::{FromPrimitive, ToPrimitive};
 use std::ffi::CString;
 
-static INITIALIZER: std::sync::OnceLock<RCLResult<()>> = std::sync::OnceLock::new();
+static INITIALIZER: std::sync::OnceLock<OResult<()>> = std::sync::OnceLock::new();
 
 /// Get the function name called this macro.
 #[macro_export]
@@ -310,7 +310,7 @@ impl Logger {
     }
 }
 
-fn init_once() -> RCLResult<()> {
+fn init_once() -> OResult<()> {
     *INITIALIZER.get_or_init(|| {
         // initialize
         let guard = rcl::MT_UNSAFE_LOG_FN.lock();

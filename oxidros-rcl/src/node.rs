@@ -19,7 +19,7 @@ use libc::atexit;
 
 use crate::{
     context::{remove_context, Context},
-    error::{DynError, RCLResult},
+    error::{DynError, OResult},
     msg::{ServiceMsg, TypeSupport},
     parameter::ParameterServer,
     qos, rcl,
@@ -44,7 +44,7 @@ impl Node {
         name: &str,
         namespace: Option<&str>,
         options: NodeOptions,
-    ) -> RCLResult<Arc<Self>> {
+    ) -> OResult<Arc<Self>> {
         let mut node = rcl::MTSafeFn::rcl_get_zero_initialized_node();
 
         let name_c = CString::new(name).unwrap();
@@ -83,15 +83,15 @@ impl Node {
         &self.node as *const _ as *mut _
     }
 
-    pub fn get_name(&self) -> RCLResult<String> {
+    pub fn get_name(&self) -> OResult<String> {
         rcl::MTSafeFn::rcl_node_get_name(&self.node)
     }
 
-    pub fn get_fully_qualified_name(&self) -> RCLResult<String> {
+    pub fn get_fully_qualified_name(&self) -> OResult<String> {
         rcl::MTSafeFn::rcl_node_get_fully_qualified_name(&self.node)
     }
 
-    pub fn get_namespace(&self) -> RCLResult<String> {
+    pub fn get_namespace(&self) -> OResult<String> {
         rcl::MTSafeFn::rcl_node_get_namespace(&self.node)
     }
 
@@ -122,7 +122,7 @@ impl Node {
         self: &Arc<Self>,
         topic_name: &str,
         qos: Option<qos::Profile>,
-    ) -> RCLResult<Publisher<T>> {
+    ) -> OResult<Publisher<T>> {
         Publisher::new(self.clone(), topic_name, qos)
     }
 
@@ -148,7 +148,7 @@ impl Node {
         self: &Arc<Self>,
         topic_name: &str,
         qos: Option<qos::Profile>,
-    ) -> RCLResult<Publisher<T>> {
+    ) -> OResult<Publisher<T>> {
         Publisher::new_disable_loaned_message(self.clone(), topic_name, qos)
     }
 
@@ -172,7 +172,7 @@ impl Node {
         self: &Arc<Self>,
         topic_name: &str,
         qos: Option<qos::Profile>,
-    ) -> RCLResult<Subscriber<T>> {
+    ) -> OResult<Subscriber<T>> {
         Subscriber::new(self.clone(), topic_name, qos)
     }
 
@@ -196,7 +196,7 @@ impl Node {
         self: &Arc<Self>,
         topic_name: &str,
         qos: Option<qos::Profile>,
-    ) -> RCLResult<Subscriber<T>> {
+    ) -> OResult<Subscriber<T>> {
         Subscriber::new_disable_loaned_message(self.clone(), topic_name, qos)
     }
 
@@ -220,7 +220,7 @@ impl Node {
         self: &Arc<Self>,
         service_name: &str,
         qos: Option<qos::Profile>,
-    ) -> RCLResult<Server<T>> {
+    ) -> OResult<Server<T>> {
         Server::new(self.clone(), service_name, qos)
     }
 
@@ -244,7 +244,7 @@ impl Node {
         self: &Arc<Self>,
         service_name: &str,
         qos: Option<qos::Profile>,
-    ) -> RCLResult<Client<T>> {
+    ) -> OResult<Client<T>> {
         Client::new(self.clone(), service_name, qos)
     }
 }

@@ -125,7 +125,7 @@ impl Context {
         name: &str,
         namespace: Option<&str>,
         options: NodeOptions,
-    ) -> RCLResult<Arc<Node>> {
+    ) -> OResult<Arc<Node>> {
         let a = self.clone();
         Node::new(a, name, namespace, options)
     }
@@ -153,7 +153,7 @@ impl Context {
     /// - `RCLError::BadAlloc` if allocating memory failed, or
     /// - `RCLError::WaitSetInvalid` if the wait set is not destroyed properly, or
     /// - `RCLError::Error` if an unspecified error occurs.
-    pub fn create_selector(self: &Arc<Self>) -> RCLResult<Selector> {
+    pub fn create_selector(self: &Arc<Self>) -> OResult<Selector> {
         Selector::new(self.clone())
     }
 
@@ -183,7 +183,7 @@ pub(crate) struct InitOptions {
 
 impl InitOptions {
     /// Create options to initialize a context.
-    pub fn new() -> RCLResult<InitOptions> {
+    pub fn new() -> OResult<InitOptions> {
         // allocate options
         let mut options = rcl::MTSafeFn::rcl_get_zero_initialized_init_options();
 

@@ -7,7 +7,7 @@ use std::{ffi::CString, marker::PhantomData, sync::Arc, task::Poll, time::Durati
 
 use crate::helper::is_unpin;
 use crate::{
-    error::{DynError, RCLActionError, RCLActionResult, RCLError},
+    error::{DynError, OError, RCLActionError, RCLActionResult},
     get_allocator, is_halt,
     msg::{
         interfaces::action_msgs::{
@@ -120,7 +120,7 @@ where
             &mut is_available as *mut _,
         ) {
             Ok(()) => Ok(is_available),
-            Err(RCLActionError::RCLError(RCLError::NodeInvalid)) => {
+            Err(RCLActionError::RCLError(OError::NodeInvalid)) => {
                 // TODO: soft failure in case of shutdown context
                 eprintln!("Invalid node (the shutdown has started?)");
                 Ok(false)

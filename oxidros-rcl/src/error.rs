@@ -7,7 +7,7 @@ pub use oxidros_core::error::*;
 /// Convert a rcl-style, C-style, return value to a Rust-style value.
 /// If `n` indicates successful, this returns Ok(()),
 /// otherwise returns Err(_).
-pub(crate) fn ret_val_to_err(n: rcl::rcl_ret_t) -> RCLResult<()> {
+pub(crate) fn ret_val_to_err(n: rcl::rcl_ret_t) -> OResult<()> {
     if (n as u32) == rcl::RCL_RET_OK {
         Ok(())
     } else {

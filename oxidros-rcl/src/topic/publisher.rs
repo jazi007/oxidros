@@ -48,7 +48,7 @@
 //! `None` of the 2nd argument of `create_publisher` is equivalent to `Some(Profile::default())`.
 
 use crate::{
-    error::{DynError, RCLResult},
+    error::{DynError, OResult},
     get_allocator,
     msg::TypeSupport,
     node::Node,
@@ -103,7 +103,7 @@ impl<T: TypeSupport> Publisher<T> {
         node: Arc<Node>,
         topic_name: &str,
         qos: Option<qos::Profile>,
-    ) -> RCLResult<Self> {
+    ) -> OResult<Self> {
         let mut publisher = rcl::MTSafeFn::rcl_get_zero_initialized_publisher();
 
         let topic_name_c = CString::new(topic_name).unwrap_or_default();
@@ -138,7 +138,7 @@ impl<T: TypeSupport> Publisher<T> {
         node: Arc<Node>,
         topic_name: &str,
         qos: Option<qos::Profile>,
-    ) -> RCLResult<Self> {
+    ) -> OResult<Self> {
         let mut publisher = rcl::MTSafeFn::rcl_get_zero_initialized_publisher();
 
         let topic_name_c = CString::new(topic_name).unwrap_or_default();
@@ -178,7 +178,7 @@ impl<T: TypeSupport> Publisher<T> {
     }
 
     /// Borrows a memory chunk from the shared memory.
-    pub fn borrow_loaned_message(&self) -> RCLResult<PublisherLoanedMessage<T>> {
+    pub fn borrow_loaned_message(&self) -> OResult<PublisherLoanedMessage<T>> {
         PublisherLoanedMessage::new(self.publisher.clone())
     }
 

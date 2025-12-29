@@ -17,7 +17,7 @@ pub mod sequence;
 pub mod time;
 
 // Re-export commonly used items
-pub use error::{DynError, RCLActionError, RCLError};
+pub use error::{DynError, OError, RCLActionError};
 pub use msg::{
     ActionGoal, ActionMsg, ActionResult, GetUUID, GoalResponse, ResultResponse, ServiceMsg,
     TryClone, TypeSupport,

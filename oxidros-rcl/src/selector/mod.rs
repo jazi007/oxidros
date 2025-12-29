@@ -58,7 +58,7 @@ use self::guard_condition::{GuardCondition, RCLGuardCondition};
 use crate::{
     action::{self, handle::GoalHandle, SendGoalServiceRequest},
     context::Context,
-    error::{DynError, RCLActionResult, RCLError, RCLResult},
+    error::{DynError, OError, OResult, RCLActionResult},
     get_allocator,
     logger::{pr_error_in, pr_fatal_in, Logger},
     msg::{interfaces::action_msgs::msg::GoalInfo, ActionMsg, GetUUID, ServiceMsg, TypeSupport},
@@ -193,7 +193,7 @@ pub struct Selector {
 }
 
 impl Selector {
-    pub(crate) fn new(context: Arc<Context>) -> RCLResult<Self> {
+    pub(crate) fn new(context: Arc<Context>) -> OResult<Self> {
         let mut wait_set = rcl::MTSafeFn::rcl_get_zero_initialized_wait_set();
 
         {
@@ -1215,7 +1215,7 @@ impl Selector {
             let wait_start = SystemTime::now();
 
             match rcl::MTSafeFn::rcl_wait(&mut self.wait_set, timeout_nanos) {
-                Err(RCLError::Timeout) => (),
+                Err(OError::Timeout) => (),
                 Err(e) => return Err(e.into()),
                 _ => {
                     #[cfg(feature = "rcl_stat")]

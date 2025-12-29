@@ -1,6 +1,6 @@
 //! Goal handle representing each action goal.
 
-use oxidros_core::{RCLError, TryClone};
+use oxidros_core::{OError, TryClone};
 use parking_lot::Mutex;
 use std::{collections::BTreeMap, rc::Rc, sync::Arc};
 
@@ -114,7 +114,7 @@ where
 
         if let Some(reqs) = requests.remove(&goal_id) {
             for mut request_id in reqs {
-                let result = result.try_clone().ok_or(RCLError::BadAlloc)?;
+                let result = result.try_clone().ok_or(OError::BadAlloc)?;
                 let response = T::new_result_response(GoalStatus::Succeeded as u8, result);
 
                 match guard.rcl_action_send_result_response(
@@ -142,7 +142,7 @@ where
     fn update_result(&self, result: T::ResultContent) -> Result<(), DynError> {
         let mut results = self.results.lock();
         if results
-            .insert(self.goal_id, result.try_clone().ok_or(RCLError::BadAlloc)?)
+            .insert(self.goal_id, result.try_clone().ok_or(OError::BadAlloc)?)
             .is_some()
         {
             return Err(format!(

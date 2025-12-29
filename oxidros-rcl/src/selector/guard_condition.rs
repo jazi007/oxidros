@@ -1,4 +1,4 @@
-use crate::{context::Context, error::RCLResult, get_allocator, rcl};
+use crate::{context::Context, error::OResult, get_allocator, rcl};
 use std::sync::Arc;
 
 pub(crate) struct RCLGuardCondition {
@@ -30,7 +30,7 @@ pub(crate) struct GuardCondition {
 
 impl GuardCondition {
     #[allow(clippy::arc_with_non_send_sync)]
-    pub(crate) fn new(context: Arc<Context>) -> RCLResult<Self> {
+    pub(crate) fn new(context: Arc<Context>) -> OResult<Self> {
         let mut guard_condition = rcl::MTSafeFn::rcl_get_zero_initialized_guard_condition();
         let allocator = get_allocator();
 
@@ -50,7 +50,7 @@ impl GuardCondition {
         Ok(GuardCondition { cond })
     }
 
-    pub(crate) fn trigger(&self) -> RCLResult<()> {
+    pub(crate) fn trigger(&self) -> OResult<()> {
         let guard = rcl::MT_UNSAFE_FN.lock();
         guard.rcl_trigger_guard_condition(unsafe { self.cond.as_ptr_mut() })
     }

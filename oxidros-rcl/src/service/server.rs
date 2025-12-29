@@ -93,7 +93,7 @@ use super::Header;
 #[cfg(feature = "jazzy")]
 use crate::msg::interfaces::rosgraph_msgs::msg::Clock;
 use crate::{
-    error::{DynError, RCLError, RCLResult},
+    error::{DynError, OError, OResult},
     get_allocator,
     helper::is_unpin,
     is_halt,
@@ -166,11 +166,7 @@ pub struct Server<T> {
 }
 
 impl<T: ServiceMsg> Server<T> {
-    pub(crate) fn new(
-        node: Arc<Node>,
-        service_name: &str,
-        qos: Option<Profile>,
-    ) -> RCLResult<Self> {
+    pub(crate) fn new(node: Arc<Node>, service_name: &str, qos: Option<Profile>) -> OResult<Self> {
         let mut service = rcl::MTSafeFn::rcl_get_zero_initialized_service();
         let service_name = CString::new(service_name).unwrap_or_default();
         let profile = qos.unwrap_or_else(Profile::services_default);
@@ -203,7 +199,7 @@ impl<T: ServiceMsg> Server<T> {
         clock: &mut Clock,
         qos: Profile,
         introspection_state: RCLServiceIntrospection,
-    ) -> RCLResult<()> {
+    ) -> OResult<()> {
         let mut pub_opts = unsafe { rcl::rcl_publisher_get_default_options() };
         pub_opts.qos = (&qos).into();
 
@@ -274,7 +270,7 @@ impl<T: ServiceMsg> Server<T> {
         let (request, header) =
             match rcl_take_request_with_info::<<T as ServiceMsg>::Request>(&data.service) {
                 Ok(data) => data,
-                Err(RCLError::ServiceTakeFailed) => {
+                Err(OError::ServiceTakeFailed) => {
                     drop(data);
                     return RecvResult::RetryLater;
                 }
@@ -401,7 +397,7 @@ impl<T: ServiceMsg> ServerSend<T> {
     /// `data` should be immutable, but `rcl_send_response` provided
     /// by ROS2 takes normal pointers instead of `const` pointers.
     /// So, currently, `send` takes `data` as mutable.
-    pub fn send(mut self, data: &<T as ServiceMsg>::Response) -> Result<(), RCLError> {
+    pub fn send(mut self, data: &<T as ServiceMsg>::Response) -> Result<(), OError> {
         let server_data = self.data.lock();
         rcl::MTSafeFn::rcl_send_response(
             &server_data.service,
@@ -413,7 +409,7 @@ impl<T: ServiceMsg> ServerSend<T> {
 
 fn rcl_take_request_with_info<T>(
     service: &rcl::rcl_service_t,
-) -> RCLResult<(T, rcl::rmw_service_info_t)> {
+) -> OResult<(T, rcl::rmw_service_info_t)> {
     let mut header: rcl::rmw_service_info_t = unsafe { std::mem::zeroed() };
     let mut ros_request: T = unsafe { std::mem::zeroed() };
 

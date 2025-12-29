@@ -1,7 +1,7 @@
 use std::{ptr::null_mut, sync::Arc};
 
 use crate::{
-    error::{DynError, RCLResult},
+    error::{DynError, OResult},
     msg::TypeSupport,
     rcl,
 };
@@ -17,7 +17,7 @@ pub enum PublisherLoanedMessage<T: TypeSupport> {
 unsafe impl<T: Send + TypeSupport> Send for PublisherLoanedMessage<T> {}
 
 impl<T: TypeSupport> PublisherLoanedMessage<T> {
-    pub(crate) fn new(publisher: Arc<rcl::rcl_publisher_t>) -> RCLResult<Self> {
+    pub(crate) fn new(publisher: Arc<rcl::rcl_publisher_t>) -> OResult<Self> {
         if rcl::MTSafeFn::rcl_publisher_can_loan_messages(publisher.as_ref() as *const _) {
             Ok(Self::Loaned(Loaned::new(publisher)?))
         } else {
@@ -94,7 +94,7 @@ pub struct Loaned<T: TypeSupport> {
 }
 
 impl<T: TypeSupport> Loaned<T> {
-    pub(crate) fn new(publisher: Arc<rcl::rcl_publisher_t>) -> RCLResult<Self> {
+    pub(crate) fn new(publisher: Arc<rcl::rcl_publisher_t>) -> OResult<Self> {
         let mut chunk = null_mut();
         let guard = rcl::MT_UNSAFE_FN.lock();
         guard.rcl_borrow_loaned_message(

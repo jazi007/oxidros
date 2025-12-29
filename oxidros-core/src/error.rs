@@ -9,11 +9,11 @@ use std::{
 pub type DynError = Box<dyn Error + Send + Sync + 'static>;
 
 /// Result type using RCLError.
-pub type RCLResult<T> = Result<T, RCLError>;
+pub type OResult<T> = Result<T, OError>;
 
 /// Errors that can occur in RCL operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RCLError {
+pub enum OError {
     /// Generic error.
     Error,
 
@@ -129,13 +129,13 @@ pub enum RCLError {
     InvalidRetVal,
 }
 
-impl Display for RCLError {
+impl Display for OError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
     }
 }
 
-impl Error for RCLError {}
+impl Error for OError {}
 
 /// Result type using RCLActionError.
 pub type RCLActionResult<T> = Result<T, RCLActionError>;
@@ -171,7 +171,7 @@ pub enum RCLActionError {
     GoalEventInvalid,
 
     /// Generic RCL error occurred.
-    RCLError(RCLError),
+    RCLError(OError),
 
     /// Invalid return value (unknown error code).
     InvalidRetVal,
@@ -185,8 +185,8 @@ impl Display for RCLActionError {
 
 impl Error for RCLActionError {}
 
-impl From<RCLError> for RCLActionError {
-    fn from(err: RCLError) -> Self {
+impl From<OError> for RCLActionError {
+    fn from(err: OError) -> Self {
         RCLActionError::RCLError(err)
     }
 }

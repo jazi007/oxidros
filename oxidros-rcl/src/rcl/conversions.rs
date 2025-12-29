@@ -256,7 +256,7 @@ impl From<&super::rcl_variant_t> for oxidros_core::parameter::Value {
     }
 }
 
-impl From<RclRetErr> for oxidros_core::RCLError {
+impl From<RclRetErr> for oxidros_core::OError {
     fn from(value: RclRetErr) -> Self {
         let value = value.0 as u32;
         match value {
@@ -302,9 +302,9 @@ impl From<RclRetErr> for oxidros_core::RCLError {
     }
 }
 
-impl From<oxidros_core::RCLError> for RclRetErr {
-    fn from(value: oxidros_core::RCLError) -> Self {
-        use oxidros_core::RCLError::*;
+impl From<oxidros_core::OError> for RclRetErr {
+    fn from(value: oxidros_core::OError) -> Self {
+        use oxidros_core::OError::*;
         let err = match value {
             Error => super::RCL_RET_ERROR,
             Timeout => super::RCL_RET_TIMEOUT,
