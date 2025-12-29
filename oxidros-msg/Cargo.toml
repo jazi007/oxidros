@@ -12,7 +12,6 @@ authors.workspace = true
 
 [dependencies]
 oxidros-core = { path = "../oxidros-core" }
-oxidros-rcl = { path = "../oxidros-rcl" }
 log.workspace = true
 widestring = "1.2.1"
 

@@ -634,26 +634,10 @@ checksum = "2839e79665f131bdb5782e51f2c6c9599c133c6098982a54c794358bf432529c"
 
 [[package]]
 name = "oxidros"
-version = "0.4.6"
+version = "0.1.0"
 dependencies = [
- "crossbeam-channel",
- "futures-util",
- "libc",
- "memac",
- "num-derive",
- "num-traits",
- "once_cell",
  "oxidros-build",
- "oxidros-core",
- "oxidros-msg",
  "oxidros-rcl",
- "parking_lot",
- "rand",
- "regex",
- "serde",
- "serde_json",
- "signal-hook",
- "tokio",
 ]
 
 [[package]]
@@ -678,17 +662,31 @@ dependencies = [
  "log",
  "oxidros-build",
  "oxidros-core",
- "oxidros-rcl",
  "ros2-msg-gen",
  "widestring",
 ]
 
 [[package]]
 name = "oxidros-rcl"
-version = "0.1.0"
+version = "0.4.6"
 dependencies = [
+ "crossbeam-channel",
+ "futures-util",
+ "libc",
+ "memac",
+ "num-derive",
+ "num-traits",
+ "once_cell",
  "oxidros-build",
  "oxidros-core",
+ "oxidros-msg",
+ "parking_lot",
+ "rand",
+ "regex",
+ "serde",
+ "serde_json",
+ "signal-hook",
+ "tokio",
 ]
 
 [[package]]

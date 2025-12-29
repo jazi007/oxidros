@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    "oxidros",
     "oxidros-core",
     "oxidros-msg",
     "oxidros-rcl",
@@ -9,7 +8,7 @@ members = [
     "oxidros-build",
     "idl_parser",
     "examples/ros2msg_example",
-    "examples/simple",
+    "examples/simple", "oxidros",
 ]
 resolver = "2"
 

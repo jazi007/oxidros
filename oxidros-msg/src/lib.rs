@@ -23,7 +23,6 @@ use std::{ffi::CString, fmt::Display, mem::transmute};
 pub mod rcl {
     // Re-export C types from runtime_c
     pub use crate::runtime_c::*;
-    pub use oxidros_rcl::rosidl_action_type_support_t;
 }
 
 pub mod primitives;

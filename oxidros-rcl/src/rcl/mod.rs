@@ -1,0 +1,1152 @@
+//! RCL bindings and safe wrappers.
+//!
+//! This module re-exports all types from oxidros_rcl and adds safe wrappers
+//! around the C functions.
+
+#![allow(dead_code)]
+#![allow(non_upper_case_globals)]
+#![allow(non_camel_case_types)]
+#![allow(deref_nullptr)]
+#![allow(non_snake_case)]
+#![allow(improper_ctypes)]
+#![allow(clippy::upper_case_acronyms)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clashing_extern_declarations)]
+
+use regex::Regex;
+
+pub(crate) mod conversions;
+use std::{collections::BTreeMap, ffi::CStr};
+
+/// A wrapper type around rcl_ret_t
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct RclRetErr(pub rcl_ret_t);
+
+// Include the generated RCL bindings
+include!(concat!(env!("OUT_DIR"), "/rcl.rs"));
+
+use crate::{
+    error::{action_ret_val_to_err, ret_val_to_err, RCLActionResult, RCLError, RCLResult},
+    parameter::Value,
+};
+use once_cell::sync::Lazy;
+use parking_lot::Mutex;
+
+pub(crate) static MT_UNSAFE_FN: Lazy<Mutex<MTUnsafeFn>> =
+    Lazy::new(|| Mutex::new(MTUnsafeFn::new()));
+
+pub(crate) static MT_UNSAFE_LOG_FN: Lazy<Mutex<MTUnsafeLogFn>> =
+    Lazy::new(|| Mutex::new(MTUnsafeLogFn::new()));
+
+pub(crate) struct MTUnsafeFn;
+pub(crate) struct MTUnsafeLogFn;
+
+// copied from https://github.com/ros2/rclcpp/blob/rolling/rclcpp/src/rclcpp/parameter_map.cpp
+fn is_node_name_matched(node_name: &str, node_fqn: &str) -> bool {
+    let regex = node_name.replace("/*", "(/\\w+)");
+    Regex::new(&regex)
+        .map(|re| re.is_match(node_fqn))
+        .unwrap_or(false)
+}
+
+impl MTUnsafeFn {
+    fn new() -> Self {
+        Self
+    }
+
+    pub fn rcl_init(
+        &self,
+        argc: ::std::os::raw::c_int,
+        argv: *const *const ::std::os::raw::c_char,
+        options: *const rcl_init_options_t,
+        context: *mut rcl_context_t,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_init(argc, argv, options, context) })
+    }
+
+    pub fn rcl_context_fini(&self, context: *mut rcl_context_t) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_context_fini(context) })
+    }
+
+    pub fn rcl_init_options_init(
+        &self,
+        init_options: *mut rcl_init_options_t,
+        allocator: rcl_allocator_t,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_init_options_init(init_options, allocator) })
+    }
+
+    pub fn rcl_init_options_fini(&self, init_options: *mut rcl_init_options_t) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_init_options_fini(init_options) })
+    }
+
+    pub fn rcl_node_init(
+        &self,
+        node: *mut rcl_node_t,
+        name: *const ::std::os::raw::c_char,
+        namespace_: *const ::std::os::raw::c_char,
+        context: *mut rcl_context_t,
+        options: *const rcl_node_options_t,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_node_init(node, name, namespace_, context, options) })
+    }
+
+    pub fn rcl_node_fini(&self, node: *mut rcl_node_t) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_node_fini(node) })
+    }
+
+    pub fn rcl_node_options_fini(&self, options: *mut rcl_node_options_t) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_node_options_fini(options) })
+    }
+
+    pub fn rcl_publisher_init(
+        &self,
+        publisher: *mut rcl_publisher_t,
+        node: *const rcl_node_t,
+        type_support: *const rosidl_message_type_support_t,
+        topic_name: *const ::std::os::raw::c_char,
+        options: *const rcl_publisher_options_t,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe {
+            self::rcl_publisher_init(publisher, node, type_support, topic_name, options)
+        })
+    }
+
+    pub fn rcl_publisher_fini(
+        &self,
+        publisher: *mut rcl_publisher_t,
+        node: *mut rcl_node_t,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_publisher_fini(publisher, node) })
+    }
+
+    pub fn rcl_subscription_fini(
+        &self,
+        subscription: *mut rcl_subscription_t,
+        node: *mut rcl_node_t,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_subscription_fini(subscription, node) })
+    }
+
+    pub fn rcl_subscription_init(
+        &self,
+        subscription: *mut rcl_subscription_t,
+        node: *const rcl_node_t,
+        type_support: *const rosidl_message_type_support_t,
+        topic_name: *const ::std::os::raw::c_char,
+        options: *const rcl_subscription_options_t,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe {
+            self::rcl_subscription_init(subscription, node, type_support, topic_name, options)
+        })
+    }
+
+    pub fn rcl_take(
+        &self,
+        subscription: *const rcl_subscription_t,
+        ros_message: *mut ::std::os::raw::c_void,
+        message_info: *mut rmw_message_info_t,
+        allocation: *mut rmw_subscription_allocation_t,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe {
+            self::rcl_take(subscription, ros_message, message_info, allocation)
+        })
+    }
+
+    pub fn rcl_wait_set_init(
+        &self,
+        wait_set: *mut rcl_wait_set_t,
+        number_of_subscriptions: usize,
+        number_of_guard_conditions: usize,
+        number_of_timers: usize,
+        number_of_clients: usize,
+        number_of_services: usize,
+        number_of_events: usize,
+        context: *mut rcl_context_t,
+        allocator: rcl_allocator_t,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe {
+            self::rcl_wait_set_init(
+                wait_set,
+                number_of_subscriptions,
+                number_of_guard_conditions,
+                number_of_timers,
+                number_of_clients,
+                number_of_services,
+                number_of_events,
+                context,
+                allocator,
+            )
+        })
+    }
+
+    pub fn rcl_wait_set_clear(&self, wait_set: *mut rcl_wait_set_t) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_wait_set_clear(wait_set) })
+    }
+
+    pub fn rcl_wait_set_resize(
+        &self,
+        wait_set: *mut rcl_wait_set_t,
+        subscriptions_size: usize,
+        guard_conditions_size: usize,
+        timers_size: usize,
+        clients_size: usize,
+        services_size: usize,
+        events_size: usize,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe {
+            self::rcl_wait_set_resize(
+                wait_set,
+                subscriptions_size,
+                guard_conditions_size,
+                timers_size,
+                clients_size,
+                services_size,
+                events_size,
+            )
+        })
+    }
+
+    pub fn rcl_wait_set_add_subscription(
+        &self,
+        wait_set: *mut rcl_wait_set_t,
+        subscription: *const rcl_subscription_t,
+        index: *mut usize,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe {
+            self::rcl_wait_set_add_subscription(wait_set, subscription, index)
+        })
+    }
+
+    pub fn rcl_wait_set_fini(&self, wait_set: *mut rcl_wait_set_t) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_wait_set_fini(wait_set) })
+    }
+
+    pub fn rcl_guard_condition_init(
+        &self,
+        guard_condition: *mut rcl_guard_condition_t,
+        context: *mut rcl_context_t,
+        options: rcl_guard_condition_options_t,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_guard_condition_init(guard_condition, context, options) })
+    }
+
+    pub fn rcl_trigger_guard_condition(
+        &self,
+        guard_condition: *mut rcl_guard_condition_t,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_trigger_guard_condition(guard_condition) })
+    }
+
+    pub fn rcl_guard_condition_fini(
+        &self,
+        guard_condition: *mut rcl_guard_condition_t,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_guard_condition_fini(guard_condition) })
+    }
+
+    pub fn rcl_wait_set_add_guard_condition(
+        &self,
+        wait_set: *mut rcl_wait_set_t,
+        guard_condition: *const rcl_guard_condition_t,
+        index: *mut usize,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe {
+            self::rcl_wait_set_add_guard_condition(wait_set, guard_condition, index)
+        })
+    }
+
+    pub fn rcl_service_init(
+        &self,
+        service: *mut rcl_service_t,
+        node: *const rcl_node_t,
+        type_support: *const rosidl_service_type_support_t,
+        service_name: *const ::std::os::raw::c_char,
+        options: *const rcl_service_options_t,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe {
+            self::rcl_service_init(service, node, type_support, service_name, options)
+        })
+    }
+
+    pub fn rcl_service_fini(
+        &self,
+        service: *mut rcl_service_t,
+        node: *mut rcl_node_t,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_service_fini(service, node) })
+    }
+
+    pub fn rcl_take_request_with_info(
+        &self,
+        service: *const rcl_service_t,
+        request_header: *mut rmw_service_info_t,
+        ros_request: *mut ::std::os::raw::c_void,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe {
+            self::rcl_take_request_with_info(service, request_header, ros_request)
+        })
+    }
+
+    pub fn rcl_client_init(
+        &self,
+        client: *mut rcl_client_t,
+        node: *const rcl_node_t,
+        type_support: *const rosidl_service_type_support_t,
+        service_name: *const ::std::os::raw::c_char,
+        options: *const rcl_client_options_t,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe {
+            self::rcl_client_init(client, node, type_support, service_name, options)
+        })
+    }
+
+    pub fn rcl_client_fini(
+        &self,
+        client: *mut rcl_client_t,
+        node: *mut rcl_node_t,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_client_fini(client, node) })
+    }
+
+    pub fn rcl_take_response_with_info(
+        &self,
+        client: *const rcl_client_t,
+        request_header: *mut rmw_service_info_t,
+        ros_response: *mut ::std::os::raw::c_void,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe {
+            self::rcl_take_response_with_info(client, request_header, ros_response)
+        })
+    }
+
+    pub fn rcl_wait_set_add_client(
+        &self,
+        wait_set: *mut rcl_wait_set_t,
+        client: *const rcl_client_t,
+        index: *mut usize,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_wait_set_add_client(wait_set, client, index) })
+    }
+
+    pub fn rcl_wait_set_add_service(
+        &self,
+        wait_set: *mut rcl_wait_set_t,
+        service: *const rcl_service_t,
+        index: *mut usize,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_wait_set_add_service(wait_set, service, index) })
+    }
+
+    pub fn rcl_borrow_loaned_message(
+        &self,
+        publisher: *const rcl_publisher_t,
+        type_support: *const rosidl_message_type_support_t,
+        ros_message: *mut *mut ::std::os::raw::c_void,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe {
+            self::rcl_borrow_loaned_message(publisher, type_support, ros_message)
+        })
+    }
+
+    pub fn rcl_return_loaned_message_from_publisher(
+        &self,
+        publisher: *const rcl_publisher_t,
+        loaned_message: *mut ::std::os::raw::c_void,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe {
+            self::rcl_return_loaned_message_from_publisher(publisher, loaned_message)
+        })
+    }
+
+    pub fn rcl_take_loaned_message(
+        &self,
+        subscription: *const rcl_subscription_t,
+        loaned_message: *mut *mut ::std::os::raw::c_void,
+        message_info: *mut rmw_message_info_t,
+        allocation: *mut rmw_subscription_allocation_t,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe {
+            self::rcl_take_loaned_message(subscription, loaned_message, message_info, allocation)
+        })
+    }
+
+    pub fn rcl_ros_clock_init(
+        &self,
+        clock: *mut rcl_clock_t,
+        allocator: *mut rcl_allocator_t,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_ros_clock_init(clock, allocator) })
+    }
+
+    pub fn rcl_ros_clock_fini(&self, clock: *mut rcl_clock_t) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_ros_clock_fini(clock) })
+    }
+
+    pub fn rcl_return_loaned_message_from_subscription(
+        &self,
+        subscription: *const rcl_subscription_t,
+        loaned_message: *mut ::std::os::raw::c_void,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe {
+            self::rcl_return_loaned_message_from_subscription(subscription, loaned_message)
+        })
+    }
+
+    pub fn rcl_action_client_init(
+        &self,
+        action_client: *mut rcl_action_client_t,
+        node: *mut rcl_node_t,
+        type_support: *const rosidl_action_type_support_t,
+        action_name: *const ::std::os::raw::c_char,
+        options: *const rcl_action_client_options_t,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_client_init(action_client, node, type_support, action_name, options)
+        })
+    }
+
+    pub fn rcl_action_client_fini(
+        &self,
+        action_client: *mut rcl_action_client_t,
+        node: *mut rcl_node_t,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe { self::rcl_action_client_fini(action_client, node) })
+    }
+
+    pub fn rcl_action_server_is_available(
+        &self,
+        node: *const rcl_node_t,
+        client: *const rcl_action_client_t,
+        is_available: *mut bool,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_server_is_available(node, client, is_available)
+        })
+    }
+
+    pub fn rcl_action_take_goal_response(
+        &self,
+        action_client: *const rcl_action_client_t,
+        response_header: *mut rmw_request_id_t,
+        ros_goal_response: *mut ::std::os::raw::c_void,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_take_goal_response(action_client, response_header, ros_goal_response)
+        })
+    }
+
+    pub fn rcl_action_goal_handle_get_status(
+        &self,
+        goal_handle: *const rcl_action_goal_handle_t,
+        status: *mut rcl_action_goal_state_t,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_goal_handle_get_status(goal_handle, status)
+        })
+    }
+
+    pub fn rcl_action_update_goal_state(
+        &self,
+        goal_handle: *mut rcl_action_goal_handle_t,
+        new_state: rcl_action_goal_event_t,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe { self::rcl_action_update_goal_state(goal_handle, new_state) })
+    }
+
+    pub fn rcl_action_goal_handle_fini(
+        &self,
+        goal_handle: *mut rcl_action_goal_handle_t,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe { self::rcl_action_goal_handle_fini(goal_handle) })
+    }
+
+    pub fn rcl_action_take_feedback(
+        &self,
+        action_client: *const rcl_action_client_t,
+        ros_feedback: *mut ::std::os::raw::c_void,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_take_feedback(action_client, ros_feedback)
+        })
+    }
+
+    pub fn rcl_action_take_status(
+        &self,
+        action_client: *const rcl_action_client_t,
+        ros_status_array: *mut ::std::os::raw::c_void,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_take_status(action_client, ros_status_array)
+        })
+    }
+
+    pub fn rcl_action_take_result_request(
+        &self,
+        action_server: *const rcl_action_server_t,
+        request_header: *mut rmw_request_id_t,
+        ros_result_request: *mut ::std::os::raw::c_void,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_take_result_request(action_server, request_header, ros_result_request)
+        })
+    }
+
+    pub fn rcl_action_send_result_response(
+        &self,
+        action_server: *const rcl_action_server_t,
+        response_header: *mut rmw_request_id_t,
+        ros_result_response: *mut ::std::os::raw::c_void,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_send_result_response(
+                action_server,
+                response_header,
+                ros_result_response,
+            )
+        })
+    }
+
+    pub fn rcl_action_take_result_response(
+        &self,
+        action_client: *const rcl_action_client_t,
+        response_header: *mut rmw_request_id_t,
+        ros_result: *mut ::std::os::raw::c_void,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_take_result_response(action_client, response_header, ros_result)
+        })
+    }
+
+    pub fn rcl_action_send_cancel_request(
+        &self,
+        action_client: *const rcl_action_client_t,
+        ros_cancel_request: *const ::std::os::raw::c_void,
+        sequence_number: *mut i64,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_send_cancel_request(action_client, ros_cancel_request, sequence_number)
+        })
+    }
+
+    pub fn rcl_action_take_cancel_response(
+        &self,
+        action_client: *const rcl_action_client_t,
+        response_header: *mut rmw_request_id_t,
+        ros_cancel_response: *mut ::std::os::raw::c_void,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_take_cancel_response(
+                action_client,
+                response_header,
+                ros_cancel_response,
+            )
+        })
+    }
+
+    pub fn rcl_action_server_init(
+        &self,
+        action_server: *mut rcl_action_server_t,
+        node: *mut rcl_node_t,
+        clock: *mut rcl_clock_t,
+        type_support: *const rosidl_action_type_support_t,
+        action_name: *const ::std::os::raw::c_char,
+        options: *const rcl_action_server_options_t,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_server_init(
+                action_server,
+                node,
+                clock,
+                type_support,
+                action_name,
+                options,
+            )
+        })
+    }
+
+    pub fn rcl_action_server_fini(
+        &self,
+        action_server: *mut rcl_action_server_t,
+        node: *mut rcl_node_t,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe { self::rcl_action_server_fini(action_server, node) })
+    }
+
+    pub fn rcl_action_publish_feedback(
+        &self,
+        action_server: *const rcl_action_server_t,
+        ros_feedback: *mut ::std::os::raw::c_void,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_publish_feedback(action_server, ros_feedback)
+        })
+    }
+
+    pub fn rcl_action_publish_status(
+        &self,
+        action_server: *const rcl_action_server_t,
+        status_message: *const ::std::os::raw::c_void,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_publish_status(action_server, status_message)
+        })
+    }
+
+    pub fn rcl_action_get_goal_status_array(
+        &self,
+        action_server: *const rcl_action_server_t,
+        status_message: *mut rcl_action_goal_status_array_t,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_get_goal_status_array(action_server, status_message)
+        })
+    }
+
+    pub fn rcl_action_take_goal_request(
+        &self,
+        action_server: *const rcl_action_server_t,
+        request_header: *mut rmw_request_id_t,
+        ros_goal_request: *mut ::std::os::raw::c_void,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_take_goal_request(action_server, request_header, ros_goal_request)
+        })
+    }
+
+    pub fn rcl_action_send_goal_response(
+        &self,
+        action_server: *const rcl_action_server_t,
+        response_header: *mut rmw_request_id_t,
+        ros_goal_response: *mut ::std::os::raw::c_void,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_send_goal_response(action_server, response_header, ros_goal_response)
+        })
+    }
+
+    pub fn rcl_action_accept_new_goal(
+        &self,
+        action_server: *mut rcl_action_server_t,
+        goal_info: *const rcl_action_goal_info_t,
+    ) -> *mut rcl_action_goal_handle_t {
+        unsafe { self::rcl_action_accept_new_goal(action_server, goal_info) }
+    }
+
+    pub fn rcl_action_take_cancel_request(
+        &self,
+        action_server: *const rcl_action_server_t,
+        request_header: *mut rmw_request_id_t,
+        ros_cancel_request: *mut ::std::os::raw::c_void,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_take_cancel_request(action_server, request_header, ros_cancel_request)
+        })
+    }
+
+    pub fn rcl_action_process_cancel_request(
+        &self,
+        action_server: *const rcl_action_server_t,
+        cancel_request: *const rcl_action_cancel_request_t,
+        cancel_response: *mut rcl_action_cancel_response_t,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_process_cancel_request(action_server, cancel_request, cancel_response)
+        })
+    }
+
+    pub fn rcl_action_send_cancel_response(
+        &self,
+        action_server: *const rcl_action_server_t,
+        response_header: *mut rmw_request_id_t,
+        ros_cancel_response: *mut ::std::os::raw::c_void,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_send_cancel_response(
+                action_server,
+                response_header,
+                ros_cancel_response,
+            )
+        })
+    }
+
+    pub fn rcl_action_wait_set_add_action_client(
+        &self,
+        wait_set: *mut rcl_wait_set_t,
+        action_client: *const rcl_action_client_t,
+        client_index: *mut usize,
+        subscription_index: *mut usize,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_wait_set_add_action_client(
+                wait_set,
+                action_client,
+                client_index,
+                subscription_index,
+            )
+        })
+    }
+
+    pub fn rcl_action_wait_set_add_action_server(
+        &self,
+        wait_set: *mut rcl_wait_set_t,
+        action_server: *const rcl_action_server_t,
+        service_index: *mut usize,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_wait_set_add_action_server(wait_set, action_server, service_index)
+        })
+    }
+
+    pub fn rcl_action_server_wait_set_get_entities_ready(
+        &self,
+        wait_set: *const rcl_wait_set_t,
+        action_server: *const rcl_action_server_t,
+        is_goal_request_ready: *mut bool,
+        is_cancel_request_ready: *mut bool,
+        is_result_request_ready: *mut bool,
+        is_goal_expired: *mut bool,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_server_wait_set_get_entities_ready(
+                wait_set,
+                action_server,
+                is_goal_request_ready,
+                is_cancel_request_ready,
+                is_result_request_ready,
+                is_goal_expired,
+            )
+        })
+    }
+
+    pub fn rcl_action_client_wait_set_get_entities_ready(
+        &self,
+        wait_set: *const rcl_wait_set_t,
+        action_client: *const rcl_action_client_t,
+        is_feedback_ready: *mut bool,
+        is_status_ready: *mut bool,
+        is_goal_response_ready: *mut bool,
+        is_cancel_response_ready: *mut bool,
+        is_result_response_ready: *mut bool,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_client_wait_set_get_entities_ready(
+                wait_set,
+                action_client,
+                is_feedback_ready,
+                is_status_ready,
+                is_goal_response_ready,
+                is_cancel_response_ready,
+                is_result_response_ready,
+            )
+        })
+    }
+
+    pub fn rcutils_reset_error(&self) {
+        unsafe { self::rcutils_reset_error() };
+    }
+
+    pub fn rcl_logging_configure(
+        &self,
+        global_args: *const rcl_arguments_t,
+        allocator: *const rcl_allocator_t,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_logging_configure(global_args, allocator) })
+    }
+
+    pub fn rcl_logging_fini(&self) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_logging_fini() })
+    }
+
+    /// This implementation is based on [rclcpp rclcpp::parameter_map_from](https://github.com/ros2/rclcpp/blob/rolling/rclcpp/src/rclcpp/parameter_map.cpp)
+    #[allow(clippy::useless_conversion)]
+    pub fn parameter_map(
+        &mut self,
+        node_fqn: &str,
+        arguments: *const rcl_arguments_t,
+    ) -> RCLResult<BTreeMap<String, Value>> {
+        let mut params_map = BTreeMap::new();
+        let mut params: Box<*mut rcl_params_t> = Box::new(std::ptr::null_mut());
+        let ret = unsafe { self::rcl_arguments_get_param_overrides(arguments, params.as_mut()) };
+        ret_val_to_err(ret)?;
+        if params.is_null() {
+            return Ok(params_map);
+        }
+
+        let node_names = unsafe {
+            std::slice::from_raw_parts(
+                (*(*params.as_ref())).node_names,
+                (*(*params.as_ref())).num_nodes.try_into().unwrap(),
+            )
+        };
+
+        let node_params = unsafe {
+            std::slice::from_raw_parts(
+                (*(*params.as_ref())).params,
+                (*(*params.as_ref())).num_nodes.try_into().unwrap(),
+            )
+        };
+
+        for (nn, np) in node_names.iter().zip(node_params) {
+            let c_node_name = unsafe { CStr::from_ptr(*nn) };
+            let Ok(node_name) = c_node_name.to_str() else {
+                continue;
+            };
+            let fqn = if node_name.chars().next().unwrap_or('/').eq(&'/') {
+                node_name.to_owned()
+            } else {
+                format!("/{}", node_name)
+            };
+            if !is_node_name_matched(&fqn, node_fqn) {
+                continue;
+            }
+            let (param_names, param_values) = unsafe {
+                (
+                    std::slice::from_raw_parts(
+                        np.parameter_names,
+                        np.num_params.try_into().unwrap(),
+                    ),
+                    std::slice::from_raw_parts(
+                        np.parameter_values,
+                        np.num_params.try_into().unwrap(),
+                    ),
+                )
+            };
+            for (s, v) in param_names.iter().zip(param_values) {
+                let s = unsafe { CStr::from_ptr(*s) };
+                if let Ok(key) = s.to_str() {
+                    params_map.insert(key.to_owned(), v.into());
+                }
+            }
+        }
+        Ok(params_map)
+    }
+
+    pub fn rcl_service_server_is_available(
+        &self,
+        node: *const rcl_node_t,
+        client: *const rcl_client_t,
+    ) -> RCLResult<bool> {
+        let mut available = false;
+        let ret = unsafe { self::rcl_service_server_is_available(node, client, &mut available) };
+        ret_val_to_err(ret)?;
+        Ok(available)
+    }
+
+    #[cfg(feature = "jazzy")]
+    pub fn rcl_service_configure_service_introspection(
+        &self,
+        service: *mut rcl_service_t,
+        node: *mut rcl_node_t,
+        clock: *mut rcl_clock_t,
+        type_support: *const rosidl_service_type_support_t,
+        publisher_options: rcl_publisher_options_t,
+        introspection_state: rcl_service_introspection_state_t,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe {
+            self::rcl_service_configure_service_introspection(
+                service,
+                node,
+                clock,
+                type_support,
+                publisher_options,
+                introspection_state,
+            )
+        })
+    }
+}
+
+impl MTUnsafeLogFn {
+    fn new() -> Self {
+        Self
+    }
+
+    pub fn rcutils_logging_initialize(&self) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcutils_logging_initialize() })
+    }
+
+    pub fn rcutils_logging_logger_is_enabled_for(
+        &self,
+        name: *const ::std::os::raw::c_char,
+        severity: i32,
+    ) -> bool {
+        unsafe { self::rcutils_logging_logger_is_enabled_for(name, severity) }
+    }
+
+    pub fn rcutils_log(
+        &self,
+        location: *const rcutils_log_location_t,
+        severity: ::std::os::raw::c_int,
+        name: *const ::std::os::raw::c_char,
+        format: *const ::std::os::raw::c_char,
+    ) {
+        unsafe { self::rcutils_log(location, severity, name, format) }
+    }
+}
+
+pub(crate) struct MTSafeFn;
+
+impl MTSafeFn {
+    pub fn rcl_get_zero_initialized_context() -> rcl_context_t {
+        unsafe { self::rcl_get_zero_initialized_context() }
+    }
+
+    pub fn rcl_context_is_valid(context: *const rcl_context_t) -> bool {
+        unsafe { self::rcl_context_is_valid(context) }
+    }
+
+    pub fn rcl_shutdown(context: *mut rcl_context_t) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_shutdown(context) })
+    }
+
+    pub fn rcutils_get_default_allocator() -> rcutils_allocator_t {
+        unsafe { self::rcutils_get_default_allocator() }
+    }
+
+    pub fn rcl_get_zero_initialized_init_options() -> rcl_init_options_t {
+        unsafe { self::rcl_get_zero_initialized_init_options() }
+    }
+
+    pub fn rcl_get_zero_initialized_node() -> rcl_node_t {
+        unsafe { self::rcl_get_zero_initialized_node() }
+    }
+
+    pub fn rcl_node_get_default_options() -> rcl_node_options_t {
+        unsafe { self::rcl_node_get_default_options() }
+    }
+
+    pub fn rcl_get_zero_initialized_publisher() -> rcl_publisher_t {
+        unsafe { self::rcl_get_zero_initialized_publisher() }
+    }
+
+    pub fn rcl_publisher_can_loan_messages(publisher: *const rcl_publisher_t) -> bool {
+        unsafe { self::rcl_publisher_can_loan_messages(publisher) }
+    }
+
+    pub fn rcl_subscription_can_loan_messages(subscription: *const rcl_subscription_t) -> bool {
+        unsafe { self::rcl_subscription_can_loan_messages(subscription) }
+    }
+
+    pub fn rcl_publish(
+        publisher: *const rcl_publisher_t,
+        ros_message: *const ::std::os::raw::c_void,
+        allocation: *mut rmw_publisher_allocation_t,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_publish(publisher, ros_message, allocation) })
+    }
+
+    pub fn rcl_publish_loaned_message(
+        publisher: *const rcl_publisher_t,
+        ros_message: *mut ::std::os::raw::c_void,
+        allocation: *mut rmw_publisher_allocation_t,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe {
+            self::rcl_publish_loaned_message(publisher, ros_message, allocation)
+        })
+    }
+
+    #[allow(clippy::useless_conversion)]
+    pub fn rcl_publish_serialized_message(
+        publisher: *const rcl_publisher_t,
+        data: &[u8],
+        allocation: *mut rmw_publisher_allocation_t,
+    ) -> RCLResult<()> {
+        let ros_message = rcl_serialized_message_t {
+            buffer: data.as_ptr() as *mut u8,
+            buffer_length: data
+                .len()
+                .try_into()
+                .map_err(|_| RCLError::InvalidArgument)?,
+            buffer_capacity: data
+                .len()
+                .try_into()
+                .map_err(|_| RCLError::InvalidArgument)?,
+            allocator: unsafe { self::rcutils_get_default_allocator() },
+        };
+        ret_val_to_err(unsafe {
+            self::rcl_publish_serialized_message(publisher, (&ros_message) as *const _, allocation)
+        })
+    }
+
+    pub fn rmw_get_default_publisher_options() -> rmw_publisher_options_t {
+        unsafe { self::rmw_get_default_publisher_options() }
+    }
+
+    pub fn rcl_get_zero_initialized_subscription() -> rcl_subscription_t {
+        unsafe { self::rcl_get_zero_initialized_subscription() }
+    }
+
+    pub fn rmw_get_default_subscription_options() -> rmw_subscription_options_t {
+        unsafe { self::rmw_get_default_subscription_options() }
+    }
+
+    pub fn rcl_get_zero_initialized_wait_set() -> self::rcl_wait_set_t {
+        unsafe { self::rcl_get_zero_initialized_wait_set() }
+    }
+
+    pub fn rcl_wait(wait_set: *mut rcl_wait_set_t, timeout: i64) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_wait(wait_set, timeout) })
+    }
+
+    pub fn rcl_get_zero_initialized_guard_condition() -> rcl_guard_condition_t {
+        unsafe { self::rcl_get_zero_initialized_guard_condition() }
+    }
+
+    pub fn rcl_get_zero_initialized_service() -> rcl_service_t {
+        unsafe { self::rcl_get_zero_initialized_service() }
+    }
+
+    pub fn rcl_send_response(
+        service: *const rcl_service_t,
+        response_header: *mut rmw_request_id_t,
+        ros_response: *mut ::std::os::raw::c_void,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_send_response(service, response_header, ros_response) })
+    }
+
+    pub fn rcl_get_zero_initialized_client() -> rcl_client_t {
+        unsafe { self::rcl_get_zero_initialized_client() }
+    }
+
+    pub fn rcl_send_request(
+        client: *const rcl_client_t,
+        ros_request: *const ::std::os::raw::c_void,
+        sequence_number: *mut i64,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_send_request(client, ros_request, sequence_number) })
+    }
+
+    pub fn rcl_clock_get_now(
+        clock: *mut rcl_clock_t,
+        time_point_value: *mut rcl_time_point_value_t,
+    ) -> RCLResult<()> {
+        ret_val_to_err(unsafe { self::rcl_clock_get_now(clock, time_point_value) })
+    }
+
+    pub fn rcl_action_get_zero_initialized_client() -> rcl_action_client_t {
+        unsafe { self::rcl_action_get_zero_initialized_client() }
+    }
+
+    pub fn rcl_action_client_get_default_options() -> rcl_action_client_options_t {
+        unsafe { self::rcl_action_client_get_default_options() }
+    }
+
+    pub fn rcl_action_send_goal_request(
+        action_client: *const rcl_action_client_t,
+        ros_goal_request: *const ::std::os::raw::c_void,
+        sequence_number: *mut i64,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_send_goal_request(action_client, ros_goal_request, sequence_number)
+        })
+    }
+
+    pub fn rcl_action_send_result_request(
+        action_client: *const rcl_action_client_t,
+        ros_result_request: *mut ::std::os::raw::c_void,
+        sequence_number: *mut i64,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_send_result_request(action_client, ros_result_request, sequence_number)
+        })
+    }
+
+    pub fn rcl_action_server_wait_set_get_num_entities(
+        action_server: *const rcl_action_server_t,
+        num_subscriptions: *mut usize,
+        num_guard_conditions: *mut usize,
+        num_timers: *mut usize,
+        num_clients: *mut usize,
+        num_services: *mut usize,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_server_wait_set_get_num_entities(
+                action_server,
+                num_subscriptions,
+                num_guard_conditions,
+                num_timers,
+                num_clients,
+                num_services,
+            )
+        })
+    }
+
+    pub fn rcl_action_client_wait_set_get_num_entities(
+        action_client: *const rcl_action_client_t,
+        num_subscriptions: *mut usize,
+        num_guard_conditions: *mut usize,
+        num_timers: *mut usize,
+        num_clients: *mut usize,
+        num_services: *mut usize,
+    ) -> RCLActionResult<()> {
+        action_ret_val_to_err(unsafe {
+            self::rcl_action_client_wait_set_get_num_entities(
+                action_client,
+                num_subscriptions,
+                num_guard_conditions,
+                num_timers,
+                num_clients,
+                num_services,
+            )
+        })
+    }
+
+    pub fn rcl_action_get_zero_initialized_server() -> rcl_action_server_t {
+        unsafe { self::rcl_action_get_zero_initialized_server() }
+    }
+
+    pub fn rcl_action_get_zero_initialized_goal_status_array() -> rcl_action_goal_status_array_t {
+        unsafe { self::rcl_action_get_zero_initialized_goal_status_array() }
+    }
+
+    pub fn rcl_action_get_zero_initialized_goal_info() -> rcl_action_goal_info_t {
+        unsafe { self::rcl_action_get_zero_initialized_goal_info() }
+    }
+
+    pub fn rcl_action_server_get_default_options() -> rcl_action_server_options_t {
+        unsafe { self::rcl_action_server_get_default_options() }
+    }
+
+    pub fn rcl_action_get_zero_initialized_cancel_request() -> rcl_action_cancel_request_t {
+        unsafe { self::rcl_action_get_zero_initialized_cancel_request() }
+    }
+
+    pub fn rcl_action_get_zero_initialized_cancel_response() -> rcl_action_cancel_response_t {
+        unsafe { self::rcl_action_get_zero_initialized_cancel_response() }
+    }
+
+    pub fn rcl_node_get_name(node: *const rcl_node_t) -> RCLResult<String> {
+        let name_c = unsafe { self::rcl_node_get_name(node) };
+        if name_c.is_null() {
+            return Err(RCLError::NodeInvalid);
+        }
+        let name_c = unsafe { CStr::from_ptr(name_c) };
+        Ok(name_c
+            .to_str()
+            .map_err(|_| RCLError::NodeInvalidName)?
+            .to_owned())
+    }
+    pub fn rcl_node_get_fully_qualified_name(node: *const rcl_node_t) -> RCLResult<String> {
+        let name_c = unsafe { self::rcl_node_get_fully_qualified_name(node) };
+        if name_c.is_null() {
+            return Err(RCLError::NodeInvalid);
+        }
+        let name_c = unsafe { CStr::from_ptr(name_c) };
+        Ok(name_c
+            .to_str()
+            .map_err(|_| RCLError::NodeInvalidName)?
+            .to_owned())
+    }
+    pub fn rcl_node_get_namespace(node: *const rcl_node_t) -> RCLResult<String> {
+        let name_c = unsafe { self::rcl_node_get_namespace(node) };
+        if name_c.is_null() {
+            return Err(RCLError::NodeInvalid);
+        }
+        let name_c = unsafe { CStr::from_ptr(name_c) };
+        Ok(name_c
+            .to_str()
+            .map_err(|_| RCLError::NodeInvalidName)?
+            .to_owned())
+    }
+}

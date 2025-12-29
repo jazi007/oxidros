@@ -209,6 +209,7 @@ pub fn generate_runtime_c(out_dir: &Path) {
 #include <rosidl_runtime_c/primitives_sequence_functions.h>
 #include <rosidl_runtime_c/sequence_bound.h>
 #include <rosidl_runtime_c/service_type_support_struct.h>
+#include <rosidl_runtime_c/action_type_support_struct.h>
 #include <rosidl_runtime_c/string.h>
 #include <rosidl_runtime_c/string_functions.h>
 #include <rosidl_runtime_c/u16string.h>
