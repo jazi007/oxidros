@@ -300,9 +300,7 @@ impl Generator {
 
         // Write.
         let mut f = File::create(out_file)?;
-        let prefix = self.prefix();
         for line in lines {
-            let line = line.replace("{prefix}", prefix);
             f.write_fmt(format_args!("{}\n", line))?;
         }
 
@@ -341,9 +339,12 @@ impl Generator {
         lines.push_back(gen_impl_for_struct(lib, "msg", &struct_def.id));
 
         lines.push_front("use std::ops::{Deref, DerefMut};\n".to_string());
+        let p = self.prefix();
         lines.push_front(
-            "use {prefix}oxidros_core::{SequenceRaw, TryClone, TypeSupport};\n#[allow(unused_imports)]\nuse {prefix}{msg, rcl};"
-                .to_string(),
+            format!(
+                "use {}oxidros_core::{{SequenceRaw, TryClone, TypeSupport}};\n#[allow(unused_imports)]\nuse {}{{msg, rcl}};",
+                p, p
+            ),
         );
     }
 
@@ -364,8 +365,12 @@ impl Generator {
 
         if *idl_type == IDLType::NoType {
             lines.push_front("use std::ops::{Deref, DerefMut};\n".to_string());
+            let p = self.prefix();
             lines.push_front(
-                "use {prefix}oxidros_core::{SequenceRaw, ServiceMsg, TryClone, TypeSupport};\n#[allow(unused_imports)]\nuse {prefix}{msg, rcl};".to_string()
+                format!(
+                    "use {}oxidros_core::{{SequenceRaw, ServiceMsg, TryClone, TypeSupport}};\n#[allow(unused_imports)]\nuse {}{{msg, rcl}};",
+                    p, p
+                )
             );
             lines.push_back(gen_impl_service_msg(lib, "srv", type_str));
         }
@@ -411,8 +416,12 @@ impl Generator {
 
         if *idl_type == IDLType::NoType {
             lines.push_front("use std::ops::{Deref, DerefMut};\n".to_string());
+            let p = self.prefix();
             lines.push_front(
-                "use {prefix}oxidros_core::{ActionMsg, ActionGoal, ActionResult, GetUUID, GoalResponse, ResultResponse, SequenceRaw, TryClone, TypeSupport};\nuse {prefix}{msg, rcl, builtin_interfaces::UnsafeTime, unique_identifier_msgs};".to_string()
+                format!(
+                    "use {}oxidros_core::{{ActionMsg, ActionGoal, ActionResult, GetUUID, GoalResponse, ResultResponse, SequenceRaw, TryClone, TypeSupport}};\nuse {}{{builtin_interfaces::UnsafeTime, unique_identifier_msgs, rcl}};",
+                    p, p
+                )
             );
             lines.push_back(gen_impl_action_msg(lib, type_str));
         }
@@ -550,7 +559,7 @@ impl Generator {
     fn idl_member(&mut self, lines: &mut VecDeque<String>, member: &Member, lib: &str) {
         let type_str = self.idl_type_spec(&member.type_spec, lib);
         let type_str = if type_str == "string" {
-            "{prefix}msg::RosString<0>".to_string()
+            format!("{}msg::RosString<0>", self.prefix())
         } else {
             type_str
         };
@@ -580,11 +589,11 @@ impl Generator {
 
     fn idl_template_type(&mut self, type_spec: &TemplateTypeSpec, lib: &str) -> String {
         match type_spec {
-            TemplateTypeSpec::String(val) => idl_string_type(val),
+            TemplateTypeSpec::String(val) => idl_string_type(self.prefix(), val),
             TemplateTypeSpec::Sequence(val) => self.idl_sequence_type(val, lib),
             TemplateTypeSpec::FixedPoint(_) => unimplemented!(),
             TemplateTypeSpec::Map(_) => unimplemented!(),
-            TemplateTypeSpec::WString(val) => idl_wstring_type(val),
+            TemplateTypeSpec::WString(val) => idl_wstring_type(self.prefix(), val),
         }
     }
 
@@ -595,11 +604,11 @@ impl Generator {
         lib: &str,
     ) -> String {
         match type_spec {
-            TemplateTypeSpec::String(val) => idl_string_type_seq(val, size),
+            TemplateTypeSpec::String(val) => idl_string_type_seq(self.prefix(), val, size),
             TemplateTypeSpec::Sequence(val) => self.idl_sequence_type(val, lib),
             TemplateTypeSpec::FixedPoint(_) => unimplemented!(),
             TemplateTypeSpec::Map(_) => unimplemented!(),
-            TemplateTypeSpec::WString(val) => idl_wstring_type_seq(val, size),
+            TemplateTypeSpec::WString(val) => idl_wstring_type_seq(self.prefix(), val, size),
         }
     }
 
@@ -621,45 +630,45 @@ impl Generator {
     fn idl_seq_type(&mut self, type_spec: &TypeSpec, size: &BigInt, lib: &str) -> String {
         match type_spec {
             TypeSpec::PrimitiveType(PrimitiveType::Boolean) => {
-                format!("{{prefix}}msg::BoolSeq<{size}>")
+                format!("{}msg::BoolSeq<{size}>", self.prefix())
             }
             TypeSpec::PrimitiveType(PrimitiveType::Int8)
             | TypeSpec::PrimitiveType(PrimitiveType::Char) => {
-                format!("{{prefix}}msg::I8Seq<{size}>")
+                format!("{}msg::I8Seq<{size}>", self.prefix())
             }
             TypeSpec::PrimitiveType(PrimitiveType::Int16)
             | TypeSpec::PrimitiveType(PrimitiveType::Short) => {
-                format!("{{prefix}}msg::I16Seq<{size}>")
+                format!("{}msg::I16Seq<{size}>", self.prefix())
             }
             TypeSpec::PrimitiveType(PrimitiveType::Int32)
             | TypeSpec::PrimitiveType(PrimitiveType::Long) => {
-                format!("{{prefix}}msg::I32Seq<{size}>")
+                format!("{}msg::I32Seq<{size}>", self.prefix())
             }
             TypeSpec::PrimitiveType(PrimitiveType::Int64)
             | TypeSpec::PrimitiveType(PrimitiveType::LongLong) => {
-                format!("{{prefix}}msg::I64Seq<{size}>")
+                format!("{}msg::I64Seq<{size}>", self.prefix())
             }
             TypeSpec::PrimitiveType(PrimitiveType::Uint8)
             | TypeSpec::PrimitiveType(PrimitiveType::Octet) => {
-                format!("{{prefix}}msg::U8Seq<{size}>")
+                format!("{}msg::U8Seq<{size}>", self.prefix())
             }
             TypeSpec::PrimitiveType(PrimitiveType::Uint16)
             | TypeSpec::PrimitiveType(PrimitiveType::UnsignedShort) => {
-                format!("{{prefix}}msg::U16Seq<{size}>")
+                format!("{}msg::U16Seq<{size}>", self.prefix())
             }
             TypeSpec::PrimitiveType(PrimitiveType::Uint32)
             | TypeSpec::PrimitiveType(PrimitiveType::UnsignedLong) => {
-                format!("{{prefix}}msg::U32Seq<{size}>")
+                format!("{}msg::U32Seq<{size}>", self.prefix())
             }
             TypeSpec::PrimitiveType(PrimitiveType::Uint64)
             | TypeSpec::PrimitiveType(PrimitiveType::UnsignedLongLong) => {
-                format!("{{prefix}}msg::U64Seq<{size}>")
+                format!("{}msg::U64Seq<{size}>", self.prefix())
             }
             TypeSpec::PrimitiveType(PrimitiveType::Float) => {
-                format!("{{prefix}}msg::F32Seq<{size}>")
+                format!("{}msg::F32Seq<{size}>", self.prefix())
             }
             TypeSpec::PrimitiveType(PrimitiveType::Double) => {
-                format!("{{prefix}}msg::F64Seq<{size}>")
+                format!("{}msg::F64Seq<{size}>", self.prefix())
             }
             TypeSpec::PrimitiveType(PrimitiveType::LongDouble) => unimplemented!(),
             TypeSpec::PrimitiveType(PrimitiveType::WChar) => unimplemented!(),
@@ -667,7 +676,7 @@ impl Generator {
             TypeSpec::ScopedName(name) => {
                 let type_str = self.idl_scoped_name(name, lib);
                 if type_str == "string" {
-                    format!("{{prefix}}msg::RosStringSeq<0, {size}>")
+                    format!("{}msg::RosStringSeq<0, {size}>", self.prefix())
                 } else {
                     format!("{type_str}Seq<{size}>")
                 }
@@ -752,9 +761,13 @@ impl Generator {
 
         lines.push_back(gen_impl_for_msg(lib, &rs_type_name).into());
         lines.push_front("use std::ops::{Deref, DerefMut};\n".into());
+        let p = self.prefix();
         lines.push_front(
-            "use {prefix}oxidros_core::{SequenceRaw, TryClone, TypeSupport};\n#[allow(unused_imports)]\nuse {prefix}{msg, rcl};"
-                .into(),
+            format!(
+                "use {}oxidros_core::{{SequenceRaw, TryClone, TypeSupport}};\n#[allow(unused_imports)]\nuse {}{{msg, rcl}};",
+                p, p
+            )
+            .into(),
         );
 
         // Create a directory.
@@ -764,9 +777,7 @@ impl Generator {
         // Write.
         let out_file = out_dir.join(rs_file);
         let mut f = File::create(out_file)?;
-        let prefix = self.prefix();
         for line in lines {
-            let line = line.replace("{prefix}", prefix);
             f.write_fmt(format_args!("{}\n", line))?;
         }
 
@@ -828,9 +839,7 @@ impl Generator {
         // Write.
         let out_file = out_dir.join(rs_file);
         let mut f = File::create(out_file)?;
-        let prefix = self.prefix();
         for line in lines {
-            let line = line.replace("{prefix}", prefix);
             f.write_fmt(format_args!("{}\n", line))?;
         }
 
@@ -838,6 +847,7 @@ impl Generator {
     }
 
     fn generate_var(&mut self, type_name: &TypeName, var_name: &str, lib: &str) -> String {
+        let p = self.prefix();
         match type_name {
             TypeName::Type {
                 type_name,
@@ -847,11 +857,11 @@ impl Generator {
                     format!("{var_name}: {}", gen_type(type_name.as_str()))
                 }
                 ArrayInfo::Dynamic => {
-                    let type_name = gen_seq_type("super::super", type_name, 0);
+                    let type_name = gen_seq_type(self.prefix(), "super::super", type_name, 0);
                     format!("{var_name}: {type_name}")
                 }
                 ArrayInfo::Limited(size) => {
-                    let type_name = gen_seq_type("super::super", type_name, *size);
+                    let type_name = gen_seq_type(self.prefix(), "super::super", type_name, *size);
                     format!("{var_name}: {type_name}")
                 }
                 ArrayInfo::Static(size) => {
@@ -879,11 +889,11 @@ impl Generator {
                         format!("{var_name}: {scope}::msg::{module_name}::{type_name}")
                     }
                     ArrayInfo::Dynamic => {
-                        let type_name = gen_seq_type(&scope, type_name, 0);
+                        let type_name = gen_seq_type(self.prefix(), &scope, type_name, 0);
                         format!("{var_name}: {type_name}")
                     }
                     ArrayInfo::Limited(size) => {
-                        let type_name = gen_seq_type(&scope, type_name, *size);
+                        let type_name = gen_seq_type(self.prefix(), &scope, type_name, *size);
                         format!("{var_name}: {type_name}")
                     }
                     ArrayInfo::Static(size) => {
@@ -898,30 +908,30 @@ impl Generator {
                 array_info,
             } => match array_info {
                 ArrayInfo::NotArray => {
-                    format!("{var_name}: {{prefix}}msg::RosString<{str_len}>")
+                    format!("{var_name}: {}msg::RosString<{str_len}>", p)
                 }
                 ArrayInfo::Dynamic => {
-                    format!("{var_name}: {{prefix}}msg::RosStringSeq<{str_len}, 0>")
+                    format!("{var_name}: {}msg::RosStringSeq<{str_len}, 0>", p)
                 }
                 ArrayInfo::Limited(size) => {
-                    format!("{var_name}: {{prefix}}msg::RosStringSeq<{str_len}, {size}>")
+                    format!("{var_name}: {}msg::RosStringSeq<{str_len}, {size}>", p)
                 }
                 ArrayInfo::Static(size) => {
-                    format!("{var_name}: [{{prefix}}msg::RosString<{str_len}>; {size}]")
+                    format!("{var_name}: [{}msg::RosString<{str_len}>; {size}]", p)
                 }
             },
             TypeName::String(array_info) => match array_info {
                 ArrayInfo::NotArray => {
-                    format!("{var_name}: {{prefix}}msg::RosString<0>")
+                    format!("{var_name}: {}msg::RosString<0>", p)
                 }
                 ArrayInfo::Dynamic => {
-                    format!("{var_name}: {{prefix}}msg::RosStringSeq<0, 0>")
+                    format!("{var_name}: {}msg::RosStringSeq<0, 0>", p)
                 }
                 ArrayInfo::Limited(size) => {
-                    format!("{var_name}: {{prefix}}msg::RosStringSeq<0, {size}>")
+                    format!("{var_name}: {}msg::RosStringSeq<0, {size}>", p)
                 }
                 ArrayInfo::Static(size) => {
-                    format!("{var_name}: [{{prefix}}msg::RosString<0>; {size}]")
+                    format!("{var_name}: [{}msg::RosString<0>; {size}]", p)
                 }
             },
         }
@@ -1012,54 +1022,53 @@ fn idl_array_size(dcl: &ArrayDeclarator) -> BigInt {
     })
 }
 
-fn idl_string_type(string_type: &StringType) -> String {
+fn idl_string_type(prefix: &str, string_type: &StringType) -> String {
     match string_type {
         StringType::Sized(expr) => {
             if let ConstValue::Integer(n) = eval(expr) {
-                format!("crate::msg::RosString<{n}>")
+                format!("{}msg::RosString<{n}>", prefix)
             } else {
                 panic!("not a integer number")
             }
         }
-        StringType::UnlimitedSize => "crate::msg::RosString<0>".to_string(),
+        StringType::UnlimitedSize => format!("{}msg::RosString<0>", prefix),
     }
 }
-fn idl_wstring_type(string_type: &WStringType) -> String {
+fn idl_wstring_type(prefix: &str, string_type: &WStringType) -> String {
     match string_type {
         WStringType::Sized(expr) => {
             if let ConstValue::Integer(n) = eval(expr) {
-                format!("crate::msg::RosWString<{n}>")
+                format!("{}msg::RosWString<{n}>", prefix)
             } else {
                 panic!("not a integer number")
             }
         }
-        WStringType::UnlimitedSize => "crate::msg::RosWString<0>".to_string(),
+        WStringType::UnlimitedSize => format!("{}msg::RosWString<0>", prefix),
     }
 }
 
-fn idl_string_type_seq(string_type: &StringType, size: &BigInt) -> String {
+fn idl_string_type_seq(prefix: &str, string_type: &StringType, size: &BigInt) -> String {
     match string_type {
         StringType::Sized(expr) => {
             if let ConstValue::Integer(n) = eval(expr) {
-                format!("crate::msg::RosStringSeq<{n}, {size}>")
+                format!("{}msg::RosStringSeq<{n}, {size}>", prefix)
             } else {
                 panic!("not a integer number")
             }
         }
-        StringType::UnlimitedSize => format!("crate::msg::RosStringSeq<0, {size}>"),
+        StringType::UnlimitedSize => format!("{}msg::RosStringSeq<0, {size}>", prefix),
     }
 }
-
-fn idl_wstring_type_seq(string_type: &WStringType, size: &BigInt) -> String {
+fn idl_wstring_type_seq(prefix: &str, string_type: &WStringType, size: &BigInt) -> String {
     match string_type {
         WStringType::Sized(expr) => {
             if let ConstValue::Integer(n) = eval(expr) {
-                format!("crate::msg::RosWStringSeq<{n}, {size}>")
+                format!("{}msg::RosWStringSeq<{n}, {size}>", prefix)
             } else {
                 panic!("not a integer number")
             }
         }
-        WStringType::UnlimitedSize => format!("crate::msg::RosWStringSeq<0, {size}>"),
+        WStringType::UnlimitedSize => format!("{}msg::RosWStringSeq<0, {size}>", prefix),
     }
 }
 fn module_file_type(path: &Path) -> Result<(String, PathBuf, String), DynError> {
@@ -1105,21 +1114,21 @@ fn mangle_mod(var_name: &str) -> Cow<'_, str> {
     }
 }
 
-fn gen_seq_type(scope: &str, type_str: &str, size: usize) -> String {
+fn gen_seq_type(prefix: &str, scope: &str, type_str: &str, size: usize) -> String {
     let module_name = type_str.to_case(Case::Snake);
     let module_name = mangle_mod(&module_name);
     match type_str {
-        "bool" => format!("crate::msg::BoolSeq<{size}>"),
-        "byte" | "uint8" => format!("crate::msg::I8Seq<{size}>"),
-        "int16" => format!("crate::msg::I16Seq<{size}>"),
-        "int32" => format!("crate::msg::I32Seq<{size}>"),
-        "int64" => format!("crate::msg::I64Seq<{size}>"),
-        "char" | "int8" => format!("crate::msg::U8Seq<{size}>"),
-        "uint16" => format!("crate::msg::U16Seq<{size}>"),
-        "uint32" => format!("crate::msg::U32Seq<{size}>"),
-        "uint64" => format!("crate::msg::U64Seq<{size}>"),
-        "float32" => format!("crate::msg::F32Seq<{size}>"),
-        "float64" => format!("crate::msg::F64Seq<{size}>"),
+        "bool" => format!("{}msg::BoolSeq<{size}>", prefix),
+        "byte" | "uint8" => format!("{}msg::I8Seq<{size}>", prefix),
+        "int16" => format!("{}msg::I16Seq<{size}>", prefix),
+        "int32" => format!("{}msg::I32Seq<{size}>", prefix),
+        "int64" => format!("{}msg::I64Seq<{size}>", prefix),
+        "char" | "int8" => format!("{}msg::U8Seq<{size}>", prefix),
+        "uint16" => format!("{}msg::U16Seq<{size}>", prefix),
+        "uint32" => format!("{}msg::U32Seq<{size}>", prefix),
+        "uint64" => format!("{}msg::U64Seq<{size}>", prefix),
+        "float32" => format!("{}msg::F32Seq<{size}>", prefix),
+        "float64" => format!("{}msg::F64Seq<{size}>", prefix),
         _ => format!("{scope}::msg::{module_name}::{type_str}Seq<{size}>"),
     }
 }
