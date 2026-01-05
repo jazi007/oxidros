@@ -15,7 +15,7 @@
 //! This crate provides Rust bindings for ROS2 messages, services, and actions.
 //! Select the appropriate ROS2 distribution using features: `jazzy`, `iron`, `humble`, or `galactic`.
 //!
-//! Messages are generated at compile time using ros2-msg-gen and bindgen.
+//! Messages are generated at compile time using ros2msg and ros2-type-hash-derive for FFI.
 
 use std::{ffi::CString, fmt::Display, mem::transmute};
 
@@ -51,6 +51,11 @@ pub mod builtin_interfaces {
     pub use oxidros_core::{UnsafeDuration, UnsafeTime};
 }
 
+// Re-export ros2-type-hash traits and macros for generated code
+pub use ros2_type_hash::{
+    ros2_action, ros2_service, Ros2Msg, SequenceRaw, ServiceMsg, TryClone, TypeSupport,
+};
+
 // Include generated message modules
 pub mod common_interfaces {
     //! Common ROS2 interface messages (geometry_msgs, sensor_msgs, etc.)
@@ -75,8 +80,7 @@ pub use oxidros_core;
 
 // Re-export traits from oxidros-core at the top level for convenience
 pub use oxidros_core::{
-    ActionGoal, ActionMsg, ActionResult, GetUUID, GoalResponse, ResultResponse, ServiceMsg,
-    TypeSupport,
+    ActionGoal, ActionMsg, ActionResult, GetUUID, GoalResponse, ResultResponse,
 };
 
 // Re-export UnsafeTime and UnsafeDuration from oxidros-core

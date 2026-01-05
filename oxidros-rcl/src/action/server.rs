@@ -5,9 +5,7 @@ use oxidros_core::selector::CallbackResult;
 use oxidros_core::{
     DurabilityPolicy, HistoryPolicy, LivelinessPolicy, ReliabilityPolicy, TryClone,
 };
-use oxidros_msg::interfaces::action_msgs::srv::CancelGoal_Response_Constants::{
-    ERROR_GOAL_TERMINATED, ERROR_NONE, ERROR_REJECTED, ERROR_UNKNOWN_GOAL_ID,
-};
+use oxidros_msg::interfaces::action_msgs::srv::CancelGoal_Response;
 use oxidros_msg::interfaces::unique_identifier_msgs::msg::UUID;
 use parking_lot::Mutex;
 use std::future::Future;
@@ -434,7 +432,7 @@ impl<T: ActionMsg> ServerCancelSend<T> {
 
         let code = self.cancel_goals(&accepted_goals)?;
         response.msg.return_code = code;
-        if code == ERROR_NONE {
+        if code == CancelGoal_Response::ERROR_NONE {
             response.msg.goals_canceling = action_msgs__msg__GoalInfo__Sequence {
                 data: accepted_goals.as_mut_ptr() as *mut _ as *mut action_msgs__msg__GoalInfo,
                 size: accepted_goals.len(),
@@ -463,20 +461,20 @@ impl<T: ActionMsg> ServerCancelSend<T> {
     /// Cancel the goals. Returns the status code for the CancelGoal response.
     fn cancel_goals(&mut self, goals: &[GoalInfo]) -> Result<i8, DynError> {
         if goals.is_empty() {
-            return Ok(ERROR_REJECTED);
+            return Ok(CancelGoal_Response::ERROR_REJECTED);
         }
         let handles = self.server.handles.lock();
         // Make sure that all the goals are found in the handles beforehand
         for goal in goals {
             if !handles.contains_key(&goal.goal_id.uuid) {
-                return Ok(ERROR_UNKNOWN_GOAL_ID);
+                return Ok(CancelGoal_Response::ERROR_UNKNOWN_GOAL_ID);
             }
         }
         // Make sure all the goals are not in terminal state
         for goal in goals {
             let handle = handles.get(&goal.goal_id.uuid).unwrap();
             if handle.is_terminal()? {
-                return Ok(ERROR_GOAL_TERMINATED);
+                return Ok(CancelGoal_Response::ERROR_GOAL_TERMINATED);
             }
         }
         for goal in goals {
@@ -484,7 +482,7 @@ impl<T: ActionMsg> ServerCancelSend<T> {
             let handle = handles.get(&uuid).unwrap();
             handle.update(GoalEvent::CancelGoal)?;
         }
-        Ok(ERROR_NONE)
+        Ok(CancelGoal_Response::ERROR_NONE)
     }
 }
 

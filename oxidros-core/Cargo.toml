@@ -15,6 +15,7 @@ statistics = []
 [dependencies]
 parking_lot = "0.12"
 num-traits = "0.2"
+ros2-type-hash = { path = "../../ros2utils/crates/ros2-type-hash" }
 
 [lib]
 name = "oxidros_core"

@@ -6,8 +6,19 @@ authors.workspace = true
 repository.workspace = true
 license-file.workspace = true
 
+# Build script for generating ROS2 message types
+build = "build.rs"
+
 [dependencies]
-oxidros = { path = "../../oxidros/" }
+# ros2-type-hash provides the Ros2Msg derive macro for FFI code generation
+ros2-type-hash = { path = "../../../ros2utils/crates/ros2-type-hash", features = ["derive"] }
 
 [build-dependencies]
-ros2-msg-gen = { path = "../../ros2-msg-gen/" }
+# ros2msg provides the generator for converting ROS2 .msg files to Rust
+ros2msg = { path = "../../../ros2utils/crates/ros2msg" }
+
+[features]
+default = []
+jazzy = []
+humble = []
+kilted = []
