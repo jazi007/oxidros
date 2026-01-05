@@ -1,12 +1,12 @@
 [package]
 name = "oxidros-core"
 version = "0.1.0"
-edition = "2021"
-license = "Apache-2.0"
 description = "Core traits and types for oxidros ROS2 client library"
-repository = "https://github.com/yourusername/oxidros"
 keywords = ["ros2", "robotics"]
-categories = ["api-bindings"]
+edition.workspace = true
+repository.workspace = true
+license-file.workspace = true
+authors.workspace = true
 
 [features]
 default = []

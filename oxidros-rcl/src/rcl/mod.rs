@@ -27,7 +27,7 @@ pub struct RclRetErr(pub rcl_ret_t);
 include!(concat!(env!("OUT_DIR"), "/rcl.rs"));
 
 use crate::{
-    error::{action_ret_val_to_err, ret_val_to_err, OError, OResult, RCLActionResult},
+    error::{OError, OResult, RCLActionResult, action_ret_val_to_err, ret_val_to_err},
     parameter::Value,
 };
 use once_cell::sync::Lazy;

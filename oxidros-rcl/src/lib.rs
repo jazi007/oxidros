@@ -246,7 +246,7 @@ type PhantomUnsend = PhantomData<MutexGuard<'static, ()>>;
 
 use error::DynError;
 use msg::ServiceMsg;
-use service::{client::ClientRecv, Header};
+use service::{Header, client::ClientRecv};
 pub use signal_handler::is_halt;
 
 // Re-export oxidros_core so external crates can access traits without direct dependency

@@ -92,7 +92,7 @@ pub mod pubsub;
 /// prelude module
 pub mod prelude {
     pub use crate::clientserver::{Client, Server};
-    pub use crate::common::{create_qos, ArcNode, Attributes, DynError, Result};
+    pub use crate::common::{ArcNode, Attributes, DynError, Result, create_qos};
     pub use crate::communicate::Communicate;
     pub use crate::pubsub::{Publish, Subscribe};
     pub use oxidros::{

@@ -59,8 +59,7 @@ mod rcl_impl {
             if self.0.data.is_null() {
                 &[]
             } else {
-                let s = unsafe { std::slice::from_raw_parts(self.0.data, self.0.size) };
-                s
+                unsafe { std::slice::from_raw_parts(self.0.data, self.0.size) }
             }
         }
 
@@ -68,8 +67,7 @@ mod rcl_impl {
             if self.0.data.is_null() {
                 &mut []
             } else {
-                let s = unsafe { std::slice::from_raw_parts_mut(self.0.data, self.0.size) };
-                s
+                unsafe { std::slice::from_raw_parts_mut(self.0.data, self.0.size) }
             }
         }
 
@@ -285,8 +283,7 @@ mod rcl_impl {
             if self.0.data.is_null() {
                 &[]
             } else {
-                let s = unsafe { std::slice::from_raw_parts(self.0.data, self.0.size) };
-                s
+                unsafe { std::slice::from_raw_parts(self.0.data, self.0.size) }
             }
         }
 
@@ -294,8 +291,7 @@ mod rcl_impl {
             if self.0.data.is_null() {
                 &mut []
             } else {
-                let s = unsafe { std::slice::from_raw_parts_mut(self.0.data, self.0.size) };
-                s
+                unsafe { std::slice::from_raw_parts_mut(self.0.data, self.0.size) }
             }
         }
 

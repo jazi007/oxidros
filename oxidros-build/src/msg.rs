@@ -286,11 +286,7 @@ pub fn generate_msgs(packages: &[&str]) {
         .into_iter()
         .filter_map(|p| {
             let p = p.join("share");
-            if p.exists() {
-                Some(p)
-            } else {
-                None
-            }
+            if p.exists() { Some(p) } else { None }
         })
         .collect();
     if ament_paths.is_empty() {

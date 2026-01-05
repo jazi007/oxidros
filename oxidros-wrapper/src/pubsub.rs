@@ -3,12 +3,12 @@
 use std::pin::Pin;
 
 use oxidros::{
+    RecvResult,
     msg::TypeSupport,
     topic::{
         publisher::Publisher,
         subscriber::{Subscriber, TakenMsg},
     },
-    RecvResult,
 };
 use tokio_stream::Stream;
 

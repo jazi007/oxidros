@@ -40,7 +40,7 @@ pub use runtime_c::*;
 // Re-export msg module utilities for generated code
 pub mod msg {
     pub use crate::primitives::{
-        BoolSeq, F32Seq, F64Seq, I16Seq, I32Seq, I64Seq, I8Seq, U16Seq, U32Seq, U64Seq, U8Seq,
+        BoolSeq, F32Seq, F64Seq, I8Seq, I16Seq, I32Seq, I64Seq, U8Seq, U16Seq, U32Seq, U64Seq,
     };
     pub use crate::strings::{RosString, RosStringSeq, RosWString, RosWStringSeq};
     pub use oxidros_core::TypeSupport;
@@ -53,7 +53,7 @@ pub mod builtin_interfaces {
 
 // Re-export ros2-type-hash traits and macros for generated code
 pub use ros2_type_hash::{
-    ros2_action, ros2_service, Ros2Msg, SequenceRaw, ServiceMsg, TryClone, TypeSupport,
+    Ros2Msg, SequenceRaw, ServiceMsg, TryClone, TypeSupport, ros2_action, ros2_service,
 };
 
 // Include generated message modules

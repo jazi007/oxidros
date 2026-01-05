@@ -56,22 +56,22 @@
 use self::guard_condition::{GuardCondition, RCLGuardCondition};
 
 use crate::{
-    action::{self, handle::GoalHandle, SendGoalServiceRequest},
+    PhantomUnsend, PhantomUnsync, RecvResult,
+    action::{self, SendGoalServiceRequest, handle::GoalHandle},
     context::Context,
     error::{DynError, OError, OResult, RCLActionResult},
     get_allocator,
-    logger::{pr_error_in, pr_fatal_in, Logger},
-    msg::{interfaces::action_msgs::msg::GoalInfo, ActionMsg, GetUUID, ServiceMsg, TypeSupport},
+    logger::{Logger, pr_error_in, pr_fatal_in},
+    msg::{ActionMsg, GetUUID, ServiceMsg, TypeSupport, interfaces::action_msgs::msg::GoalInfo},
     parameter::ParameterServer,
     rcl::{self, rcl_action_client_t},
     service::{
+        Header,
         client::{ClientData, ClientRecv},
         server::{Server, ServerData},
-        Header,
     },
     signal_handler::{self, Signaled},
     topic::subscriber::{RCLSubscription, Subscriber},
-    PhantomUnsend, PhantomUnsync, RecvResult,
 };
 use oxidros_core::{
     delta_list::DeltaList,
@@ -1247,7 +1247,7 @@ impl Selector {
                     let head = dlist.front_mut().unwrap();
                     self.base_time += *head.0;
 
-                    let handler = head.1 .0.handler.take();
+                    let handler = head.1.0.handler.take();
                     if let Some(mut handler) = handler {
                         #[cfg(feature = "statistics")]
                         let start = std::time::SystemTime::now();
@@ -1255,7 +1255,7 @@ impl Selector {
                         handler(); // invoke the callback function
 
                         // register the wall timer again.
-                        if let TimerType::WallTimer(name, dur) = &head.1 .0.event {
+                        if let TimerType::WallTimer(name, dur) = &head.1.0.event {
                             let elapsed = now_time.elapsed().unwrap();
 
                             if let Some(dur) = dur.checked_sub(elapsed) {
@@ -1271,7 +1271,7 @@ impl Selector {
                                 }
                             }
                         } else {
-                            self.timer_ids.remove(&head.1 .1);
+                            self.timer_ids.remove(&head.1.1);
                         }
                     }
                 } else {
@@ -1402,10 +1402,10 @@ fn notify<K, V>(m: &mut BTreeMap<*const K, ConditionHandler<V>>, array: *const *
                 debug_assert!(m.contains_key(&p));
                 if let Some(h) = m.get_mut(&p) {
                     let mut is_rm = false;
-                    if let Some(hdl) = &mut h.handler {
-                        if hdl() == CallbackResult::Remove {
-                            is_rm = true;
-                        }
+                    if let Some(hdl) = &mut h.handler
+                        && hdl() == CallbackResult::Remove
+                    {
+                        is_rm = true;
                     }
                     if h.is_once || is_rm {
                         m.remove(&p);

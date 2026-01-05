@@ -4,7 +4,7 @@
 //! where multiple sources (subscriptions, services, timers) can be waited on
 //! simultaneously.
 
-use crate::{parameter::Parameters, ServiceMsg};
+use crate::{ServiceMsg, parameter::Parameters};
 use std::collections::BTreeSet;
 
 /// Result type for callback functions.

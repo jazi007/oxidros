@@ -13,7 +13,6 @@ pub mod msg;
 pub mod parameter;
 pub mod qos;
 pub mod selector;
-pub mod sequence;
 pub mod time;
 
 // Re-export commonly used items
@@ -24,5 +23,5 @@ pub use msg::{
 };
 pub use parameter::{Descriptor, FloatingPointRange, IntegerRange, Parameter, Value};
 pub use qos::{DurabilityPolicy, HistoryPolicy, LivelinessPolicy, Profile, ReliabilityPolicy};
-pub use sequence::SequenceRaw;
+pub use ros2_type_hash::*;
 pub use time::{UnsafeDuration, UnsafeTime};

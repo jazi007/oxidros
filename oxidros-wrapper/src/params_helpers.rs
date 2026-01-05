@@ -4,7 +4,7 @@
 use crate::common::Result;
 use oxidros::parameter::Value;
 use std::{collections::BTreeMap, io::Read, path::Path};
-use yaml_rust2::{yaml::Hash, Yaml, YamlLoader};
+use yaml_rust2::{Yaml, YamlLoader, yaml::Hash};
 
 /// ROS nodes parameters type alias
 pub type NodesParameters = BTreeMap<String, BTreeMap<String, Value>>;

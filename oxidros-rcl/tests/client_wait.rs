@@ -3,7 +3,7 @@ pub mod common;
 use oxidros_rcl::msg::common_interfaces::example_interfaces::srv::{
     AddTwoInts_Request, AddTwoInts_Response,
 };
-use oxidros_rcl::{context::Context, error::DynError, RecvResult};
+use oxidros_rcl::{RecvResult, context::Context, error::DynError};
 use std::time::Duration;
 
 const SERVICE_NAME2: &str = "test_service2";

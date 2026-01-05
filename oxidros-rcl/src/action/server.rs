@@ -11,17 +11,18 @@ use parking_lot::Mutex;
 use std::future::Future;
 use std::{collections::BTreeMap, ffi::CString, sync::Arc, task::Poll, time::Duration};
 
-use crate::helper::is_unpin;
-use crate::logger::{pr_error_in, Logger};
-use crate::msg::GetUUID;
 use crate::PhantomUnsync;
+use crate::helper::is_unpin;
+use crate::logger::{Logger, pr_error_in};
+use crate::msg::GetUUID;
 use crate::{
+    RecvResult,
     clock::Clock,
     error::{DynError, RCLActionError, RCLActionResult},
     get_allocator, is_halt,
     msg::{
-        builtin_interfaces::UnsafeTime, interfaces::action_msgs::msg::GoalInfo, ActionGoal,
-        ActionMsg, GoalResponse,
+        ActionGoal, ActionMsg, GoalResponse, builtin_interfaces::UnsafeTime,
+        interfaces::action_msgs::msg::GoalInfo,
     },
     node::Node,
     qos::Profile,
@@ -32,11 +33,10 @@ use crate::{
     },
     selector::async_selector::{Command, SELECTOR},
     signal_handler::Signaled,
-    RecvResult,
 };
 
 use super::GoalEvent;
-use super::{handle::GoalHandle, GetResultServiceRequest, GoalStatus, SendGoalServiceRequest};
+use super::{GetResultServiceRequest, GoalStatus, SendGoalServiceRequest, handle::GoalHandle};
 
 pub struct ServerQosOption {
     pub goal_service: Profile,

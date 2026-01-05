@@ -1,12 +1,12 @@
 //! Receive signals on a thread for graceful shutdown.
 
 use crate::{
-    logger::{pr_info_in, Logger},
+    logger::{Logger, pr_info_in},
     rcl,
     selector::guard_condition::GuardCondition,
 };
 use once_cell::sync::Lazy;
-use parking_lot::{lock_api::MutexGuard, Mutex, RawMutex};
+use parking_lot::{Mutex, RawMutex, lock_api::MutexGuard};
 use signal_hook::consts::*;
 
 #[cfg(not(target_os = "windows"))]

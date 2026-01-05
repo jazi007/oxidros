@@ -13,7 +13,7 @@ use oxidros_core::selector::CallbackResult;
 use parking_lot::Mutex;
 use std::{
     sync::Arc,
-    thread::{self, yield_now, JoinHandle},
+    thread::{self, JoinHandle, yield_now},
 };
 
 pub(crate) static SELECTOR: Lazy<Mutex<AsyncSelector>> =

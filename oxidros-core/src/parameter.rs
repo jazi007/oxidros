@@ -1,6 +1,6 @@
 //! Parameter types and structures for ROS2 parameter server.
 
-use crate::{helper::Contains, DynError};
+use crate::{DynError, helper::Contains};
 use num_traits::Zero;
 use std::{
     collections::{BTreeMap, BTreeSet},

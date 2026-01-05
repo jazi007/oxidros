@@ -23,7 +23,7 @@ use crate::{
     get_allocator,
     node::{Node, NodeOptions},
     rcl,
-    selector::{async_selector::SELECTOR, Selector},
+    selector::{Selector, async_selector::SELECTOR},
     signal_handler,
 };
 use once_cell::sync::Lazy;
@@ -215,7 +215,7 @@ impl Drop for InitOptions {
 unsafe impl Sync for Context {}
 unsafe impl Send for Context {}
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub(crate) extern "C" fn remove_context() {
     {
         let _ = SELECTOR.lock().halt();

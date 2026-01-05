@@ -55,6 +55,7 @@
 
 use super::Header;
 use crate::{
+    RecvResult,
     error::{DynError, OError, OResult},
     get_allocator, is_halt,
     msg::ServiceMsg,
@@ -62,11 +63,10 @@ use crate::{
     qos::Profile,
     rcl,
     selector::{
-        async_selector::{self, SELECTOR},
         Selector,
+        async_selector::{self, SELECTOR},
     },
     signal_handler::Signaled,
-    RecvResult,
 };
 use oxidros_core::selector::CallbackResult;
 use std::{

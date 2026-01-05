@@ -3,10 +3,10 @@ pub mod common;
 use oxidros_rcl::{
     self,
     action::{
+        GoalStatus,
         client::{Client, ClientGoalRecv, ClientResultRecv},
         handle::GoalHandle,
         server::{AsyncServer, Server, ServerCancelSend, ServerGoalSend, ServerQosOption},
-        GoalStatus,
     },
     context::Context,
     error::DynError,
@@ -131,7 +131,7 @@ async fn run_server(server: Server<Fibonacci>, abort: bool) -> Result<(), DynErr
     let cancel = move |sender: ServerCancelSend<Fibonacci>, candidates| {
         println!("server: received cancel request for: {:?}", candidates);
         let accepted = candidates; // filter requests here if needed
-                                   // return cancel response
+        // return cancel response
         sender
             .send(accepted)
             .expect("could not send cancel response");

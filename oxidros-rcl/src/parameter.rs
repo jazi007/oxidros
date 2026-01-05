@@ -164,8 +164,9 @@
 use crate::{
     error::{DynError, OResult},
     is_halt,
-    logger::{pr_error_in, pr_fatal_in, Logger},
+    logger::{Logger, pr_error_in, pr_fatal_in},
     msg::{
+        RosString, RosStringSeq, U8Seq,
         interfaces::rcl_interfaces::{
             self,
             msg::{
@@ -183,14 +184,13 @@ use crate::{
                 },
             },
         },
-        RosString, RosStringSeq, U8Seq,
     },
     node::Node,
     qos::Profile,
     selector::{
+        Selector,
         async_selector::{Command, SELECTOR},
         guard_condition::GuardCondition,
-        Selector,
     },
     signal_handler::Signaled,
 };
@@ -306,10 +306,10 @@ impl ParameterServer {
 
 impl Drop for ParameterServer {
     fn drop(&mut self) {
-        if self.cond_halt.trigger().is_ok() {
-            if let Some(handler) = self.handler.take() {
-                let _ = handler.join();
-            }
+        if self.cond_halt.trigger().is_ok()
+            && let Some(handler) = self.handler.take()
+        {
+            let _ = handler.join();
         }
     }
 }

@@ -1,11 +1,12 @@
 use std::time::Duration;
 
 use oxidros::{
+    RecvResult,
     context::Context,
     error::DynError,
     logger::Logger,
     msg::common_interfaces::example_interfaces::srv::{AddTwoInts, AddTwoInts_Request},
-    pr_info, RecvResult,
+    pr_info,
 };
 
 fn main() -> Result<(), DynError> {

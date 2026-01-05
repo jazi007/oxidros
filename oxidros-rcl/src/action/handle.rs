@@ -4,10 +4,10 @@ use oxidros_core::{OError, TryClone};
 use parking_lot::Mutex;
 use std::{collections::BTreeMap, rc::Rc, sync::Arc};
 
-use super::{server::ServerData, GoalEvent, GoalStatus};
+use super::{GoalEvent, GoalStatus, server::ServerData};
 use crate::{
     error::{DynError, RCLActionError, RCLActionResult},
-    logger::{pr_error_in, Logger},
+    logger::{Logger, pr_error_in},
     msg::ActionMsg,
     rcl,
 };

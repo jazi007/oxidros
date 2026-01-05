@@ -7,24 +7,24 @@ use std::{ffi::CString, marker::PhantomData, sync::Arc, task::Poll, time::Durati
 
 use crate::helper::is_unpin;
 use crate::{
+    RecvResult,
     error::{DynError, OError, RCLActionError, RCLActionResult},
     get_allocator, is_halt,
     msg::{
+        ActionMsg,
         interfaces::action_msgs::{
             msg::GoalStatusArray,
             srv::{CancelGoal_Request, CancelGoal_Response},
         },
-        ActionMsg,
     },
     node::Node,
     qos::Profile,
     rcl,
     selector::{
-        async_selector::{self, SELECTOR},
         Selector,
+        async_selector::{self, SELECTOR},
     },
     signal_handler::Signaled,
-    RecvResult,
 };
 
 use super::{

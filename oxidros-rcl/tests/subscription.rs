@@ -1,7 +1,7 @@
 pub mod common;
 
 use oxidros_rcl::msg::common_interfaces::example_interfaces::msg::Int64;
-use oxidros_rcl::{context::Context, RecvResult};
+use oxidros_rcl::{RecvResult, context::Context};
 use std::error::Error;
 
 #[test]

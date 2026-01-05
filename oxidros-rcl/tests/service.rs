@@ -1,10 +1,10 @@
 pub mod common;
 
 use oxidros_rcl::{
+    RecvResult,
     context::Context,
     error::DynError,
     msg::common_interfaces::example_interfaces::srv::{AddTwoInts_Request, AddTwoInts_Response},
-    RecvResult,
 };
 use std::time::Duration;
 

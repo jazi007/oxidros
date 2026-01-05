@@ -162,10 +162,10 @@ fn main() {
                     if let Ok(entries) = std::fs::read_dir(&dir_path) {
                         for entry in entries.flatten() {
                             let path = entry.path();
-                            if let Some(ext) = path.extension() {
-                                if ext == *subdir {
-                                    files.push(path.to_string_lossy().to_string());
-                                }
+                            if let Some(ext) = path.extension()
+                                && ext == *subdir
+                            {
+                                files.push(path.to_string_lossy().to_string());
                             }
                         }
                     }

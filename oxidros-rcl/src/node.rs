@@ -18,7 +18,7 @@
 use libc::atexit;
 
 use crate::{
-    context::{remove_context, Context},
+    context::{Context, remove_context},
     error::{DynError, OResult},
     msg::{ServiceMsg, TypeSupport},
     parameter::ParameterServer,

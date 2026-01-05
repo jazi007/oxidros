@@ -151,6 +151,7 @@
 //! `None` of the 2nd argument of `create_subscriber` is equivalent to `Some(Profile::default())`.
 
 use crate::{
+    PhantomUnsync, RecvResult,
     error::{DynError, OError, OResult},
     get_allocator,
     helper::is_unpin,
@@ -161,7 +162,6 @@ use crate::{
     selector::async_selector::{self, SELECTOR},
     signal_handler::Signaled,
     topic::subscriber_loaned_message::SubscriberLoanedMessage,
-    PhantomUnsync, RecvResult,
 };
 pub use oxidros_core::message::TakenMsg;
 use oxidros_core::selector::CallbackResult;

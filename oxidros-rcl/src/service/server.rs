@@ -93,6 +93,7 @@ use super::Header;
 #[cfg(feature = "jazzy")]
 use crate::msg::interfaces::rosgraph_msgs::msg::Clock;
 use crate::{
+    PhantomUnsync, RecvResult,
     error::{DynError, OError, OResult},
     get_allocator,
     helper::is_unpin,
@@ -103,7 +104,6 @@ use crate::{
     rcl::{self, rmw_request_id_t},
     selector::async_selector::{self, SELECTOR},
     signal_handler::Signaled,
-    PhantomUnsync, RecvResult,
 };
 use oxidros_core::selector::CallbackResult;
 use parking_lot::Mutex;
@@ -144,8 +144,8 @@ impl From<rcl::rcl_service_introspection_state_t> for RCLServiceIntrospection {
 #[cfg(any(feature = "jazzy", feature = "kilted"))]
 impl From<RCLServiceIntrospection> for rcl::rcl_service_introspection_state_t {
     fn from(value: RCLServiceIntrospection) -> Self {
-        use rcl::rcl_service_introspection_state_t::*;
         use RCLServiceIntrospection::*;
+        use rcl::rcl_service_introspection_state_t::*;
         match value {
             RCLServiceIntrospectionOff => RCL_SERVICE_INTROSPECTION_OFF,
             RCLServiceIntrospectionMetadata => RCL_SERVICE_INTROSPECTION_METADATA,

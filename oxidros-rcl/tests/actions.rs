@@ -1,11 +1,12 @@
 pub mod common;
 
 use oxidros_rcl::{
+    RecvResult,
     action::{
+        GoalStatus,
         client::Client,
         handle::GoalHandle,
         server::{Server, ServerQosOption},
-        GoalStatus,
     },
     context::Context,
     error::DynError,
@@ -17,7 +18,6 @@ use oxidros_rcl::{
         interfaces::action_msgs::{msg::GoalInfo, srv::CancelGoal_Request},
         unique_identifier_msgs::msg::UUID,
     },
-    RecvResult,
 };
 use std::{sync::Arc, thread, time::Duration};
 
