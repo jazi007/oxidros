@@ -17,9 +17,8 @@
 //!
 //! Messages are generated at compile time using ros2msg and ros2-type-hash-derive for FFI.
 
-use std::{ffi::CString, fmt::Display, mem::transmute};
-
-// Re-export rcl types for generated code
+// Re-export rcl types for generated code (only available with rcl feature)
+#[cfg(feature = "rcl")]
 pub mod rcl {
     // Re-export C types from runtime_c
     pub use crate::runtime_c::*;
@@ -29,12 +28,13 @@ pub mod primitives;
 pub mod strings;
 
 // Include runtime C bindings first (provides rosidl_runtime_c types)
+#[cfg(feature = "rcl")]
 mod runtime_c {
     include!(concat!(env!("OUT_DIR"), "/runtime_c.rs"));
 }
 
-use oxidros_core::{DynError, Value};
 // Re-export runtime_c types
+#[cfg(feature = "rcl")]
 pub use runtime_c::*;
 
 // Re-export msg module utilities for generated code
@@ -88,6 +88,7 @@ pub use oxidros_core::{UnsafeDuration, UnsafeTime};
 
 use crate::interfaces::rcl_interfaces::msg::ParameterValue;
 use crate::msg::{BoolSeq, F64Seq, I64Seq, RosString, RosStringSeq, U8Seq};
+use oxidros_core::Value;
 
 impl From<&oxidros_core::parameter::IntegerRange>
     for interfaces::rcl_interfaces::msg::IntegerRange

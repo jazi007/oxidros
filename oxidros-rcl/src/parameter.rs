@@ -386,7 +386,7 @@ fn add_srv_set(
                 return response;
             };
 
-            let slice = results.as_slice_mut();
+            let slice = results.as_mut_slice();
 
             let mut updated = 0;
             {
@@ -619,7 +619,7 @@ fn add_srv_describe(
                     let integer_range = if let Some(range) = &param.descriptor.integer_range {
                         let mut int_range =
                             unwrap_or_continue!(rcl_interfaces::msg::IntegerRangeSeq::new(1));
-                        int_range.as_slice_mut()[0] = range.into();
+                        int_range.as_mut_slice()[0] = range.into();
                         int_range
                     } else {
                         unwrap_or_continue!(rcl_interfaces::msg::IntegerRangeSeq::new(0))
@@ -630,7 +630,7 @@ fn add_srv_describe(
                     {
                         let mut f64_range =
                             unwrap_or_continue!(rcl_interfaces::msg::FloatingPointRangeSeq::new(1));
-                        f64_range.as_slice_mut()[0] = range.into();
+                        f64_range.as_mut_slice()[0] = range.into();
                         f64_range
                     } else {
                         unwrap_or_continue!(rcl_interfaces::msg::FloatingPointRangeSeq::new(0))

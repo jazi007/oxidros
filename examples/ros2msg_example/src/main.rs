@@ -14,8 +14,12 @@
 //! ```
 
 // Include the generated message types from build.rs
-#[allow(dead_code)]
-#[allow(unused_imports)]
+#[allow(
+    dead_code,
+    unused_imports,
+    non_camel_case_types,
+    clippy::upper_case_acronyms
+)]
 mod generated {
     include!(concat!(env!("OUT_DIR"), "/generated/mod.rs"));
 }

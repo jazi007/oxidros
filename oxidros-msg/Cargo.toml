@@ -18,10 +18,10 @@ widestring = "1.2.1"
 ros2-type-hash = { path = "../../ros2utils/crates/ros2-type-hash", features = ["derive"] }
 
 [features]
-default = ["rcl"]
-jazzy = []
-humble = []
-kilted = []
+default = []
+jazzy = ["rcl"]
+humble = ["rcl"]
+kilted = ["rcl"]
 # Enable FFI code generation for ROS2 C libraries
 rcl = ["ros2-type-hash/rcl"]
 

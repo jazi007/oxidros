@@ -8,3 +8,5 @@ license-file.workspace = true
 
 [dependencies]
 bindgen = "0.72"
+ros2-type-hash = { path = "../../ros2utils/crates/ros2-type-hash", features = ["derive"] }
+ros2msg = { path = "../../ros2utils/crates/ros2msg" }

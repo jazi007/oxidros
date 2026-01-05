@@ -14,11 +14,11 @@ build = "build.rs"
 ros2-type-hash = { path = "../../../ros2utils/crates/ros2-type-hash", features = ["derive"] }
 
 [build-dependencies]
-# ros2msg provides the generator for converting ROS2 .msg files to Rust
-ros2msg = { path = "../../../ros2utils/crates/ros2msg" }
+oxidros-build = { path = "../../oxidros-build" }
 
 [features]
 default = []
-jazzy = []
-humble = []
-kilted = []
+jazzy = ["rcl"]
+humble = ["rcl"]
+kilted = ["rcl"]
+rcl = []

@@ -2,11 +2,12 @@
 //!
 //! Uses ros2msg to generate ROS2 message types with ros2-type-hash-derive for FFI support.
 
+use std::env;
+use std::path::Path;
+
 use ros2msg::generator::{
     Generator, InterfaceKind, ItemInfo, ModuleInfo, ModuleLevel, ParseCallbacks,
 };
-use std::env;
-use std::path::Path;
 
 /// Callbacks for generating ROS2 FFI code using ros2-type-hash-derive
 struct Ros2FfiCallbacks {
@@ -230,6 +231,15 @@ fn main() {
 
     // Generate runtime_c.rs using bindgen
     oxidros_build::generate_runtime_c(out_path);
+
+    // Emit library search paths for ROS2 libraries
+    for ament_path in &ament_paths {
+        // ament_paths are like /opt/ros/jazzy/share, we need /opt/ros/jazzy/lib
+        let lib_path = Path::new(ament_path).parent().unwrap().join("lib");
+        if lib_path.exists() {
+            println!("cargo:rustc-link-search={}", lib_path.display());
+        }
+    }
 
     // Link ROS2 C libraries
     oxidros_build::link_msg_ros2_libs();

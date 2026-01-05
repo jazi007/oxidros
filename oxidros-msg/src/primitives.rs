@@ -1,215 +1,339 @@
 //! Definition of ROS2 primitive types
 //!
 
-use std::{ffi::CString, fmt::Display, mem::transmute};
+use std::fmt::Display;
 
-use crate::rcl::*;
+// ============================================================================
+// rcl feature - FFI implementations
+// ============================================================================
+#[cfg(feature = "rcl")]
+mod rcl_impl {
+    use crate::rcl::*;
 
-// Definition of Sequence types -------------------------------------------------------------------
+    macro_rules! def_sequence {
+        ($ty: ident, $ty_orig:ty, $ty_seq:ty, $init:ident, $fini:ident, $eq:ident, $copy:ident) => {
+            /// A sequence of elements.
+            /// `N` represents the maximum number of elements.
+            /// If `N` is `0`, the sequence is unlimited.
+            #[repr(C)]
+            #[derive(Debug)]
+            pub struct $ty<const N: usize>($ty_seq);
 
-macro_rules! def_sequence {
-    ($ty: ident, $ty_orig:ty, $ty_seq:ty, $init:ident, $fini:ident, $eq:ident, $copy:ident) => {
-        /// A sequence of elements.
-        /// `N` represents the maximum number of elements.
-        /// If `N` is `0`, the sequence is unlimited.
-        #[repr(C)]
-        #[derive(Debug)]
-        pub struct $ty<const N: usize>($ty_seq);
+            impl<const N: usize> $ty<N> {
+                pub fn new(size: usize) -> Option<Self> {
+                    if N != 0 && size > N {
+                        // the size exceeds in the maximum number
+                        return None;
+                    }
 
-        impl<const N: usize> $ty<N> {
-            pub fn new(size: usize) -> Option<Self> {
-                if N != 0 && size > N {
-                    // the size exceeds in the maximum number
-                    return None;
+                    let mut msg: $ty_seq = unsafe { std::mem::zeroed() };
+                    if unsafe { $init(&mut msg, size as _) } {
+                        Some($ty(msg))
+                    } else {
+                        None
+                    }
                 }
 
-                let mut msg: $ty_seq = unsafe { std::mem::zeroed() };
-                if unsafe { $init(&mut msg, size as _) } {
-                    Some($ty(msg))
-                } else {
-                    None
+                pub fn null() -> Self {
+                    let msg: $ty_seq = unsafe { std::mem::zeroed() };
+                    $ty(msg)
+                }
+
+                pub fn as_slice(&self) -> &[$ty_orig] {
+                    if self.0.data.is_null() {
+                        &[]
+                    } else {
+                        let s = unsafe {
+                            std::slice::from_raw_parts(self.0.data, self.0.size as usize)
+                        };
+                        s
+                    }
+                }
+
+                pub fn as_slice_mut(&mut self) -> &mut [$ty_orig] {
+                    if self.0.data.is_null() {
+                        &mut []
+                    } else {
+                        let s = unsafe {
+                            std::slice::from_raw_parts_mut(self.0.data, self.0.size as usize)
+                        };
+                        s
+                    }
+                }
+
+                pub fn iter(&self) -> std::slice::Iter<'_, $ty_orig> {
+                    self.as_slice().iter()
+                }
+
+                pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, $ty_orig> {
+                    self.as_slice_mut().iter_mut()
+                }
+
+                pub fn len(&self) -> usize {
+                    self.as_slice().len()
+                }
+
+                pub fn is_empty(&self) -> bool {
+                    self.len() == 0
                 }
             }
 
-            pub fn null() -> Self {
-                let msg: $ty_seq = unsafe { std::mem::zeroed() };
-                $ty(msg)
-            }
-
-            pub fn as_slice(&self) -> &[$ty_orig] {
-                if self.0.data.is_null() {
-                    &[]
-                } else {
-                    let s =
-                        unsafe { std::slice::from_raw_parts(self.0.data, self.0.size as usize) };
-                    s
+            impl<const N: usize> Drop for $ty<N> {
+                fn drop(&mut self) {
+                    unsafe { $fini(&mut self.0 as *mut _) };
                 }
             }
 
-            pub fn as_slice_mut(&mut self) -> &mut [$ty_orig] {
-                if self.0.data.is_null() {
-                    &mut []
-                } else {
-                    let s = unsafe {
-                        std::slice::from_raw_parts_mut(self.0.data, self.0.size as usize)
-                    };
-                    s
+            impl<const N: usize> PartialEq for $ty<N> {
+                fn eq(&self, other: &Self) -> bool {
+                    unsafe { $eq(&self.0, &other.0) }
                 }
             }
 
-            pub fn iter(&self) -> std::slice::Iter<'_, $ty_orig> {
-                self.as_slice().iter()
-            }
-
-            pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, $ty_orig> {
-                self.as_slice_mut().iter_mut()
-            }
-
-            pub fn len(&self) -> usize {
-                self.as_slice().len()
-            }
-
-            pub fn is_empty(&self) -> bool {
-                self.len() == 0
-            }
-        }
-
-        impl<const N: usize> Drop for $ty<N> {
-            fn drop(&mut self) {
-                unsafe { $fini(&mut self.0 as *mut _) };
-            }
-        }
-
-        impl<const N: usize> PartialEq for $ty<N> {
-            fn eq(&self, other: &Self) -> bool {
-                unsafe { $eq(&self.0, &other.0) }
-            }
-        }
-        impl<const N: usize> ::oxidros_core::msg::TryClone for $ty<N> {
-            fn try_clone(&self) -> Option<Self> {
-                let mut result = Self::new(self.0.size)?;
-                if unsafe { $copy(&self.0, &mut result.0) } {
-                    Some(result)
-                } else {
-                    None
+            impl<const N: usize> ::oxidros_core::msg::TryClone for $ty<N> {
+                fn try_clone(&self) -> Option<Self> {
+                    let mut result = Self::new(self.0.size)?;
+                    if unsafe { $copy(&self.0, &mut result.0) } {
+                        Some(result)
+                    } else {
+                        None
+                    }
                 }
             }
-        }
 
-        unsafe impl<const N: usize> Sync for $ty<N> {}
-        unsafe impl<const N: usize> Send for $ty<N> {}
-    };
+            impl<const N: usize> Clone for $ty<N> {
+                fn clone(&self) -> Self {
+                    ::oxidros_core::msg::TryClone::try_clone(self).unwrap()
+                }
+            }
+
+            impl<const N: usize> Default for $ty<N> {
+                fn default() -> Self {
+                    Self::null()
+                }
+            }
+
+            unsafe impl<const N: usize> Sync for $ty<N> {}
+            unsafe impl<const N: usize> Send for $ty<N> {}
+        };
+    }
+
+    def_sequence!(
+        BoolSeq,
+        bool,
+        rosidl_runtime_c__boolean__Sequence,
+        rosidl_runtime_c__boolean__Sequence__init,
+        rosidl_runtime_c__boolean__Sequence__fini,
+        rosidl_runtime_c__boolean__Sequence__are_equal,
+        rosidl_runtime_c__boolean__Sequence__copy
+    );
+
+    def_sequence!(
+        F32Seq,
+        f32,
+        rosidl_runtime_c__float__Sequence,
+        rosidl_runtime_c__float__Sequence__init,
+        rosidl_runtime_c__float__Sequence__fini,
+        rosidl_runtime_c__float__Sequence__are_equal,
+        rosidl_runtime_c__float__Sequence__copy
+    );
+
+    def_sequence!(
+        F64Seq,
+        f64,
+        rosidl_runtime_c__double__Sequence,
+        rosidl_runtime_c__double__Sequence__init,
+        rosidl_runtime_c__double__Sequence__fini,
+        rosidl_runtime_c__double__Sequence__are_equal,
+        rosidl_runtime_c__double__Sequence__copy
+    );
+
+    def_sequence!(
+        U8Seq,
+        u8,
+        rosidl_runtime_c__uint8__Sequence,
+        rosidl_runtime_c__uint8__Sequence__init,
+        rosidl_runtime_c__uint8__Sequence__fini,
+        rosidl_runtime_c__uint8__Sequence__are_equal,
+        rosidl_runtime_c__uint8__Sequence__copy
+    );
+
+    def_sequence!(
+        I8Seq,
+        i8,
+        rosidl_runtime_c__int8__Sequence,
+        rosidl_runtime_c__int8__Sequence__init,
+        rosidl_runtime_c__int8__Sequence__fini,
+        rosidl_runtime_c__int8__Sequence__are_equal,
+        rosidl_runtime_c__int8__Sequence__copy
+    );
+
+    def_sequence!(
+        U16Seq,
+        u16,
+        rosidl_runtime_c__uint16__Sequence,
+        rosidl_runtime_c__uint16__Sequence__init,
+        rosidl_runtime_c__uint16__Sequence__fini,
+        rosidl_runtime_c__uint16__Sequence__are_equal,
+        rosidl_runtime_c__uint16__Sequence__copy
+    );
+
+    def_sequence!(
+        I16Seq,
+        i16,
+        rosidl_runtime_c__int16__Sequence,
+        rosidl_runtime_c__int16__Sequence__init,
+        rosidl_runtime_c__int16__Sequence__fini,
+        rosidl_runtime_c__int16__Sequence__are_equal,
+        rosidl_runtime_c__int16__Sequence__copy
+    );
+
+    def_sequence!(
+        U32Seq,
+        u32,
+        rosidl_runtime_c__uint32__Sequence,
+        rosidl_runtime_c__uint32__Sequence__init,
+        rosidl_runtime_c__uint32__Sequence__fini,
+        rosidl_runtime_c__uint32__Sequence__are_equal,
+        rosidl_runtime_c__uint32__Sequence__copy
+    );
+
+    def_sequence!(
+        I32Seq,
+        i32,
+        rosidl_runtime_c__int32__Sequence,
+        rosidl_runtime_c__int32__Sequence__init,
+        rosidl_runtime_c__int32__Sequence__fini,
+        rosidl_runtime_c__int32__Sequence__are_equal,
+        rosidl_runtime_c__int32__Sequence__copy
+    );
+
+    def_sequence!(
+        U64Seq,
+        u64,
+        rosidl_runtime_c__uint64__Sequence,
+        rosidl_runtime_c__uint64__Sequence__init,
+        rosidl_runtime_c__uint64__Sequence__fini,
+        rosidl_runtime_c__uint64__Sequence__are_equal,
+        rosidl_runtime_c__uint64__Sequence__copy
+    );
+
+    def_sequence!(
+        I64Seq,
+        i64,
+        rosidl_runtime_c__int64__Sequence,
+        rosidl_runtime_c__int64__Sequence__init,
+        rosidl_runtime_c__int64__Sequence__fini,
+        rosidl_runtime_c__int64__Sequence__are_equal,
+        rosidl_runtime_c__int64__Sequence__copy
+    );
 }
 
-def_sequence!(
-    BoolSeq,
-    bool,
-    rosidl_runtime_c__boolean__Sequence,
-    rosidl_runtime_c__boolean__Sequence__init,
-    rosidl_runtime_c__boolean__Sequence__fini,
-    rosidl_runtime_c__boolean__Sequence__are_equal,
-    rosidl_runtime_c__boolean__Sequence__copy
-);
+// ============================================================================
+// non-rcl feature - Pure Rust implementations
+// ============================================================================
+#[cfg(not(feature = "rcl"))]
+mod non_rcl_impl {
+    macro_rules! def_sequence {
+        ($ty: ident, $ty_orig:ty) => {
+            /// A sequence of elements.
+            /// `N` represents the maximum number of elements.
+            /// If `N` is `0`, the sequence is unlimited.
+            #[derive(Debug)]
+            pub struct $ty<const N: usize>(Vec<$ty_orig>);
 
-def_sequence!(
-    F32Seq,
-    f32,
-    rosidl_runtime_c__float__Sequence,
-    rosidl_runtime_c__float__Sequence__init,
-    rosidl_runtime_c__float__Sequence__fini,
-    rosidl_runtime_c__float__Sequence__are_equal,
-    rosidl_runtime_c__float__Sequence__copy
-);
+            impl<const N: usize> $ty<N> {
+                pub fn new(size: usize) -> Option<Self> {
+                    if N != 0 && size > N {
+                        // the size exceeds the maximum number
+                        return None;
+                    }
+                    Some($ty(vec![Default::default(); size]))
+                }
 
-def_sequence!(
-    F64Seq,
-    f64,
-    rosidl_runtime_c__double__Sequence,
-    rosidl_runtime_c__double__Sequence__init,
-    rosidl_runtime_c__double__Sequence__fini,
-    rosidl_runtime_c__double__Sequence__are_equal,
-    rosidl_runtime_c__double__Sequence__copy
-);
+                pub fn null() -> Self {
+                    $ty(Vec::new())
+                }
 
-def_sequence!(
-    U8Seq,
-    u8,
-    rosidl_runtime_c__uint8__Sequence,
-    rosidl_runtime_c__uint8__Sequence__init,
-    rosidl_runtime_c__uint8__Sequence__fini,
-    rosidl_runtime_c__uint8__Sequence__are_equal,
-    rosidl_runtime_c__uint8__Sequence__copy
-);
+                pub fn as_slice(&self) -> &[$ty_orig] {
+                    &self.0
+                }
 
-def_sequence!(
-    I8Seq,
-    i8,
-    rosidl_runtime_c__int8__Sequence,
-    rosidl_runtime_c__int8__Sequence__init,
-    rosidl_runtime_c__int8__Sequence__fini,
-    rosidl_runtime_c__int8__Sequence__are_equal,
-    rosidl_runtime_c__int8__Sequence__copy
-);
+                pub fn as_slice_mut(&mut self) -> &mut [$ty_orig] {
+                    &mut self.0
+                }
 
-def_sequence!(
-    U16Seq,
-    u16,
-    rosidl_runtime_c__uint16__Sequence,
-    rosidl_runtime_c__uint16__Sequence__init,
-    rosidl_runtime_c__uint16__Sequence__fini,
-    rosidl_runtime_c__uint16__Sequence__are_equal,
-    rosidl_runtime_c__uint16__Sequence__copy
-);
+                pub fn iter(&self) -> std::slice::Iter<'_, $ty_orig> {
+                    self.0.iter()
+                }
 
-def_sequence!(
-    I16Seq,
-    i16,
-    rosidl_runtime_c__int16__Sequence,
-    rosidl_runtime_c__int16__Sequence__init,
-    rosidl_runtime_c__int16__Sequence__fini,
-    rosidl_runtime_c__int16__Sequence__are_equal,
-    rosidl_runtime_c__int16__Sequence__copy
-);
+                pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, $ty_orig> {
+                    self.0.iter_mut()
+                }
 
-def_sequence!(
-    U32Seq,
-    u32,
-    rosidl_runtime_c__uint32__Sequence,
-    rosidl_runtime_c__uint32__Sequence__init,
-    rosidl_runtime_c__uint32__Sequence__fini,
-    rosidl_runtime_c__uint32__Sequence__are_equal,
-    rosidl_runtime_c__uint32__Sequence__copy
-);
+                pub fn len(&self) -> usize {
+                    self.0.len()
+                }
 
-def_sequence!(
-    I32Seq,
-    i32,
-    rosidl_runtime_c__int32__Sequence,
-    rosidl_runtime_c__int32__Sequence__init,
-    rosidl_runtime_c__int32__Sequence__fini,
-    rosidl_runtime_c__int32__Sequence__are_equal,
-    rosidl_runtime_c__int32__Sequence__copy
-);
+                pub fn is_empty(&self) -> bool {
+                    self.0.is_empty()
+                }
+            }
 
-def_sequence!(
-    U64Seq,
-    u64,
-    rosidl_runtime_c__uint64__Sequence,
-    rosidl_runtime_c__uint64__Sequence__init,
-    rosidl_runtime_c__uint64__Sequence__fini,
-    rosidl_runtime_c__uint64__Sequence__are_equal,
-    rosidl_runtime_c__uint64__Sequence__copy
-);
+            impl<const N: usize> PartialEq for $ty<N> {
+                fn eq(&self, other: &Self) -> bool {
+                    self.0 == other.0
+                }
+            }
 
-def_sequence!(
-    I64Seq,
-    i64,
-    rosidl_runtime_c__int64__Sequence,
-    rosidl_runtime_c__int64__Sequence__init,
-    rosidl_runtime_c__int64__Sequence__fini,
-    rosidl_runtime_c__int64__Sequence__are_equal,
-    rosidl_runtime_c__int64__Sequence__copy
-);
+            impl<const N: usize> ::oxidros_core::msg::TryClone for $ty<N> {
+                fn try_clone(&self) -> Option<Self> {
+                    Some($ty(self.0.clone()))
+                }
+            }
+
+            impl<const N: usize> Clone for $ty<N> {
+                fn clone(&self) -> Self {
+                    $ty(self.0.clone())
+                }
+            }
+
+            impl<const N: usize> Default for $ty<N> {
+                fn default() -> Self {
+                    Self::null()
+                }
+            }
+
+            unsafe impl<const N: usize> Sync for $ty<N> {}
+            unsafe impl<const N: usize> Send for $ty<N> {}
+        };
+    }
+
+    def_sequence!(BoolSeq, bool);
+    def_sequence!(F32Seq, f32);
+    def_sequence!(F64Seq, f64);
+    def_sequence!(U8Seq, u8);
+    def_sequence!(I8Seq, i8);
+    def_sequence!(U16Seq, u16);
+    def_sequence!(I16Seq, i16);
+    def_sequence!(U32Seq, u32);
+    def_sequence!(I32Seq, i32);
+    def_sequence!(U64Seq, u64);
+    def_sequence!(I64Seq, i64);
+}
+
+// ============================================================================
+// Re-exports
+// ============================================================================
+#[cfg(feature = "rcl")]
+pub use rcl_impl::*;
+
+#[cfg(not(feature = "rcl"))]
+pub use non_rcl_impl::*;
+
+// ============================================================================
+// Common utilities
+// ============================================================================
 
 /// The error type returned when a conversion from a slice to an array fails.
 #[derive(Debug, Copy, Clone)]

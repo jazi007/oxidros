@@ -4,11 +4,10 @@ members = [
     "oxidros-msg",
     "oxidros-rcl",
     "oxidros-wrapper",
-    "ros2-msg-gen",
     "oxidros-build",
-    "idl_parser",
+    "oxidros",
     "examples/ros2msg_example",
-    "examples/simple", "oxidros",
+    "examples/simple",
 ]
 resolver = "2"
 
