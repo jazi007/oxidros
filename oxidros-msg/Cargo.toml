@@ -14,8 +14,8 @@ authors.workspace = true
 oxidros-core = { path = "../oxidros-core" }
 log.workspace = true
 widestring = "1.2.1"
-# Re-export ros2-type-hash traits for generated code
-ros2-type-hash = { path = "../../ros2utils/crates/ros2-type-hash", features = ["derive"] }
+# Re-export ros2-types traits for generated code
+ros2-types = { path = "../../ros2utils/crates/ros2-types", features = ["derive"] }
 
 [features]
 default = []
@@ -23,7 +23,7 @@ jazzy = ["rcl"]
 humble = ["rcl"]
 kilted = ["rcl"]
 # Enable FFI code generation for ROS2 C libraries
-rcl = ["ros2-type-hash/rcl"]
+rcl = ["ros2-types/rcl"]
 
 [build-dependencies]
 ros2msg = { path = "../../ros2utils/crates/ros2msg" }

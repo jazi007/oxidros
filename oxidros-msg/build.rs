@@ -1,6 +1,6 @@
 //! Build script for oxidros-msg
 //!
-//! Uses ros2msg to generate ROS2 message types with ros2-type-hash-derive for FFI support.
+//! Uses ros2msg to generate ROS2 message types with ros2-types-derive for FFI support.
 
 use std::env;
 use std::path::Path;
@@ -9,7 +9,7 @@ use ros2msg::generator::{
     Generator, InterfaceKind, ItemInfo, ModuleInfo, ModuleLevel, ParseCallbacks,
 };
 
-/// Callbacks for generating ROS2 FFI code using ros2-type-hash-derive
+/// Callbacks for generating ROS2 FFI code using ros2-types-derive
 struct Ros2FfiCallbacks {
     /// Path prefix for unique_identifier_msgs (for action types)
     uuid_path: String,
@@ -46,9 +46,9 @@ impl ParseCallbacks for Ros2FfiCallbacks {
         }
     }
 
-    /// Add derives for ROS2 types including Ros2Msg from ros2-type-hash-derive
+    /// Add derives for ROS2 types including Ros2Msg from ros2-types-derive
     fn add_derives(&self, _info: &ItemInfo) -> Vec<String> {
-        vec!["ros2_type_hash::Ros2Msg".to_string()]
+        vec!["ros2_types::Ros2Msg".to_string()]
     }
 
     /// Custom type mapping for ROS2 FFI types - strings

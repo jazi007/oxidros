@@ -23,5 +23,5 @@ pub use msg::{
 };
 pub use parameter::{Descriptor, FloatingPointRange, IntegerRange, Parameter, Value};
 pub use qos::{DurabilityPolicy, HistoryPolicy, LivelinessPolicy, Profile, ReliabilityPolicy};
-pub use ros2_type_hash::*;
+pub use ros2_types::*;
 pub use time::{UnsafeDuration, UnsafeTime};

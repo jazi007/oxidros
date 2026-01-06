@@ -4,7 +4,7 @@
 //! and provides additional oxidros-specific implementations.
 
 // Re-export all traits from ros2-type-hash
-pub use ros2_type_hash::{
+pub use ros2_types::{
     ActionGoal, ActionMsg, ActionResult, GetUUID, GoalResponse, ResultResponse, ServiceMsg,
     TryClone, TypeSupport,
 };

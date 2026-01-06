@@ -15,7 +15,7 @@
 //! This crate provides Rust bindings for ROS2 messages, services, and actions.
 //! Select the appropriate ROS2 distribution using features: `jazzy`, `iron`, `humble`, or `galactic`.
 //!
-//! Messages are generated at compile time using ros2msg and ros2-type-hash-derive for FFI.
+//! Messages are generated at compile time using ros2msg and ros2-types-derive for FFI.
 
 // Re-export rcl types for generated code (only available with rcl feature)
 #[cfg(feature = "rcl")]
@@ -51,8 +51,8 @@ pub mod builtin_interfaces {
     pub use oxidros_core::{UnsafeDuration, UnsafeTime};
 }
 
-// Re-export ros2-type-hash traits and macros for generated code
-pub use ros2_type_hash::{
+// Re-export ros2-types traits and macros for generated code
+pub use ros2_types::{
     Ros2Msg, SequenceRaw, ServiceMsg, TryClone, TypeSupport, ros2_action, ros2_service,
 };
 

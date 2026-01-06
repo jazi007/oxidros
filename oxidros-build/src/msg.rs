@@ -2,7 +2,7 @@
 //!
 //! This module provides functionality for generating Rust types from ROS2 interface
 //! definition files (`.msg`, `.srv`, `.action`, `.idl`). It uses the [`ros2msg`] crate
-//! for parsing and code generation, combined with [`ros2_type_hash`] derive macros for
+//! for parsing and code generation, combined with [`ros2_types`] derive macros for
 //! generating type support code.
 //!
 //! # Overview
@@ -57,7 +57,7 @@ use crate::get_paths_from_env;
 /// # Customizations
 ///
 /// - Adds `#[ros2(package = "...", interface_type = "...")]` attributes
-/// - Adds `ros2_type_hash::Ros2Msg` derive macro to all types
+/// - Adds `ros2_types::Ros2Msg` derive macro to all types
 /// - Re-exports types from their modules for convenient access
 struct ExampleCallbacks;
 
@@ -84,7 +84,7 @@ impl ParseCallbacks for ExampleCallbacks {
     /// The derive macro generates implementations for FFI conversion traits
     /// and type support lookup functions.
     fn add_derives(&self, _info: &ItemInfo) -> Vec<String> {
-        vec!["ros2_type_hash::Ros2Msg".to_string()]
+        vec!["ros2_types::Ros2Msg".to_string()]
     }
 
     /// Re-exports types from their modules for convenient access.

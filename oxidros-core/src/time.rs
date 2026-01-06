@@ -3,4 +3,4 @@
 //! This module re-exports the time types from `ros2-type-hash`.
 
 // Re-export time types from ros2-type-hash
-pub use ros2_type_hash::{UnsafeDuration, UnsafeTime};
+pub use ros2_types::{UnsafeDuration, UnsafeTime};

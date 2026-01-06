@@ -537,7 +537,7 @@ name = "oxidros-build"
 version = "0.1.0"
 dependencies = [
  "bindgen",
- "ros2-type-hash",
+ "ros2-types",
  "ros2msg",
 ]
 
@@ -547,7 +547,7 @@ version = "0.1.0"
 dependencies = [
  "num-traits",
  "parking_lot",
- "ros2-type-hash",
+ "ros2-types",
 ]
 
 [[package]]
@@ -559,7 +559,7 @@ dependencies = [
  "oxidros-core",
  "proc-macro2",
  "quote",
- "ros2-type-hash",
+ "ros2-types",
  "ros2msg",
  "widestring",
 ]
@@ -790,10 +790,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
 
 [[package]]
-name = "ros2-type-hash"
+name = "ros2-types"
 version = "0.1.0"
 dependencies = [
- "ros2-type-hash-derive",
+ "ros2-types-derive",
  "serde",
  "serde_json",
  "sha2",
@@ -801,7 +801,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ros2-type-hash-derive"
+name = "ros2-types-derive"
 version = "0.1.0"
 dependencies = [
  "darling",
@@ -830,7 +830,7 @@ name = "ros2msg_example"
 version = "0.1.0"
 dependencies = [
  "oxidros-build",
- "ros2-type-hash",
+ "ros2-types",
 ]
 
 [[package]]
