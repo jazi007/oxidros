@@ -1,0 +1,17 @@
+[package]
+name = "ros2-types-example"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+ros2-types = { path = "../../ros2-types", features = ["derive"] }
+serde.workspace = true
+serde_json.workspace = true
+serde-big-array = "0.5"
+
+[build-dependencies]
+ros2msg = { path = "../../ros2msg", features = ["serde"] }
+ros2-types = { path = "../../ros2-types" }
+heck = "0.5"
+

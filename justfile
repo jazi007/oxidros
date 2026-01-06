@@ -6,10 +6,6 @@ default:
 test:
     cargo test --all
 
-# Generate code coverage report
-coverage:
-    ./scripts/coverage.sh
-
 # Run clippy linter on all crates
 clippy:
     cargo clippy --all --all-targets -- -D warnings
@@ -41,3 +37,15 @@ doc:
 # Clean build artifacts
 clean:
     cargo clean
+
+# Run IDL parser conformance tests against ROS2
+idl-conformance *ARGS:
+    ./scripts/run_idl_conformance.sh {{ARGS}}
+
+# Run TypeDescription hash validation against ROS2
+type-hash-validation *ARGS:
+    ./scripts/run_type_hash_validation.sh {{ARGS}}
+
+# Run all validation tests (IDL conformance + type hash)
+validate: idl-conformance type-hash-validation
+    @echo "All validation tests passed!"

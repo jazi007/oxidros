@@ -10,8 +10,7 @@ members = [
     "ros2-types",
     "ros2args",
     "ros2msg",
-    "examples/ros2msg_example",
-    "examples/simple",
+    "examples/*",
 ]
 resolver = "2"
 
