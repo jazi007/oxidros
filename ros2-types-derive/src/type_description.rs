@@ -35,9 +35,8 @@ pub fn derive_type_description_impl(input: DeriveInput) -> Result<TokenStream, s
             let field_name = field_name_raw.strip_prefix("r#").unwrap_or(&field_name_raw);
             let field_type = &f.ty;
 
-            // Map Rust type to ROS field type
-            let field_type_expr =
-                map_rust_type_to_field_type(field_type, f.ros2_type.as_deref(), f.capacity);
+            // Map Rust type to ROS field type using explicit field attributes
+            let field_type_expr = map_rust_type_to_field_type(field_type, f);
 
             // Generate Field::new() or Field::with_default() based on whether we have a default value
             if let Some(ref default_value) = f.default {

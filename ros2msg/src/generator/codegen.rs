@@ -504,11 +504,13 @@ impl CodeGenerator {
         format!("{pkg}::{ftype}::{module_name}::{type_name}")
     }
 
-    /// Determine if a field is an array and get its size
+    /// Determine if a field is a fixed-size array and get its size.
+    /// Note: `BoundedSequence` is NOT an array - it's a sequence with max capacity.
+    /// Arrays are [T; N] in Rust, sequences are Vec<T>.
     fn get_array_info(member_type: &IdlType, typedef_map: &HashMap<String, Type>) -> Option<u32> {
         match member_type {
             IdlType::Array(arr) => Some(arr.size),
-            IdlType::BoundedSequence(seq) => Some(seq.maximum_size),
+            // BoundedSequence is NOT an array - it uses capacity, not array_size
             IdlType::Named(n) => {
                 // Check if this is a typedef - if so, look it up in the map
                 let trimmed_name = n.name.trim();

@@ -50,7 +50,7 @@ fn default_interface_type() -> String {
 /// Field-level attributes for ROS2 type metadata
 ///
 /// Used by both `TypeDescription` and `Ros2Msg` derives.
-#[derive(Debug, FromField)]
+#[derive(Debug, Clone, FromField)]
 #[darling(attributes(ros2))]
 pub struct Ros2FieldOpts {
     pub ident: Option<syn::Ident>,
@@ -63,6 +63,11 @@ pub struct Ros2FieldOpts {
     /// Capacity for bounded strings/sequences
     #[darling(default)]
     pub capacity: Option<u64>,
+
+    /// Explicitly mark this field as a sequence.
+    /// Use `#[ros2(sequence)]` on the field (flag-style).
+    #[darling(default)]
+    pub sequence: bool,
 
     /// Default value for the field
     #[darling(default)]

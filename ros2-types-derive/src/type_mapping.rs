@@ -86,22 +86,6 @@ pub fn is_nested_type(ty: &Type) -> bool {
                         | "c_char"
                         | "c_schar"
                         | "c_uchar"
-                        // ROS FFI types - these are NOT nested ROS message types
-                        | "RosString"
-                        | "RosWString"
-                        | "BoolSeq"
-                        | "I8Seq"
-                        | "I16Seq"
-                        | "I32Seq"
-                        | "I64Seq"
-                        | "U8Seq"
-                        | "U16Seq"
-                        | "U32Seq"
-                        | "U64Seq"
-                        | "F32Seq"
-                        | "F64Seq"
-                        | "RosStringSeq"
-                        | "RosWStringSeq"
                 )
             } else {
                 false
@@ -116,8 +100,32 @@ pub fn collect_referenced_types(field_opts: &[Ros2FieldOpts]) -> Vec<TokenStream
     let mut referenced = Vec::new();
 
     for field_opt in field_opts {
-        // Extract the actual nested type, unwrapping Vec if needed
-        let nested_ty = extract_nested_type(&field_opt.ty);
+        // Attempt to extract nested type.
+        // Priority: 1) If field is explicitly marked `sequence`, try to get generic inner type (Sequence<T> or similar).
+        //           2) Fallback to extracting nested from Vec<T> or direct nested type.
+        let nested_ty = if field_opt.sequence {
+            // Try to extract generic inner type for path types like Sequence<T>
+            match &field_opt.ty {
+                Type::Path(type_path) => {
+                    if let Some(segment) = type_path.path.segments.last() {
+                        use syn::PathArguments;
+                        if let PathArguments::AngleBracketed(args) = &segment.arguments
+                            && let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first()
+                        {
+                            extract_nested_type(inner_ty)
+                        } else {
+                            // Fallback to Vec/T handling
+                            extract_nested_type(&field_opt.ty)
+                        }
+                    } else {
+                        extract_nested_type(&field_opt.ty)
+                    }
+                }
+                _ => extract_nested_type(&field_opt.ty),
+            }
+        } else {
+            extract_nested_type(&field_opt.ty)
+        };
 
         if let Some(ty) = nested_ty {
             // Call type_description() on the nested type to get its FULL description
@@ -140,8 +148,7 @@ pub fn collect_referenced_types(field_opts: &[Ros2FieldOpts]) -> Vec<TokenStream
 /// Map Rust types to ROS2 FieldType for TypeDescription
 pub fn map_rust_type_to_field_type(
     ty: &Type,
-    ros2_type: Option<&str>,
-    ros2_capacity: Option<u64>,
+    field_opts: &crate::attrs::Ros2FieldOpts,
 ) -> TokenStream {
     use syn::{PathArguments, PathSegment};
 
@@ -161,12 +168,54 @@ pub fn map_rust_type_to_field_type(
             };
         } else {
             // For [primitive; N], use array with encoded type_id
-            let elem_field_type = map_rust_type_to_field_type(elem_ty, ros2_type, None);
+            let elem_field_type = map_rust_type_to_field_type(elem_ty, field_opts);
 
             return quote! {
                 {
                     let inner = #elem_field_type;
                     ros2_types::types::FieldType::array(inner.type_id, #len as u64)
+                }
+            };
+        }
+    }
+
+    // If the field is explicitly marked as a sequence, try to extract
+    // a generic inner type (works for Vec<T>, Sequence<T>, or other
+    // wrapper types with angle-bracketed generic args). This makes the
+    // derive attribute-driven instead of relying on the outer type
+    // being literally `Vec`.
+    if field_opts.sequence
+        && let Type::Path(type_path) = ty
+        && let Some(PathSegment {
+            arguments: PathArguments::AngleBracketed(args),
+            ..
+        }) = type_path.path.segments.last()
+        && let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first()
+    {
+        // Prevent outer `sequence` attr from influencing inner mapping
+        let mut inner_opts = field_opts.clone();
+        inner_opts.sequence = false;
+        let inner_field_type = map_rust_type_to_field_type(inner_ty, &inner_opts);
+        if let Some(cap) = field_opts.capacity {
+            return quote! {
+                {
+                    let inner = #inner_field_type;
+                    if inner.type_id == ros2_types::FIELD_TYPE_NESTED_TYPE {
+                        ros2_types::types::FieldType::nested_bounded_sequence(&inner.nested_type_name, #cap)
+                    } else {
+                        ros2_types::types::FieldType::bounded_sequence(inner.type_id, #cap)
+                    }
+                }
+            };
+        } else {
+            return quote! {
+                {
+                    let inner = #inner_field_type;
+                    if inner.type_id == ros2_types::FIELD_TYPE_NESTED_TYPE {
+                        ros2_types::types::FieldType::nested_sequence(&inner.nested_type_name)
+                    } else {
+                        ros2_types::types::FieldType::sequence(inner.type_id)
+                    }
                 }
             };
         }
@@ -206,13 +255,17 @@ pub fn map_rust_type_to_field_type(
     if let Type::Path(type_path) = ty {
         let path_str = quote!(#type_path).to_string().replace(' ', "");
         if path_str.contains("std") && path_str.ends_with("String") {
-            if matches!(ros2_type, Some("wstring")) {
-                if let Some(capacity) = ros2_capacity {
+            // Determine if this should be treated as wstring via explicit attribute or ros2_type
+            // Only treat as wstring when explicitly overridden via ros2_type="wstring".
+            // The `string` attribute is not a marker for wide strings.
+            let is_wstring = matches!(field_opts.ros2_type.as_deref(), Some("wstring"));
+            if is_wstring {
+                if let Some(capacity) = field_opts.capacity {
                     return quote! { ros2_types::types::FieldType::bounded_wstring(#capacity) };
                 } else {
                     return quote! { ros2_types::types::FieldType::primitive(ros2_types::FIELD_TYPE_WSTRING) };
                 }
-            } else if let Some(capacity) = ros2_capacity {
+            } else if let Some(capacity) = field_opts.capacity {
                 return quote! { ros2_types::types::FieldType::bounded_string(#capacity) };
             } else {
                 return quote! { ros2_types::types::FieldType::primitive(ros2_types::FIELD_TYPE_STRING) };
@@ -222,14 +275,14 @@ pub fn map_rust_type_to_field_type(
 
     match type_name.as_str() {
         "i8" => {
-            if matches!(ros2_type, Some("char")) {
+            if matches!(field_opts.ros2_type.as_deref(), Some("char")) {
                 quote! { ros2_types::types::FieldType::primitive(ros2_types::FIELD_TYPE_CHAR) }
             } else {
                 quote! { ros2_types::types::FieldType::primitive(ros2_types::FIELD_TYPE_INT8) }
             }
         }
         "u8" => {
-            if matches!(ros2_type, Some("byte")) {
+            if matches!(field_opts.ros2_type.as_deref(), Some("byte")) {
                 quote! { ros2_types::types::FieldType::primitive(ros2_types::FIELD_TYPE_BYTE) }
             } else {
                 quote! { ros2_types::types::FieldType::primitive(ros2_types::FIELD_TYPE_UINT8) }
@@ -263,13 +316,15 @@ pub fn map_rust_type_to_field_type(
             quote! { ros2_types::types::FieldType::primitive(ros2_types::FIELD_TYPE_BOOLEAN) }
         }
         "String" => {
-            if ros2_type == Some("wstring") {
-                if let Some(capacity) = ros2_capacity {
+            // Fallback for types declared as `String` in the AST but not matching the std:: path check above.
+            let is_wstring = matches!(field_opts.ros2_type.as_deref(), Some("wstring"));
+            if is_wstring {
+                if let Some(capacity) = field_opts.capacity {
                     quote! { ros2_types::types::FieldType::bounded_wstring(#capacity) }
                 } else {
                     quote! { ros2_types::types::FieldType::primitive(ros2_types::FIELD_TYPE_WSTRING) }
                 }
-            } else if let Some(capacity) = ros2_capacity {
+            } else if let Some(capacity) = field_opts.capacity {
                 quote! { ros2_types::types::FieldType::bounded_string(#capacity) }
             } else {
                 quote! { ros2_types::types::FieldType::primitive(ros2_types::FIELD_TYPE_STRING) }
@@ -284,8 +339,11 @@ pub fn map_rust_type_to_field_type(
         "c_uchar" => {
             quote! { ros2_types::types::FieldType::primitive(ros2_types::FIELD_TYPE_UINT8) }
         }
+        // Vec<T> without explicit #[ros2(sequence)] is an error or legacy fallback.
+        // With proper generator output, all sequences should have the attribute set.
+        // We keep a minimal fallback for backward compatibility but it should rarely be hit.
         "Vec" => {
-            // Handle Vec<T> - unbounded sequence
+            // Handle Vec<T> - unbounded sequence (fallback for legacy code)
             if let Type::Path(type_path) = ty
                 && let Some(PathSegment {
                     arguments: PathArguments::AngleBracketed(args),
@@ -293,31 +351,20 @@ pub fn map_rust_type_to_field_type(
                 }) = type_path.path.segments.last()
                 && let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first()
             {
-                let inner_field_type = map_rust_type_to_field_type(inner_ty, ros2_type, None);
+                let mut inner_opts = field_opts.clone();
+                inner_opts.sequence = false;
+                let inner_field_type = map_rust_type_to_field_type(inner_ty, &inner_opts);
 
-                if let Some(capacity) = ros2_capacity {
-                    return quote! {
-                        {
-                            let inner = #inner_field_type;
-                            if inner.type_id == ros2_types::FIELD_TYPE_NESTED_TYPE {
-                                ros2_types::types::FieldType::nested_bounded_sequence(&inner.nested_type_name, #capacity)
-                            } else {
-                                ros2_types::types::FieldType::bounded_sequence(inner.type_id, #capacity)
-                            }
+                return quote! {
+                    {
+                        let inner = #inner_field_type;
+                        if inner.type_id == ros2_types::FIELD_TYPE_NESTED_TYPE {
+                            ros2_types::types::FieldType::nested_sequence(&inner.nested_type_name)
+                        } else {
+                            ros2_types::types::FieldType::sequence(inner.type_id)
                         }
-                    };
-                } else {
-                    return quote! {
-                        {
-                            let inner = #inner_field_type;
-                            if inner.type_id == ros2_types::FIELD_TYPE_NESTED_TYPE {
-                                ros2_types::types::FieldType::nested_sequence(&inner.nested_type_name)
-                            } else {
-                                ros2_types::types::FieldType::sequence(inner.type_id)
-                            }
-                        }
-                    };
-                }
+                    }
+                };
             }
             quote! { ros2_types::types::FieldType::primitive(ros2_types::FIELD_TYPE_NOT_SET) }
         }

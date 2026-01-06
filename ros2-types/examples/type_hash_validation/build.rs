@@ -44,6 +44,24 @@ impl ParseCallbacks for TypeDescCallbacks {
             ros2_parts.push(format!("ros2_type = \"{}\"", type_override));
         }
 
+        // If the field is a sequence (not a fixed-size array), mark it explicitly
+        // so derives know. Fixed-size arrays have `array_size()` set and are
+        // represented as arrays in ROS2, not sequences.
+        //
+        // Detection methods:
+        // 1. ROS type name starts with "sequence" (explicit IDL sequence)
+        // 2. Has capacity but no array_size (bounded sequence)
+        // 3. Rust field type is Vec<...> without array_size (unbounded sequence)
+        let ros_type_name = field_info.ros_type_name();
+        let rust_type = field_info.field_type();
+        let is_sequence = ros_type_name.starts_with("sequence")
+            || (field_info.capacity().is_some() && field_info.array_size().is_none())
+            || (rust_type.starts_with("Vec<") && field_info.array_size().is_none());
+
+        if is_sequence {
+            ros2_parts.push("sequence".to_string());
+        }
+
         // Add capacity if present
         if let Some(capacity) = field_info.capacity() {
             ros2_parts.push(format!("capacity = {}", capacity));
