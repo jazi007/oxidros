@@ -1,0 +1,283 @@
+// Complete IDL Grammar for Pest Parser  
+// Full ROS2 IDL specification implementation matching grammar.lark
+
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+COMMENT = _{ line_comment | block_comment }
+line_comment = { "//" ~ (!"\n" ~ ANY)* }
+block_comment = { "/*" ~ (!"*/" ~ ANY)* ~ "*/" }
+
+// Keywords
+KW_MODULE = @{ "module" ~ !(ASCII_ALPHANUMERIC | "_") }
+KW_CONST = @{ "const" ~ !(ASCII_ALPHANUMERIC | "_") }
+KW_STRUCT = @{ "struct" ~ !(ASCII_ALPHANUMERIC | "_") }
+KW_ENUM = { "enum" }
+KW_UNION = { "union" }
+KW_SWITCH = { "switch" }
+KW_CASE = { "case" }
+KW_DEFAULT = { "default" }
+KW_SEQUENCE = { "sequence" }
+KW_STRING = { "string" }
+KW_WSTRING = { "wstring" }
+KW_FIXED = { "fixed" }
+KW_ANY = { "any" }
+KW_NATIVE = { "native" }
+KW_VALUEBASE = { "ValueBase" }
+KW_OBJECT = { "Object" }
+KW_BOOLEAN = { "boolean" }
+KW_OCTET = { "octet" }
+KW_CHAR = { "char" }
+KW_WCHAR = { "wchar" }
+KW_FLOAT = @{ "float" ~ !(ASCII_ALPHANUMERIC | "_") }
+KW_DOUBLE = @{ "double" ~ !(ASCII_ALPHANUMERIC | "_") }
+KW_LONG = @{ "long" ~ !(ASCII_ALPHANUMERIC | "_") }
+KW_SHORT = @{ "short" ~ !(ASCII_ALPHANUMERIC | "_") }
+KW_UNSIGNED = @{ "unsigned" ~ !(ASCII_ALPHANUMERIC | "_") }
+KW_SIGNED = @{ "signed" ~ !(ASCII_ALPHANUMERIC | "_") }
+KW_INT8 = @{ "int8" ~ !(ASCII_ALPHANUMERIC | "_") }
+KW_INT16 = @{ "int16" ~ !(ASCII_ALPHANUMERIC | "_") }
+KW_INT32 = @{ "int32" ~ !(ASCII_ALPHANUMERIC | "_") }
+KW_INT64 = @{ "int64" ~ !(ASCII_ALPHANUMERIC | "_") }
+KW_UINT8 = @{ "uint8" ~ !(ASCII_ALPHANUMERIC | "_") }
+KW_UINT16 = @{ "uint16" ~ !(ASCII_ALPHANUMERIC | "_") }
+KW_UINT32 = @{ "uint32" ~ !(ASCII_ALPHANUMERIC | "_") }
+KW_UINT64 = @{ "uint64" ~ !(ASCII_ALPHANUMERIC | "_") }
+KW_FLOAT32 = { "float32" }
+KW_FLOAT64 = { "float64" }
+KW_TRUE = { "true" | "TRUE" }
+KW_FALSE = { "false" | "FALSE" }
+KW_TYPEDEF = { "typedef" }
+KW_INTERFACE = { "interface" }
+KW_EXCEPTION = { "exception" }
+KW_RAISES = { "raises" }
+KW_READONLY = { "readonly" }
+KW_ATTRIBUTE = { "attribute" }
+
+// Literals  
+decimal_literal = @{ (!"0" ~ ASCII_DIGIT ~ ASCII_DIGIT*) | "0" }
+hex_literal = @{ "0" ~ ("x" | "X") ~ ASCII_HEX_DIGIT+ }
+octal_literal = @{ "0" ~ ASCII_OCT_DIGIT+ }
+
+float_literal = @{
+    ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT* ~ (("e" | "E") ~ ("+" | "-")? ~ ASCII_DIGIT+)? |
+    "." ~ ASCII_DIGIT+ ~ (("e" | "E") ~ ("+" | "-")? ~ ASCII_DIGIT+)? |
+    ASCII_DIGIT+ ~ ("e" | "E") ~ ("+" | "-")? ~ ASCII_DIGIT+
+}
+
+string_literal = @{ "\"" ~ (!"\"" ~ (escape_seq | ANY))* ~ "\"" }
+string_concat = { string_literal ~ (string_literal)* }
+wide_string_literal = @{ "L\"" ~ (!"\"" ~ (escape_seq | ANY))* ~ "\"" }
+char_literal = @{ "'" ~ (escape_seq | (!"'" ~ ANY)) ~ "'" }
+wide_char_literal = @{ "L'" ~ (escape_seq | (!"'" ~ ANY)) ~ "'" }
+escape_seq = @{ "\\" ~ (("x" ~ ASCII_HEX_DIGIT ~ ASCII_HEX_DIGIT) | ("u" ~ ASCII_HEX_DIGIT{4}) | ("U" ~ ASCII_HEX_DIGIT{8}) | ANY) }
+
+boolean_literal = { KW_TRUE | KW_FALSE }
+fixed_pt_literal = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ ~ ("d" | "D") }
+
+identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+
+// Main entry point
+specification = { SOI ~ (include_directive | definition)* ~ EOI }
+
+// Include directive
+include_directive = { "#include" ~ (string_literal | angle_bracket_include) }
+angle_bracket_include = { "<" ~ (!(">" | "\n") ~ ANY)+ ~ ">" }
+
+// Definitions
+definition = {
+    module |
+    const_dcl |
+    type_dcl |
+    except_dcl |
+    interface |
+    value |
+    type_id_dcl |
+    type_prefix_dcl |
+    event |
+    component |
+    home
+}
+
+// Type declarations
+type_dcl = {
+    typedef_dcl |
+    struct_type |
+    union_type |
+    enum_type |
+    bitmask_type
+}
+
+typedef_dcl = { annotation* ~ KW_TYPEDEF ~ type_declarator ~ ";" }
+type_declarator = { type_spec ~ declarators }
+declarators = { declarator ~ ("," ~ declarator)* }
+
+// Exception declaration
+except_dcl = { annotation* ~ KW_EXCEPTION ~ identifier ~ "{" ~ member* ~ "}" }
+
+// Interface declaration (stub for now)
+interface = { annotation* ~ KW_INTERFACE ~ identifier ~ "{" ~ "}" }
+value = { annotation* ~ "value" ~ identifier ~ "{" ~ "}" }
+type_id_dcl = { "typeid" ~ scoped_name ~ string_literal }
+type_prefix_dcl = { "typeprefix" ~ scoped_name ~ string_literal }
+event = { annotation* ~ "event" ~ identifier ~ "{" ~ "}" }
+component = { annotation* ~ "component" ~ identifier ~ "{" ~ "}" }
+home = { annotation* ~ "home" ~ identifier ~ "{" ~ "}" }
+
+// Module declaration
+module = { annotation* ~ KW_MODULE ~ identifier ~ "{" ~ definition* ~ "}" ~ ";"? }
+
+// Annotations
+annotation = { "@" ~ scoped_name ~ ("(" ~ annotation_appl_params ~ ")")? }
+annotation_appl_params = { (annotation_appl_param ~ ("," ~ annotation_appl_param)*) | const_expr }
+annotation_appl_param = { identifier ~ "=" ~ const_expr }
+
+// Constant declaration
+const_dcl = { annotation* ~ KW_CONST ~ const_type ~ identifier ~ "=" ~ const_expr ~ ";" }
+
+// Type declarations
+struct_type = { annotation* ~ KW_STRUCT ~ identifier ~ "{" ~ member* ~ "}" ~ ";" }
+member = { annotation* ~ type_spec ~ declarator ~ ";" }
+
+enum_type = { annotation* ~ KW_ENUM ~ identifier ~ "{" ~ enumerator ~ ("," ~ enumerator)* ~ "}" ~ ";" }
+enumerator = { annotation* ~ identifier }
+
+bitmask_type = { annotation* ~ "bitmask" ~ identifier ~ "{" ~ bit_value ~ ("," ~ bit_value)* ~ ","? ~ "}" ~ ";" }
+bit_value = { annotation* ~ identifier }
+
+union_type = { annotation* ~ KW_UNION ~ identifier ~ KW_SWITCH ~ "(" ~ switch_type_spec ~ ")" ~ "{" ~ case* ~ "}" ~ ";"? }
+switch_type_spec = { integer_type | char_type | boolean_type | scoped_name }
+case = { case_label+ ~ element_spec }
+case_label = { (KW_CASE ~ const_expr ~ ":") | (KW_DEFAULT ~ ":") }
+element_spec = { annotation* ~ type_spec ~ declarator ~ ";" }
+
+// Type specifications
+type_spec = {
+    simple_type_spec |
+    constr_type_spec
+}
+
+simple_type_spec = {
+    base_type_spec |
+    template_type_spec |
+    scoped_name
+}
+
+base_type_spec = {
+    floating_pt_type |
+    integer_type |
+    char_type |
+    wide_char_type |
+    boolean_type |
+    octet_type |
+    any_type |
+    object_type |
+    value_base_type
+}
+
+template_type_spec = {
+    sequence_type |
+    string_type |
+    wide_string_type |
+    fixed_pt_type
+}
+
+constr_type_spec = {
+    struct_type |
+    union_type |
+    enum_type
+}
+
+// Basic types
+floating_pt_type = { 
+    KW_FLOAT | KW_DOUBLE | 
+    ("long" ~ KW_DOUBLE) | 
+    KW_FLOAT32 | KW_FLOAT64 
+}
+
+integer_type = { signed_int | unsigned_int }
+
+signed_int = { 
+    signed_longlong_int | 
+    signed_long_int | 
+    signed_short_int | 
+    KW_INT8 | KW_INT16 | KW_INT32 | KW_INT64 
+}
+
+unsigned_int = { 
+    unsigned_longlong_int |
+    unsigned_long_int |
+    unsigned_short_int |
+    KW_UINT8 | KW_UINT16 | KW_UINT32 | KW_UINT64 
+}
+
+signed_short_int = { KW_SHORT }
+signed_long_int = { KW_LONG }
+signed_longlong_int = { KW_LONG ~ KW_LONG }
+unsigned_short_int = { KW_UNSIGNED ~ KW_SHORT }
+unsigned_long_int = { KW_UNSIGNED ~ KW_LONG }
+unsigned_longlong_int = { KW_UNSIGNED ~ KW_LONG ~ KW_LONG }
+
+char_type = { KW_CHAR }
+wide_char_type = { KW_WCHAR }
+boolean_type = { KW_BOOLEAN }
+octet_type = { KW_OCTET }
+any_type = { KW_ANY }
+object_type = { KW_OBJECT }
+value_base_type = { KW_VALUEBASE }
+
+// Template types
+sequence_type = { KW_SEQUENCE ~ "<" ~ type_spec ~ ("," ~ positive_int_const)? ~ ">" }
+string_type = { KW_STRING ~ ("<" ~ positive_int_const ~ ">")? }
+wide_string_type = { KW_WSTRING ~ ("<" ~ positive_int_const ~ ">")? }
+fixed_pt_type = { KW_FIXED ~ "<" ~ positive_int_const ~ "," ~ positive_int_const ~ ">" }
+
+// Constant types (specific types must come before scoped_name to avoid matching keywords as identifiers)
+const_type = {
+    integer_type |
+    char_type |
+    wide_char_type |
+    boolean_type |
+    floating_pt_type |
+    string_type |
+    wide_string_type |
+    fixed_pt_type |
+    octet_type |
+    scoped_name
+}
+
+// Expressions
+const_expr = { or_expr }
+or_expr = { xor_expr ~ ("|" ~ xor_expr)* }
+xor_expr = { and_expr ~ ("^" ~ and_expr)* }
+and_expr = { shift_expr ~ ("&" ~ shift_expr)* }
+shift_expr = { add_expr ~ (("<<" | ">>") ~ add_expr)* }
+add_expr = { mult_expr ~ (("+" | "-") ~ mult_expr)* }
+mult_expr = { unary_expr ~ (("*" | "/" | "%") ~ unary_expr)* }
+unary_expr = { (unary_operator ~ unary_expr) | primary_expr }
+unary_operator = { "+" | "-" | "~" }
+// Note: literal must come before scoped_name to handle boolean literals (TRUE/FALSE) correctly
+primary_expr = { literal | scoped_name | ("(" ~ const_expr ~ ")") }
+
+// Literals
+literal = {
+    floating_pt_literal |
+    integer_literal |
+    character_literal |
+    wide_character_literal |
+    string_concat |
+    wide_string_literal |
+    boolean_literal |
+    fixed_pt_literal
+}
+
+integer_literal = { hex_literal | octal_literal | decimal_literal }
+floating_pt_literal = { float_literal }
+character_literal = { char_literal }
+wide_character_literal = { wide_char_literal }
+
+// Names and declarators
+scoped_name = { identifier ~ ("::" ~ identifier)* }
+declarator = { pointer_declarator | direct_declarator }
+pointer_declarator = { "*" ~ direct_declarator }
+direct_declarator = { identifier ~ ("[" ~ positive_int_const ~ "]")* }
+
+positive_int_const = { const_expr }

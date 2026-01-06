@@ -1,0 +1,35 @@
+[package]
+name = "ros2-types"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license-file.workspace = true
+repository.workspace = true
+description = "ROS2 type support: traits, type descriptions, and RIHS01 hash calculation"
+readme = "README.md"
+keywords = ["ros2", "robotics", "types", "type-description"]
+categories = ["encoding", "parser-implementations"]
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = "0.10"
+thiserror = "2"
+
+# Optional derive macro support
+ros2-types-derive = { path = "../ros2-types-derive", optional = true }
+
+[features]
+default = []
+derive = ["ros2-types-derive"]
+# Enable FFI code generation for ROS2 C libraries
+# When this feature is enabled, Ros2Msg derive generates extern "C" bindings
+rcl = ["ros2-types-derive/rcl"]
+
+[lints.rust]
+# Allow the rcl feature check in generated code even when rcl is not enabled
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("rcl"))'] }
+
+[dev-dependencies]
+serde_json.workspace = true
+ros2msg = { path = "../ros2msg", features = ["serde"] }

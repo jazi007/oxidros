@@ -1,0 +1,20 @@
+module rosidl_parser {
+  module srv {
+    module MyService_Request {
+      const short SHORT_CONSTANT = -23;
+    };
+
+    struct MyService_Request {
+      int8 input_value_a;
+      uint32 input_value_b;
+    };
+
+    module MyService_Response {
+      const unsigned long UNSIGNED_LONG_CONSTANT = 42;
+    };
+
+    struct MyService_Response {
+      float output_value_a;
+    };
+  };
+};

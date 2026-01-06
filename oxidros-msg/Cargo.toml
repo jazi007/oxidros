@@ -15,7 +15,7 @@ oxidros-core = { path = "../oxidros-core" }
 log.workspace = true
 widestring = "1.2.1"
 # Re-export ros2-types traits for generated code
-ros2-types = { path = "../../ros2utils/crates/ros2-types", features = ["derive"] }
+ros2-types = { path = "../ros2-types", features = ["derive"] }
 
 [features]
 default = []
@@ -26,7 +26,7 @@ kilted = ["rcl"]
 rcl = ["ros2-types/rcl"]
 
 [build-dependencies]
-ros2msg = { path = "../../ros2utils/crates/ros2msg" }
+ros2msg = { path = "../ros2msg" }
 oxidros-build = { path = "../oxidros-build" }
 quote = "1.0"
 proc-macro2 = "1.0"

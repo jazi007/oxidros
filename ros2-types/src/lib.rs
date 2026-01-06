@@ -1,0 +1,48 @@
+//! ROS2 type support library
+//!
+//! This crate provides core traits and utilities for ROS2 message types,
+//! including RIHS01 (ROS Interface Hashing Standard v1) type hash calculation.
+//!
+//! # Features
+//!
+//! - `derive`: Enable derive macros for `TypeDescription` and `Ros2Msg`
+//!
+//! # Traits
+//!
+//! This crate provides several traits for ROS2 message types:
+//!
+//! - `TypeSupport`: For types with type support information
+//! - `TryClone`: For types that can fail cloning (FFI types)
+//! - `ServiceMsg`: For ROS2 service types (Request/Response pairs)
+//! - `ActionMsg`: For ROS2 action types (Goal/Result/Feedback)
+//! - `ActionGoal`, `ActionResult`: For action service types
+//! - `GetUUID`, `GoalResponse`, `ResultResponse`: Helper traits for actions
+
+mod error;
+mod hash;
+mod traits;
+mod type_description;
+pub mod types;
+
+pub use error::{Error, Result};
+pub use hash::{calculate_type_hash, parse_rihs_string};
+pub use traits::{
+    ActionGoal, ActionMsg, ActionResult, GetUUID, GoalResponse, ResultResponse, SequenceRaw,
+    ServiceMsg, TryClone, TypeSupport, UnsafeDuration, UnsafeTime,
+};
+pub use type_description::{MessageTypeName, TypeDescription};
+pub use types::{
+    FIELD_TYPE_BOOLEAN, FIELD_TYPE_BOUNDED_STRING, FIELD_TYPE_BOUNDED_WSTRING, FIELD_TYPE_BYTE,
+    FIELD_TYPE_CHAR, FIELD_TYPE_DOUBLE, FIELD_TYPE_FIXED_STRING, FIELD_TYPE_FIXED_WSTRING,
+    FIELD_TYPE_FLOAT, FIELD_TYPE_INT8, FIELD_TYPE_INT16, FIELD_TYPE_INT32, FIELD_TYPE_INT64,
+    FIELD_TYPE_LONG_DOUBLE, FIELD_TYPE_NESTED_TYPE, FIELD_TYPE_NOT_SET, FIELD_TYPE_STRING,
+    FIELD_TYPE_UINT8, FIELD_TYPE_UINT16, FIELD_TYPE_UINT32, FIELD_TYPE_UINT64, FIELD_TYPE_WCHAR,
+    FIELD_TYPE_WSTRING,
+};
+
+// Note: Field, FieldType, IndividualTypeDescription, TypeDescriptionMsg are NOT re-exported
+// at the crate root to avoid conflicts with generated type_description_interfaces messages.
+// Access them via ros2_types::types::{Field, FieldType, ...} if needed.
+
+#[cfg(feature = "derive")]
+pub use ros2_types_derive::{Ros2Msg, TypeDescription, ros2_action, ros2_service};
