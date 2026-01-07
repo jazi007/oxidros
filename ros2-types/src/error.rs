@@ -62,4 +62,8 @@ pub enum Error {
     /// Type description error
     #[error(transparent)]
     TypeDescriptionError(#[from] TypeDescriptionError),
+
+    /// CDR serialization error
+    #[error("CDR serialization error: {0}")]
+    CdrError(String),
 }

@@ -14,6 +14,9 @@ proc-macro = true
 default = []
 # Enable FFI code generation for ROS2 C libraries (rcl)
 rcl = []
+# Enable native CDR serialization (generates serde derives + cdr-encoding)
+# Use this for Zenoh, iceoryx2, ros2-client, or any native Rust implementation
+native = []
 
 [dependencies]
 syn = { version = "2.0", features = ["full", "extra-traits"] }

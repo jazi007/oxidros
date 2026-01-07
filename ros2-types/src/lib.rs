@@ -6,17 +6,34 @@
 //! # Features
 //!
 //! - `derive`: Enable derive macros for `TypeDescription` and `Ros2Msg`
+//! - `native`: Enable native CDR serialization (for Zenoh, iceoryx2, etc.)
 //!
 //! # Traits
 //!
 //! This crate provides several traits for ROS2 message types:
 //!
-//! - `TypeSupport`: For types with type support information
+//! - `TypeSupport`: For types with type support information and CDR serialization
 //! - `TryClone`: For types that can fail cloning (FFI types)
 //! - `ServiceMsg`: For ROS2 service types (Request/Response pairs)
 //! - `ActionMsg`: For ROS2 action types (Goal/Result/Feedback)
 //! - `ActionGoal`, `ActionResult`: For action service types
 //! - `GetUUID`, `GoalResponse`, `ResultResponse`: Helper traits for actions
+//!
+//! # Native CDR Serialization
+//!
+//! When the `native` feature is enabled, message types can be serialized/deserialized
+//! using CDR encoding (compatible with DDS/ROS2):
+//!
+//! ```ignore
+//! use ros2_types::TypeSupport;
+//!
+//! let msg = std_msgs::msg::String { data: "hello".into() };
+//! let bytes = msg.to_bytes()?;
+//! let decoded = std_msgs::msg::String::from_bytes(&bytes)?;
+//! ```
+//!
+//! **Note**: When using `native` feature, message structs must derive
+//! `serde::Serialize` and `serde::Deserialize`.
 
 mod error;
 mod hash;
@@ -46,3 +63,9 @@ pub use types::{
 
 #[cfg(feature = "derive")]
 pub use ros2_types_derive::{Ros2Msg, TypeDescription, ros2_action, ros2_service};
+
+// Re-export cdr-encoding dependencies for generated code
+#[cfg(feature = "native")]
+pub use byteorder;
+#[cfg(feature = "native")]
+pub use cdr_encoding;

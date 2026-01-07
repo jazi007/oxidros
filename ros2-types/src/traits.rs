@@ -3,18 +3,54 @@
 //! This module provides traits for ROS2 messages, services, and actions
 //! that are used by the derive macros.
 
+use crate::Result;
 use std::ffi::c_void;
 
 /// Trait for types that have type support information.
 ///
 /// This allows the runtime to understand the structure of messages
 /// for serialization and deserialization.
+///
+/// # Serialization
+///
+/// The `to_bytes` and `from_bytes` methods provide CDR serialization:
+/// - For RCL (DDS-based): Uses `rmw_serialize`/`rmw_deserialize` internally
+/// - For native Zenoh: Uses serde with `cdr-encoding` crate
 pub trait TypeSupport: 'static {
     /// Returns an opaque pointer to the type support structure.
     ///
     /// The actual type of this pointer depends on the implementation
     /// (e.g., `rosidl_message_type_support_t` in RCL).
     fn type_support() -> *const c_void;
+
+    /// Serialize this message to CDR-encoded bytes.
+    ///
+    /// # Implementation
+    /// - `rcl` feature: Uses RMW serialization functions
+    /// - `zenoh` feature: Uses serde + cdr-encoding crate
+    ///
+    /// # Errors
+    /// Returns `Error::CdrError` if serialization fails.
+    fn to_bytes(&self) -> Result<Vec<u8>>;
+
+    /// Deserialize a message from CDR-encoded bytes.
+    ///
+    /// # Implementation
+    /// - `rcl` feature: Uses RMW deserialization functions
+    /// - `zenoh` feature: Uses serde + cdr-encoding crate
+    ///
+    /// # Errors
+    /// Returns `Error::CdrError` if deserialization fails.
+    fn from_bytes(bytes: &[u8]) -> Result<Self>
+    where
+        Self: Sized;
+
+    /// Returns the type name in DDS format.
+    ///
+    /// Example: `"std_msgs::msg::dds_::String_"`
+    ///
+    /// This is used for Zenoh key expressions and type matching.
+    fn type_name() -> &'static str;
 }
 
 /// Trait for type that can fail cloning

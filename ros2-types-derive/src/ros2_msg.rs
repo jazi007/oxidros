@@ -68,6 +68,7 @@ pub fn derive_ros2_msg_impl(input: DeriveInput) -> Result<TokenStream, syn::Erro
     let rcl_impl = generate_rcl_impl(&opts, &field_opts);
     let pure_impl = generate_pure_impl(&opts, &field_opts);
     let common_impl = generate_common_impl(&opts);
+    let native_impl = generate_native_impl(&opts);
 
     // Generate service/action wrappers (must be at module level, not inside const _)
     let wrapper_impl = generate_wrapper_impl(&opts);
@@ -84,6 +85,12 @@ pub fn derive_ros2_msg_impl(input: DeriveInput) -> Result<TokenStream, syn::Erro
         #[cfg(not(feature = "rcl"))]
         const _: () = {
             #pure_impl
+        };
+
+        // Native implementations (CDR serialization for non-RCL backends)
+        #[cfg(feature = "native")]
+        const _: () = {
+            #native_impl
         };
 
         // Service/Action wrappers (at module level so they're accessible)
@@ -523,6 +530,57 @@ fn generate_pure_impl(opts: &Ros2TypeOpts, field_opts: &[Ros2FieldOpts]) -> Toke
         {
             fn eq(&self, other: &Self) -> bool {
                 self.0 == other.0
+            }
+        }
+    }
+}
+
+/// Generate native implementations (CDR serialization for non-RCL backends)
+///
+/// This generates:
+/// - `to_bytes()` using cdr-encoding serialization (Little Endian, as per DDS/ROS2)
+/// - `from_bytes()` using cdr-encoding deserialization  
+/// - `type_name()` returning DDS-formatted type name
+///
+/// These implementations are used by Zenoh, iceoryx2, ros2-client,
+/// or any other native Rust ROS2 implementation.
+///
+/// # Requirements
+///
+/// The struct must derive `serde::Serialize` and `serde::Deserialize`:
+/// ```ignore
+/// #[derive(Ros2Msg, serde::Serialize, serde::Deserialize)]
+/// #[ros2(package = "std_msgs", interface_type = "msg")]
+/// pub struct MyMessage { ... }
+/// ```
+fn generate_native_impl(opts: &Ros2TypeOpts) -> TokenStream {
+    let name = &opts.ident;
+    let package = &opts.package;
+    let interface_type = &opts.interface_type;
+
+    // DDS type name format: "pkg_name::interface_type::dds_::TypeName_"
+    let dds_type_name = format!("{}::{}::dds_::{}_", package, interface_type, name);
+
+    quote! {
+        impl ros2_types::TypeSupport for #name {
+            fn type_support() -> *const std::ffi::c_void {
+                // Native implementation doesn't use type support pointers
+                std::ptr::null()
+            }
+
+            fn to_bytes(&self) -> ros2_types::Result<Vec<u8>> {
+                ros2_types::cdr_encoding::to_vec::<Self, ros2_types::byteorder::LittleEndian>(self)
+                    .map_err(|e| ros2_types::Error::CdrError(e.to_string()))
+            }
+
+            fn from_bytes(bytes: &[u8]) -> ros2_types::Result<Self> {
+                ros2_types::cdr_encoding::from_bytes::<Self, ros2_types::byteorder::LittleEndian>(bytes)
+                    .map(|(msg, _bytes_consumed)| msg)
+                    .map_err(|e| ros2_types::Error::CdrError(e.to_string()))
+            }
+
+            fn type_name() -> &'static str {
+                #dds_type_name
             }
         }
     }
