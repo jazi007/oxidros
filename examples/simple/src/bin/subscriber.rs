@@ -1,9 +1,9 @@
 use oxidros::{
-    context::Context, error::DynError, logger::Logger,
-    msg::common_interfaces::std_msgs::msg::String, pr_info,
+    context::Context, error::Result, logger::Logger, msg::common_interfaces::std_msgs::msg::String,
+    pr_info,
 };
 
-fn main() -> Result<(), DynError> {
+fn main() -> Result<()> {
     let ctx = Context::new()?;
     let node = ctx.create_node("simple", None, Default::default())?;
     let sub1 = node.create_subscriber::<String>("chatter", None)?;

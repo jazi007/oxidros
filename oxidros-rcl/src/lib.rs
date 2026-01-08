@@ -140,7 +140,6 @@
 //! ```
 //! use oxidros_rcl::{
 //!     context::Context,
-//!     error::DynError,
 //!     logger::Logger,
 //!     msg::common_interfaces::std_msgs,
 //!     pr_info, pr_warn,
@@ -248,7 +247,6 @@ mod time;
 type PhantomUnsync = PhantomData<Cell<()>>;
 type PhantomUnsend = PhantomData<MutexGuard<'static, ()>>;
 
-use error::DynError;
 use msg::ServiceMsg;
 use service::{Header, client::ClientRecv};
 pub use signal_handler::is_halt;
@@ -261,7 +259,7 @@ pub use oxidros_core;
 pub enum RecvResult<T> {
     Ok(T),
     RetryLater,
-    Err(DynError),
+    Err(crate::error::Error),
 }
 
 /// Single-threaded container.

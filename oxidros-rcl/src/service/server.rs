@@ -94,7 +94,7 @@ use super::Header;
 use crate::msg::interfaces::rosgraph_msgs::msg::Clock;
 use crate::{
     PhantomUnsync, RecvResult,
-    error::{DynError, OError, OResult},
+    error::{OError, OResult, Result},
     get_allocator,
     helper::is_unpin,
     is_halt,
@@ -333,9 +333,7 @@ impl<T: ServiceMsg> Server<T> {
     /// - `RCLError::ServiceInvalid` if the service is invalid, or
     /// - `RCLError::BadAlloc` if allocating memory failed, or
     /// - `RCLError::Error` if an unspecified error occurs.
-    pub async fn recv(
-        &mut self,
-    ) -> Result<(ServerSend<T>, <T as ServiceMsg>::Request, Header), DynError> {
+    pub async fn recv(&mut self) -> Result<(ServerSend<T>, <T as ServiceMsg>::Request, Header)> {
         AsyncReceiver {
             server: self,
             is_waiting: false,
@@ -397,7 +395,7 @@ impl<T: ServiceMsg> ServerSend<T> {
     /// `data` should be immutable, but `rcl_send_response` provided
     /// by ROS2 takes normal pointers instead of `const` pointers.
     /// So, currently, `send` takes `data` as mutable.
-    pub fn send(mut self, data: &<T as ServiceMsg>::Response) -> Result<(), OError> {
+    pub fn send(mut self, data: &<T as ServiceMsg>::Response) -> OResult<()> {
         let server_data = self.data.lock();
         rcl::MTSafeFn::rcl_send_response(
             &server_data.service,
@@ -442,7 +440,7 @@ impl<'a, T> AsyncReceiver<'a, T> {
 }
 
 impl<'a, T: ServiceMsg> Future for AsyncReceiver<'a, T> {
-    type Output = Result<(ServerSend<T>, <T as ServiceMsg>::Request, Header), DynError>;
+    type Output = Result<(ServerSend<T>, <T as ServiceMsg>::Request, Header)>;
 
     fn poll(
         self: std::pin::Pin<&mut Self>,

@@ -17,10 +17,9 @@ use tokio_util::sync::ReusableBoxFuture;
 /// Type aliases for ROS2 `Arc<Node>`
 pub type ArcNode = Arc<Node>;
 
-/// Re-export of safe drive DynError
-pub use oxidros::error::DynError;
-/// Result Type for ROS2
-pub type Result<T> = std::result::Result<T, DynError>;
+/// Re-export of oxidros result
+pub use oxidros::error::Result;
+
 /// Publisher attributes
 #[derive(Debug, Default, Clone)]
 pub struct Attributes<'a> {

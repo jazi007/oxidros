@@ -48,7 +48,7 @@
 //! `None` of the 2nd argument of `create_publisher` is equivalent to `Some(Profile::default())`.
 
 use crate::{
-    error::{DynError, OResult},
+    error::{OResult, Result},
     get_allocator,
     msg::TypeSupport,
     node::Node,
@@ -207,7 +207,7 @@ impl<T: TypeSupport> Publisher<T> {
     /// - `RCLError::InvalidArgument` if any arguments are invalid, or
     /// - `RCLError::PublisherInvalid` if the publisher is invalid, or
     /// - `RCLError::Error` if an unspecified error occurs.
-    pub fn send(&self, msg: &T) -> Result<(), DynError> {
+    pub fn send(&self, msg: &T) -> Result<()> {
         if crate::is_halt() {
             return Err(Signaled.into());
         }
@@ -235,7 +235,7 @@ impl<T: TypeSupport> Publisher<T> {
     /// Send a loaned message.
     ///
     /// This functions takes the ownership of the loaned message since its chunk should be transferred back to the middleware.
-    pub fn send_loaned(&self, msg: PublisherLoanedMessage<T>) -> Result<(), DynError> {
+    pub fn send_loaned(&self, msg: PublisherLoanedMessage<T>) -> Result<()> {
         if crate::is_halt() {
             return Err(Signaled.into());
         }
@@ -262,7 +262,7 @@ impl<T: TypeSupport> Publisher<T> {
     ///
     /// This function is marked unsafe as the user is reponsable for CDR serialization
     ///
-    pub unsafe fn send_raw(&self, msg: &[u8]) -> Result<(), DynError> {
+    pub unsafe fn send_raw(&self, msg: &[u8]) -> Result<()> {
         if crate::is_halt() {
             return Err(Signaled.into());
         }

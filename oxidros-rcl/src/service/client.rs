@@ -56,7 +56,7 @@
 use super::Header;
 use crate::{
     RecvResult,
-    error::{DynError, OError, OResult},
+    error::{OError, OResult, Result},
     get_allocator, is_halt,
     msg::ServiceMsg,
     node::Node,
@@ -300,7 +300,7 @@ impl<'a, T: ServiceMsg> ClientRecv<'a, T> {
     /// - `RCLError::InvalidArgument` if any arguments are invalid, or
     /// - `RCLError::ClientInvalid` if the client is invalid, or
     /// - `RCLError::Error` if an unspecified error occurs.
-    pub async fn recv(self) -> Result<(<T as ServiceMsg>::Response, Header), DynError> {
+    pub async fn recv(self) -> Result<(<T as ServiceMsg>::Response, Header)> {
         AsyncReceiver {
             client: self,
             is_waiting: false,
@@ -314,7 +314,7 @@ impl<'a, T: ServiceMsg> ClientRecv<'a, T> {
     ///
     /// ```
     /// use oxidros_rcl::{
-    ///     error::DynError,
+    ///     error::Result,
     ///     logger::Logger,
     ///     msg::common_interfaces::{std_msgs, std_srvs},
     ///     pr_fatal,
@@ -330,7 +330,7 @@ impl<'a, T: ServiceMsg> ClientRecv<'a, T> {
     ///     mut selector_client: Selector,
     ///     subscriber: Subscriber<std_msgs::msg::Empty>,
     ///     mut client: Client<std_srvs::srv::Empty>,
-    /// ) -> Result<(), DynError> {
+    /// ) -> Result<()> {
     ///     let logger = Logger::new("listen_client");
     ///
     ///     selector.add_subscriber(
@@ -418,7 +418,7 @@ pub struct AsyncReceiver<'a, T: ServiceMsg> {
 }
 
 impl<'a, T: ServiceMsg> Future for AsyncReceiver<'a, T> {
-    type Output = Result<(<T as ServiceMsg>::Response, Header), DynError>;
+    type Output = Result<(<T as ServiceMsg>::Response, Header)>;
 
     fn poll(
         mut self: std::pin::Pin<&mut Self>,

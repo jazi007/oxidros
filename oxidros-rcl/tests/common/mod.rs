@@ -15,7 +15,7 @@ use oxidros_rcl::msg::common_interfaces::example_interfaces::{
 
 use oxidros_rcl::{
     self,
-    error::{DynError, OResult},
+    error::{OResult, Result},
     msg::{ServiceMsg, TypeSupport},
     node::Node,
     rcl,

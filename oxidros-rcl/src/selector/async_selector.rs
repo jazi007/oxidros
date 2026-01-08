@@ -2,7 +2,7 @@ use super::guard_condition::GuardCondition;
 use crate::{
     action,
     context::Context,
-    error::DynError,
+    error::Result,
     service::{client::ClientData, server::ServerData},
     signal_handler,
     topic::subscriber::RCLSubscription,
@@ -61,7 +61,7 @@ pub(crate) enum Command {
 
 struct SelectorData {
     tx: Sender<Command>,
-    th: JoinHandle<Result<(), DynError>>,
+    th: JoinHandle<Result<()>>,
     cond: GuardCondition,
     _context: Arc<Context>,
 }
@@ -78,7 +78,7 @@ impl AsyncSelector {
         AsyncSelector { data: None }
     }
 
-    pub(crate) fn halt(&mut self) -> Result<(), DynError> {
+    pub(crate) fn halt(&mut self) -> Result<()> {
         if let Some(SelectorData { tx, cond, th, .. }) = self.data.take() {
             tx.send(Command::Halt)
                 .map_err(|_| crate::error::Error::ChannelClosed)?;
@@ -91,11 +91,7 @@ impl AsyncSelector {
         Ok(())
     }
 
-    pub(crate) fn send_command(
-        &mut self,
-        context: &Arc<Context>,
-        cmd: Command,
-    ) -> Result<(), DynError> {
+    pub(crate) fn send_command(&mut self, context: &Arc<Context>, cmd: Command) -> Result<()> {
         loop {
             if let Some(SelectorData { tx, cond, .. }) = &self.data {
                 tx.send(cmd)
@@ -123,11 +119,7 @@ impl AsyncSelector {
     }
 }
 
-fn select(
-    context: Arc<Context>,
-    guard: GuardCondition,
-    rx: Receiver<Command>,
-) -> Result<(), DynError> {
+fn select(context: Arc<Context>, guard: GuardCondition, rx: Receiver<Command>) -> Result<()> {
     let mut selector = super::Selector::new(context)?;
 
     selector.add_guard_condition(&guard, None, false);

@@ -4,7 +4,6 @@ pub use crate::rcl::RclRetErr;
 use crate::rcl::{self, rcutils_error_string_t};
 pub use oxidros_core::error::{ActionError, Error, RclError, Result};
 
-pub type DynError = Error;
 pub type OResult<T> = std::result::Result<T, RclError>;
 pub type OError = RclError;
 pub type RCLActionError = ActionError;
@@ -33,7 +32,6 @@ pub(crate) fn action_ret_val_to_err(n: rcl::rcl_ret_t) -> RCLActionResult<()> {
         rcl::RCL_RET_ACTION_SERVER_TAKE_FAILED => Err(ActionError::ServerTakeFailed),
         rcl::RCL_RET_ACTION_GOAL_HANDLE_INVALID => Err(ActionError::GoalHandleInvalid),
         rcl::RCL_RET_ACTION_GOAL_EVENT_INVALID => Err(ActionError::GoalEventInvalid),
-
         _ => ret_val_to_err(n).map_err(ActionError::Rcl),
     }
 }

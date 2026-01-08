@@ -18,7 +18,7 @@ use crate::msg::GetUUID;
 use crate::{
     RecvResult,
     clock::Clock,
-    error::{DynError, RCLActionError, RCLActionResult},
+    error::{RCLActionError, RCLActionResult, Result},
     get_allocator, is_halt,
     msg::{
         ActionGoal, ActionMsg, GoalResponse, builtin_interfaces::UnsafeTime,
@@ -239,14 +239,14 @@ where
         }
     }
 
-    pub fn try_recv_data(&mut self) -> Result<(), DynError> {
+    pub fn try_recv_data(&mut self) -> Result<()> {
         let _ = self.try_recv_result_request();
         Ok(())
     }
 
     pub async fn recv_goal_request(
         &mut self,
-    ) -> Result<(ServerGoalSend<T>, SendGoalServiceRequest<T>), DynError> {
+    ) -> Result<(ServerGoalSend<T>, SendGoalServiceRequest<T>)> {
         AsyncGoalReceiver {
             server: self,
             is_waiting: false,
@@ -254,9 +254,7 @@ where
         .await
     }
 
-    pub async fn recv_cancel_request(
-        &mut self,
-    ) -> Result<(ServerCancelSend<T>, Vec<GoalInfo>), DynError> {
+    pub async fn recv_cancel_request(&mut self) -> Result<(ServerCancelSend<T>, Vec<GoalInfo>)> {
         AsyncCancelReceiver {
             server: self,
             is_waiting: false,
@@ -266,7 +264,7 @@ where
 
     pub async fn recv_result_request(
         &mut self,
-    ) -> Result<(ServerResultSend<T>, GetResultServiceRequest<T>), DynError> {
+    ) -> Result<(ServerResultSend<T>, GetResultServiceRequest<T>)> {
         AsyncResultReceiver {
             server: self,
             is_waiting: false,
@@ -284,7 +282,7 @@ pub struct ServerGoalSend<T: ActionMsg> {
 
 impl<T: ActionMsg> ServerGoalSend<T> {
     /// Accept the goal request.
-    pub fn accept<F>(self, handler: F) -> Result<(), DynError>
+    pub fn accept<F>(self, handler: F) -> Result<()>
     where
         F: FnOnce(GoalHandle<T>),
     {
@@ -302,7 +300,7 @@ impl<T: ActionMsg> ServerGoalSend<T> {
     }
 
     /// Reject the goal request.
-    pub fn reject(self) -> Result<(), DynError> {
+    pub fn reject(self) -> Result<()> {
         let timestamp = {
             let mut clock = self.server.data.clock.lock();
             get_timestamp(&mut clock)
@@ -311,7 +309,7 @@ impl<T: ActionMsg> ServerGoalSend<T> {
     }
 
     /// Send a response for SendGoal service, and accept the goal if `accepted` is true.
-    fn send(mut self, accepted: bool, timestamp: UnsafeTime) -> Result<(), DynError> {
+    fn send(mut self, accepted: bool, timestamp: UnsafeTime) -> Result<()> {
         // TODO: Make SendgoalServiceResponse independent of T (edit safe-drive-msg)
         type GoalResponse<T> = <<T as ActionMsg>::Goal as ActionGoal>::Response;
         let mut response = GoalResponse::<T>::new(accepted, timestamp);
@@ -325,7 +323,7 @@ impl<T: ActionMsg> ServerGoalSend<T> {
         Ok(())
     }
 
-    fn accept_goal(&self, timestamp: UnsafeTime) -> Result<GoalHandle<T>, DynError> {
+    fn accept_goal(&self, timestamp: UnsafeTime) -> Result<GoalHandle<T>> {
         // see rcl_interfaces/action_msgs/msg/GoalInfo.msg for definition
         let mut goal_info = rcl::MTSafeFn::rcl_action_get_zero_initialized_goal_info();
         goal_info.goal_id = unique_identifier_msgs__msg__UUID { uuid: self.goal_id };
@@ -364,7 +362,7 @@ impl<'a, T: ActionMsg> AsyncGoalReceiver<'a, T> {
 }
 
 impl<'a, T: ActionMsg> Future for AsyncGoalReceiver<'a, T> {
-    type Output = Result<(ServerGoalSend<T>, SendGoalServiceRequest<T>), DynError>;
+    type Output = Result<(ServerGoalSend<T>, SendGoalServiceRequest<T>)>;
 
     fn poll(
         self: std::pin::Pin<&mut Self>,
@@ -427,7 +425,7 @@ impl<T: ActionMsg> ServerCancelSend<T> {
     /// `accepted_goals` can be empty if no goals are to be canceled.
     /// The shutdown operation fo each goal should be performed after calling send(),
     /// and use [`GoalHandle::canceled`] when it is done.
-    pub fn send(mut self, mut accepted_goals: Vec<GoalInfo>) -> Result<(), DynError> {
+    pub fn send(mut self, mut accepted_goals: Vec<GoalInfo>) -> Result<()> {
         let mut response = rcl::MTSafeFn::rcl_action_get_zero_initialized_cancel_response();
 
         let code = self.cancel_goals(&accepted_goals)?;
@@ -459,7 +457,7 @@ impl<T: ActionMsg> ServerCancelSend<T> {
     }
 
     /// Cancel the goals. Returns the status code for the CancelGoal response.
-    fn cancel_goals(&mut self, goals: &[GoalInfo]) -> Result<i8, DynError> {
+    fn cancel_goals(&mut self, goals: &[GoalInfo]) -> Result<i8> {
         if goals.is_empty() {
             return Ok(CancelGoal_Response::ERROR_REJECTED);
         }
@@ -504,7 +502,7 @@ impl<'a, T: ActionMsg> AsyncCancelReceiver<'a, T> {
 }
 
 impl<'a, T: ActionMsg> Future for AsyncCancelReceiver<'a, T> {
-    type Output = Result<(ServerCancelSend<T>, Vec<GoalInfo>), DynError>;
+    type Output = Result<(ServerCancelSend<T>, Vec<GoalInfo>)>;
 
     fn poll(
         self: std::pin::Pin<&mut Self>,
@@ -566,7 +564,7 @@ pub struct ServerResultSend<T: ActionMsg> {
 }
 
 impl<T: ActionMsg> ServerResultSend<T> {
-    pub fn send(mut self, uuid: &[u8; 16]) -> Result<(), DynError> {
+    pub fn send(mut self, uuid: &[u8; 16]) -> Result<()> {
         let res = {
             let results = self.server.results.lock();
             results.get(uuid).and_then(|v| v.try_clone())
@@ -617,7 +615,7 @@ impl<'a, T: ActionMsg> AsyncResultReceiver<'a, T> {
 }
 
 impl<'a, T: ActionMsg> Future for AsyncResultReceiver<'a, T> {
-    type Output = Result<(ServerResultSend<T>, GetResultServiceRequest<T>), DynError>;
+    type Output = Result<(ServerResultSend<T>, GetResultServiceRequest<T>)>;
 
     fn poll(
         self: std::pin::Pin<&mut Self>,
@@ -694,7 +692,7 @@ impl<T: ActionMsg + 'static> AsyncServer<T> {
     }
 
     /// Listen for incoming requests.
-    pub async fn listen<G, C>(&mut self, goal_handler: G, cancel_handler: C) -> Result<(), DynError>
+    pub async fn listen<G, C>(&mut self, goal_handler: G, cancel_handler: C) -> Result<()>
     where
         G: Fn(ServerGoalSend<T>, SendGoalServiceRequest<T>),
         C: Fn(ServerCancelSend<T>, Vec<GoalInfo>),
@@ -711,7 +709,7 @@ impl<T: ActionMsg + 'static> AsyncServer<T> {
                     Ok((sender, req)) => {
                         goal_handler(sender, req);
                     }
-                    Err(e) => break Err::<(), DynError>(e),
+                    Err(e) => break Err::<(), crate::error::Error>(e),
                 }
             }
         };
@@ -724,7 +722,7 @@ impl<T: ActionMsg + 'static> AsyncServer<T> {
                     Ok((sender, candidates)) => {
                         cancel_handler(sender, candidates);
                     }
-                    Err(e) => break Err::<(), DynError>(e),
+                    Err(e) => break Err::<(), crate::error::Error>(e),
                 }
             }
         };
@@ -736,10 +734,10 @@ impl<T: ActionMsg + 'static> AsyncServer<T> {
                 match result {
                     Ok((sender, req)) => {
                         if let Err(e) = sender.send(req.get_uuid()) {
-                            break Err::<(), DynError>(e);
+                            break Err::<(), crate::error::Error>(e);
                         }
                     }
-                    Err(e) => break Err::<(), DynError>(e),
+                    Err(e) => break Err::<(), crate::error::Error>(e),
                 }
             }
         };

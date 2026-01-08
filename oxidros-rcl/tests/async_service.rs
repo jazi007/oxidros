@@ -7,18 +7,18 @@ use oxidros_rcl::msg::common_interfaces::example_interfaces::srv::{
 };
 use oxidros_rcl::{
     context::Context,
-    error::DynError,
+    error::Result,
     logger::Logger,
     msg::common_interfaces::std_srvs,
     pr_error, pr_info,
     service::{client::Client, server::Server},
 };
-use std::{error::Error, time::Duration};
+use std::time::Duration;
 
 const SERVICE_NAME: &str = "test_async_service";
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_async_service() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
+async fn test_async_service() -> Result<()> {
     // create a context
     let ctx = Context::new()?;
 
@@ -46,7 +46,7 @@ async fn test_async_service() -> Result<(), Box<dyn Error + Sync + Send + 'stati
 }
 
 /// The server
-async fn run_server(mut server: Server<AddTwoInts>) -> Result<(), DynError> {
+async fn run_server(mut server: Server<AddTwoInts>) -> Result<()> {
     for _ in 0..3 {
         // receive a request
         let (sender, request, _) = server.recv().await?;
@@ -69,7 +69,7 @@ async fn run_server(mut server: Server<AddTwoInts>) -> Result<(), DynError> {
 }
 
 /// The client
-async fn run_client(mut client: Client<AddTwoInts>) -> Result<(), DynError> {
+async fn run_client(mut client: Client<AddTwoInts>) -> Result<()> {
     let dur = Duration::from_millis(500);
     for n in 0..3 {
         let data = AddTwoInts_Request { a: n, b: n * 10 };

@@ -59,7 +59,7 @@ use crate::{
     PhantomUnsend, PhantomUnsync, RecvResult,
     action::{self, SendGoalServiceRequest, handle::GoalHandle},
     context::Context,
-    error::{DynError, OError, OResult, RCLActionResult},
+    error::{OError, OResult, RCLActionResult, Result},
     get_allocator,
     logger::{Logger, pr_error_in, pr_fatal_in},
     msg::{ActionMsg, GetUUID, ServiceMsg, TypeSupport, interfaces::action_msgs::msg::GoalInfo},
@@ -993,14 +993,14 @@ impl Selector {
     ///
     /// - `Ok(true)`: Some events has fired
     /// - `Ok(false)`: Timeout
-    /// - `Err(DynError)`: Error
+    /// - `Err(Error)`: Error
     ///
     /// # Example
     ///
     /// ```
-    /// use oxidros_rcl::{error::DynError, selector::Selector};
+    /// use oxidros_rcl::{error::Result, selector::Selector};
     ///
-    /// fn wait_events(selector: &mut Selector) -> Result<(), DynError> {
+    /// fn wait_events(selector: &mut Selector) -> Result<()> {
     ///     if selector.wait_timeout(std::time::Duration::from_millis(10))? {
     ///         // Some events has fired.
     ///     } else {
@@ -1010,7 +1010,7 @@ impl Selector {
     ///     Ok(())
     /// }
     /// ```
-    pub fn wait_timeout(&mut self, t: Duration) -> Result<bool, DynError> {
+    pub fn wait_timeout(&mut self, t: Duration) -> Result<bool> {
         let flag = Rc::new(Cell::new(false));
         let flag_cloned = flag.clone();
 
@@ -1043,7 +1043,7 @@ impl Selector {
         }
     }
 
-    fn set_rcl_wait(&mut self) -> Result<(), DynError> {
+    fn set_rcl_wait(&mut self) -> Result<()> {
         let guard = rcl::MT_UNSAFE_FN.lock();
         guard.rcl_wait_set_clear(&mut self.wait_set)?;
 
@@ -1105,9 +1105,9 @@ impl Selector {
     /// # Example
     ///
     /// ```
-    /// use oxidros_rcl::{error::DynError, selector::Selector};
+    /// use oxidros_rcl::{error::Result, selector::Selector};
     ///
-    /// fn wait_events(selector: &mut Selector) -> Result<(), DynError> {
+    /// fn wait_events(selector: &mut Selector) -> Result<()> {
     ///     // Add subscribers, servers, etc.
     ///
     ///     // Spin.
@@ -1116,7 +1116,7 @@ impl Selector {
     ///     }
     /// }
     /// ```
-    pub fn wait(&mut self) -> Result<(), DynError> {
+    pub fn wait(&mut self) -> Result<()> {
         // set rcl wait
         self.set_rcl_wait()?;
 
@@ -1166,7 +1166,7 @@ impl Selector {
         Ok(())
     }
 
-    fn wait_timer(&mut self) -> Result<(), DynError> {
+    fn wait_timer(&mut self) -> Result<()> {
         if signal_handler::is_halt() {
             return Err(Signaled.into());
         }
@@ -1541,11 +1541,11 @@ fn notify_action_client(
 
 #[cfg(test)]
 mod test {
-    use crate::{context::Context, error::DynError, selector::CallbackResult};
+    use crate::{context::Context, error::Result, selector::CallbackResult};
     use std::thread;
 
     #[test]
-    fn test_guard_condition() -> Result<(), DynError> {
+    fn test_guard_condition() -> Result<()> {
         let ctx = Context::new()?;
         let cond = super::GuardCondition::new(ctx.clone())?;
 

@@ -1,12 +1,12 @@
 use oxidros::{
     context::Context,
-    error::DynError,
+    error::Result,
     logger::Logger,
     msg::common_interfaces::example_interfaces::srv::{AddTwoInts, AddTwoInts_Response},
     pr_info,
 };
 
-fn main() -> Result<(), DynError> {
+fn main() -> Result<()> {
     let logger = Logger::new("simple");
     let ctx = Context::new()?;
     let node = ctx.create_node("simple", None, Default::default())?;

@@ -11,7 +11,7 @@ use oxidros_rcl::{
         server::{Server, ServerQosOption},
     },
     context::Context,
-    error::DynError,
+    error::Result,
     msg::{
         common_interfaces::example_interfaces::action::{
             Fibonacci, Fibonacci_Feedback, Fibonacci_GetResult_Request, Fibonacci_Goal,
@@ -28,17 +28,13 @@ fn create_server(
     node: &str,
     action: &str,
     qos: Option<ServerQosOption>,
-) -> Result<Server<Fibonacci>, DynError> {
+) -> Result<Server<Fibonacci>> {
     let node_server = ctx.create_node(node, None, Default::default()).unwrap();
 
     Server::new(node_server, action, qos).map_err(|e| e.into())
 }
 
-fn create_client(
-    ctx: &Arc<Context>,
-    node: &str,
-    action: &str,
-) -> Result<Client<Fibonacci>, DynError> {
+fn create_client(ctx: &Arc<Context>, node: &str, action: &str) -> Result<Client<Fibonacci>> {
     let options = oxidros_rcl::node::NodeOptions::default();
     let node_client = ctx.create_node(node, None, options)?;
     Client::new(node_client, action, None).map_err(|e| e.into())
@@ -77,7 +73,7 @@ fn accept_handler(handle: GoalHandle<Fibonacci>) {
 }
 
 #[test]
-fn test_action() -> Result<(), DynError> {
+fn test_action() -> Result<()> {
     let ctx = Context::new()?;
 
     let mut client = create_client(&ctx, "test_action_client", "test_action")?;
@@ -157,7 +153,7 @@ fn test_action() -> Result<(), DynError> {
 }
 
 #[test]
-fn test_action_cancel() -> Result<(), DynError> {
+fn test_action_cancel() -> Result<()> {
     let ctx = Context::new()?;
 
     let mut client = create_client(&ctx, "test_action_cancel_client", "test_action_cancel")?;
@@ -230,7 +226,7 @@ fn test_action_cancel() -> Result<(), DynError> {
 }
 
 #[test]
-fn test_action_status() -> Result<(), DynError> {
+fn test_action_status() -> Result<()> {
     let ctx = Context::new()?;
 
     let mut client = create_client(&ctx, "test_action_status_client", "test_action_status")?;

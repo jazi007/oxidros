@@ -86,7 +86,6 @@
 //! ```
 //! use oxidros_rcl::{
 //!     context::Context,
-//!     error::DynError,
 //!     logger::Logger,
 //!     parameter::{ParameterServer, Value, Parameter, Descriptor},
 //!     pr_info,
@@ -162,7 +161,7 @@
 //! ```
 
 use crate::{
-    error::{DynError, OResult},
+    error::{OResult, Result},
     is_halt,
     logger::{Logger, pr_error_in, pr_fatal_in},
     msg::{
@@ -256,14 +255,14 @@ use std::{cell::Cell, collections::BTreeSet, future::Future, rc::Rc, sync::Arc, 
 /// ```
 pub struct ParameterServer {
     pub params: Arc<RwLock<Parameters>>,
-    handler: Option<std::thread::JoinHandle<Result<(), DynError>>>,
+    handler: Option<std::thread::JoinHandle<Result<()>>>,
     cond_halt: GuardCondition,
     pub(crate) cond_callback: GuardCondition,
     node: Arc<Node>,
 }
 
 impl ParameterServer {
-    pub(crate) fn new(node: Arc<Node>) -> Result<Self, DynError> {
+    pub(crate) fn new(node: Arc<Node>) -> Result<Self> {
         let params_value = {
             let mut guard = crate::rcl::MT_UNSAFE_FN.lock();
             let fqn = node.get_fully_qualified_name()?;
@@ -319,7 +318,7 @@ fn param_server(
     params: Arc<RwLock<Parameters>>,
     cond_halt: GuardCondition,
     cond_callback: GuardCondition,
-) -> Result<(), DynError> {
+) -> Result<()> {
     if let Ok(mut selector) = node.context.create_selector() {
         add_srv_list(&node, &mut selector, params.clone())?;
         add_srv_set(
@@ -818,7 +817,7 @@ pub struct AsyncWait<'a> {
 }
 
 impl<'a> Future for AsyncWait<'a> {
-    type Output = Result<BTreeSet<String>, DynError>;
+    type Output = Result<BTreeSet<String>>;
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         if is_halt() {
             return Poll::Ready(Err(Signaled.into()));

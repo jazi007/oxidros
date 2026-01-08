@@ -11,7 +11,7 @@ use oxidros_rcl::{
         server::{AsyncServer, Server, ServerCancelSend, ServerGoalSend, ServerQosOption},
     },
     context::Context,
-    error::DynError,
+    error::Result,
     msg::{
         common_interfaces::example_interfaces::action::{
             Fibonacci, Fibonacci_Feedback, Fibonacci_GetResult_Request, Fibonacci_Goal,
@@ -29,17 +29,13 @@ fn create_server(
     node: &str,
     action: &str,
     qos: Option<ServerQosOption>,
-) -> Result<Server<Fibonacci>, DynError> {
+) -> Result<Server<Fibonacci>> {
     let node_server = ctx.create_node(node, None, Default::default()).unwrap();
 
     Server::new(node_server, action, qos).map_err(|e| e.into())
 }
 
-fn create_client(
-    ctx: &Arc<Context>,
-    node: &str,
-    action: &str,
-) -> Result<Client<Fibonacci>, DynError> {
+fn create_client(ctx: &Arc<Context>, node: &str, action: &str) -> Result<Client<Fibonacci>> {
     let node_client = ctx.create_node(node, None, Default::default())?;
     Client::new(node_client, action, None).map_err(|e| e.into())
 }
@@ -112,7 +108,7 @@ fn spawn_worker_abort(handle: GoalHandle<Fibonacci>) {
         .unwrap();
 }
 
-async fn run_server(server: Server<Fibonacci>, abort: bool) -> Result<(), DynError> {
+async fn run_server(server: Server<Fibonacci>, abort: bool) -> Result<()> {
     let mut server = AsyncServer::new(server);
 
     let goal = move |sender: ServerGoalSend<Fibonacci>, req| {
@@ -166,7 +162,7 @@ async fn receive_result_response(receiver: ClientResultRecv<'_, Fibonacci>) {
     }
 }
 
-async fn run_client(mut client: Client<Fibonacci>) -> Result<(), DynError> {
+async fn run_client(mut client: Client<Fibonacci>) -> Result<()> {
     let uuid: [u8; 16] = rand::random();
     let goal = Fibonacci_Goal { order: 10 };
     let receiver = client.send_goal_with_uuid(goal, uuid)?;
@@ -202,7 +198,7 @@ async fn run_client(mut client: Client<Fibonacci>) -> Result<(), DynError> {
     Ok(())
 }
 
-async fn run_client_cancel(mut client: Client<Fibonacci>) -> Result<(), DynError> {
+async fn run_client_cancel(mut client: Client<Fibonacci>) -> Result<()> {
     let uuid: [u8; 16] = rand::random();
     let goal = Fibonacci_Goal { order: 10 };
     let receiver = client.send_goal_with_uuid(goal, uuid)?;
@@ -233,7 +229,7 @@ async fn run_client_cancel(mut client: Client<Fibonacci>) -> Result<(), DynError
     Ok(())
 }
 
-async fn run_client_status(mut client: Client<Fibonacci>) -> Result<(), DynError> {
+async fn run_client_status(mut client: Client<Fibonacci>) -> Result<()> {
     let uuid: [u8; 16] = rand::random();
     let goal = Fibonacci_Goal { order: 10 };
     let receiver = client.send_goal_with_uuid(goal, uuid)?;
@@ -250,7 +246,7 @@ async fn run_client_status(mut client: Client<Fibonacci>) -> Result<(), DynError
     Ok(())
 }
 
-async fn run_client_abort(mut client: Client<Fibonacci>) -> Result<(), DynError> {
+async fn run_client_abort(mut client: Client<Fibonacci>) -> Result<()> {
     let uuid: [u8; 16] = rand::random();
     let goal = Fibonacci_Goal { order: 10 };
     let receiver = client.send_goal_with_uuid(goal, uuid)?;
@@ -272,9 +268,9 @@ async fn start_server_client<G>(
     server_node: &str,
     run_client_fn: G,
     server_abort: bool,
-) -> Result<(), DynError>
+) -> Result<()>
 where
-    G: FnOnce(Client<Fibonacci>) -> Pin<Box<dyn Future<Output = Result<(), DynError>> + Send>>
+    G: FnOnce(Client<Fibonacci>) -> Pin<Box<dyn Future<Output = Result<()>> + Send>>
         + Send
         + 'static,
 {
@@ -300,7 +296,7 @@ where
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_async_action() -> Result<(), DynError> {
+async fn test_async_action() -> Result<()> {
     start_server_client(
         "test_async_action",
         "test_async_action_client",
@@ -313,7 +309,7 @@ async fn test_async_action() -> Result<(), DynError> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_async_action_cancel() -> Result<(), DynError> {
+async fn test_async_action_cancel() -> Result<()> {
     start_server_client(
         "test_async_action_cancel",
         "test_async_action_client_cancel",
@@ -326,7 +322,7 @@ async fn test_async_action_cancel() -> Result<(), DynError> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_async_action_status() -> Result<(), DynError> {
+async fn test_async_action_status() -> Result<()> {
     start_server_client(
         "test_async_action_status",
         "test_async_action_client_status",
@@ -339,7 +335,7 @@ async fn test_async_action_status() -> Result<(), DynError> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_async_action_abort() -> Result<(), DynError> {
+async fn test_async_action_abort() -> Result<()> {
     start_server_client(
         "test_async_action_abort",
         "test_async_action_client_abort",

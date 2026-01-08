@@ -2,7 +2,7 @@ use std::{sync::atomic::AtomicUsize, time::Duration};
 
 use oxidros::{
     context::Context,
-    error::DynError,
+    error::Result,
     logger::Logger,
     msg::common_interfaces::example_interfaces::srv::{AddTwoInts, AddTwoInts_Request},
     pr_info,
@@ -11,7 +11,7 @@ use oxidros::{
 
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-async fn client_handler(mut client: Client<AddTwoInts>) -> Result<(), DynError> {
+async fn client_handler(mut client: Client<AddTwoInts>) -> Result<()> {
     let client_n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
     // if client_n > 0 {
     //     tokio::time::sleep(Duration::from_secs(3)).await;
@@ -34,7 +34,7 @@ async fn client_handler(mut client: Client<AddTwoInts>) -> Result<(), DynError> 
 }
 
 #[tokio::main]
-async fn main() -> Result<(), DynError> {
+async fn main() -> Result<()> {
     let ctx = Context::new()?;
     let node = ctx.create_node("simple", None, Default::default())?;
     let mut set = tokio::task::JoinSet::new();
@@ -45,7 +45,7 @@ async fn main() -> Result<(), DynError> {
     let ctrl_c = tokio::signal::ctrl_c();
     tokio::select! {
         res = set.join_all() => {
-            res.into_iter().collect::<Result<Vec<()>, DynError>>()?;
+            res.into_iter().collect::<Result<Vec<()>>>()?;
         },
         _ = ctrl_c => {},
     }

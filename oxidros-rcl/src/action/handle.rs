@@ -6,7 +6,7 @@ use std::{collections::BTreeMap, rc::Rc, sync::Arc};
 
 use super::{GoalEvent, GoalStatus, server::ServerData};
 use crate::{
-    error::{DynError, OError, RCLActionError, RCLActionResult},
+    error::{OError, RCLActionResult, Result},
     logger::{Logger, pr_error_in},
     msg::ActionMsg,
     rcl,
@@ -53,7 +53,7 @@ where
     }
 
     /// Publish a feedback.
-    pub fn feedback(&self, content: T::FeedbackContent) -> Result<(), DynError> {
+    pub fn feedback(&self, content: T::FeedbackContent) -> Result<()> {
         let mut msg = <T as ActionMsg>::new_feedback_message(content, self.goal_id);
 
         let guard = rcl::MT_UNSAFE_FN.lock();
@@ -65,7 +65,7 @@ where
     }
 
     /// Notify the server that the goal is successfully canceled.
-    pub fn canceled(&self, result: T::ResultContent) -> Result<(), DynError> {
+    pub fn canceled(&self, result: T::ResultContent) -> Result<()> {
         self.update_result(result)?;
 
         self.update(GoalEvent::Canceled)?;
@@ -75,7 +75,7 @@ where
     }
 
     /// Notify the server that the goal is successfully finished.
-    pub fn finish(&self, result: T::ResultContent) -> Result<(), DynError> {
+    pub fn finish(&self, result: T::ResultContent) -> Result<()> {
         self.update_result(result)?;
 
         self.update(GoalEvent::Succeed)?;
@@ -84,23 +84,23 @@ where
         Ok(())
     }
 
-    pub fn is_canceling(&self) -> Result<bool, DynError> {
+    pub fn is_canceling(&self) -> Result<bool> {
         Ok(GoalStatus::Canceling == self.status()?)
     }
 
     /// Returns true if the goal is in a terminal state (succeeded, canceled, or aborted).
-    pub fn is_terminal(&self) -> Result<bool, DynError> {
+    pub fn is_terminal(&self) -> Result<bool> {
         let s = self.status()?;
         Ok(GoalStatus::Succeeded == s || GoalStatus::Canceled == s || GoalStatus::Aborted == s)
     }
 
-    pub fn abort(&self) -> Result<(), RCLActionError> {
+    pub fn abort(&self) -> Result<()> {
         self.update(GoalEvent::Abort)?;
         self.data.publish_goal_status()?;
         Ok(())
     }
 
-    pub(crate) fn update(&self, event: GoalEvent) -> Result<(), RCLActionError> {
+    pub(crate) fn update(&self, event: GoalEvent) -> Result<()> {
         self.handle.update_goal_state(event)
     }
 
@@ -139,7 +139,7 @@ where
         Ok(())
     }
 
-    fn update_result(&self, result: T::ResultContent) -> Result<(), DynError> {
+    fn update_result(&self, result: T::ResultContent) -> Result<()> {
         let mut results = self.results.lock();
         if results
             .insert(self.goal_id, result.try_clone().ok_or(OError::BadAlloc)?)
@@ -157,7 +157,7 @@ where
         Ok(())
     }
 
-    fn status(&self) -> Result<GoalStatus, DynError> {
+    fn status(&self) -> Result<GoalStatus> {
         let mut s: rcl::rcl_action_goal_state_t = GoalStatus::Unknown as i8;
         let guard = rcl::MT_UNSAFE_FN.lock();
         guard
@@ -175,10 +175,9 @@ unsafe impl<T> Sync for GoalHandle<T> where T: ActionMsg {}
 pub(crate) struct GoalHandleData(pub *mut rcl::rcl_action_goal_handle_t);
 
 impl GoalHandleData {
-    pub(crate) fn update_goal_state(&self, event: GoalEvent) -> Result<(), RCLActionError> {
+    pub(crate) fn update_goal_state(&self, event: GoalEvent) -> Result<()> {
         let guard = rcl::MT_UNSAFE_FN.lock();
         guard.rcl_action_update_goal_state(self.0, event.into())?;
-
         Ok(())
     }
 }

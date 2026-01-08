@@ -8,7 +8,7 @@ use std::{ffi::CString, marker::PhantomData, sync::Arc, task::Poll, time::Durati
 use crate::helper::is_unpin;
 use crate::{
     RecvResult,
-    error::{DynError, OError, RCLActionError, RCLActionResult},
+    error::{OError, RCLActionError, RCLActionResult, Result},
     get_allocator, is_halt,
     msg::{
         ActionMsg,
@@ -135,7 +135,7 @@ where
         &mut self,
         goal: <T as ActionMsg>::GoalContent,
         uuid: [u8; 16],
-    ) -> Result<ClientGoalRecv<'_, T>, DynError> {
+    ) -> Result<ClientGoalRecv<'_, T>> {
         let request = <T as ActionMsg>::new_goal_request(goal, uuid);
         self.send_goal_request(&request)
     }
@@ -144,7 +144,7 @@ where
     fn send_goal_request(
         &mut self,
         data: &SendGoalServiceRequest<T>,
-    ) -> Result<ClientGoalRecv<'_, T>, DynError> {
+    ) -> Result<ClientGoalRecv<'_, T>> {
         if crate::is_halt() {
             return Err(Signaled.into());
         }
@@ -166,7 +166,7 @@ where
     pub fn send_result_request(
         &mut self,
         data: &GetResultServiceRequest<T>,
-    ) -> Result<ClientResultRecv<'_, T>, DynError> {
+    ) -> Result<ClientResultRecv<'_, T>> {
         let mut seq: i64 = 0;
         rcl::MTSafeFn::rcl_action_send_result_request(
             &self.data.client,
@@ -184,7 +184,7 @@ where
     pub fn send_cancel_request(
         &mut self,
         request: &CancelGoal_Request,
-    ) -> Result<ClientCancelRecv<'_, T>, DynError> {
+    ) -> Result<ClientCancelRecv<'_, T>> {
         let guard = rcl::MT_UNSAFE_FN.lock();
 
         let mut seq: i64 = 0;
@@ -224,7 +224,7 @@ where
     }
 
     /// Asynchronously receive a feedback message.
-    pub async fn recv_feedback(&mut self) -> Result<<T as ActionMsg>::Feedback, DynError> {
+    pub async fn recv_feedback(&mut self) -> Result<<T as ActionMsg>::Feedback> {
         AsyncFeedbackReceiver {
             client: self,
             is_waiting: false,
@@ -257,7 +257,7 @@ where
     }
 
     /// Asynchronously receive a status message.
-    pub async fn recv_status(&mut self) -> Result<GoalStatusArray, DynError> {
+    pub async fn recv_status(&mut self) -> Result<GoalStatusArray> {
         AsyncStatusReceiver {
             client: self,
             is_waiting: false,
@@ -321,9 +321,7 @@ impl<'a, T: ActionMsg> ClientGoalRecv<'a, T> {
     }
 
     /// Asynchronously receive the response.
-    pub async fn recv(
-        self,
-    ) -> Result<(SendGoalServiceResponse<T>, rcl::rmw_request_id_t), DynError> {
+    pub async fn recv(self) -> Result<(SendGoalServiceResponse<T>, rcl::rmw_request_id_t)> {
         AsyncGoalReceiver {
             client: self,
             is_waiting: false,
@@ -359,7 +357,7 @@ impl<'a, T: ActionMsg> Drop for AsyncGoalReceiver<'a, T> {
 }
 
 impl<'a, T: ActionMsg> Future for AsyncGoalReceiver<'a, T> {
-    type Output = Result<(SendGoalServiceResponse<T>, rcl::rmw_request_id_t), DynError>;
+    type Output = Result<(SendGoalServiceResponse<T>, rcl::rmw_request_id_t)>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         if is_halt() {
@@ -434,7 +432,7 @@ impl<'a, T: ActionMsg> ClientCancelRecv<'a, T> {
         }
     }
 
-    pub async fn recv(self) -> Result<(CancelGoal_Response, rcl::rmw_request_id_t), DynError> {
+    pub async fn recv(self) -> Result<(CancelGoal_Response, rcl::rmw_request_id_t)> {
         AsyncCancelReceiver {
             client: self,
             is_waiting: false,
@@ -470,7 +468,7 @@ impl<'a, T: ActionMsg> Drop for AsyncCancelReceiver<'a, T> {
 }
 
 impl<'a, T: ActionMsg> Future for AsyncCancelReceiver<'a, T> {
-    type Output = Result<(CancelGoal_Response, rcl::rmw_request_id_t), DynError>;
+    type Output = Result<(CancelGoal_Response, rcl::rmw_request_id_t)>;
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         if is_halt() {
@@ -547,9 +545,7 @@ impl<'a, T: ActionMsg> ClientResultRecv<'a, T> {
         }
     }
 
-    pub async fn recv(
-        self,
-    ) -> Result<(GetResultServiceResponse<T>, rcl::rmw_request_id_t), DynError> {
+    pub async fn recv(self) -> Result<(GetResultServiceResponse<T>, rcl::rmw_request_id_t)> {
         AsyncResultReceiver {
             client: self,
             is_waiting: false,
@@ -585,7 +581,7 @@ impl<'a, T: ActionMsg> Drop for AsyncResultReceiver<'a, T> {
 }
 
 impl<'a, T: ActionMsg> Future for AsyncResultReceiver<'a, T> {
-    type Output = Result<(GetResultServiceResponse<T>, rcl::rmw_request_id_t), DynError>;
+    type Output = Result<(GetResultServiceResponse<T>, rcl::rmw_request_id_t)>;
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         if is_halt() {
@@ -655,7 +651,7 @@ impl<'a, T: ActionMsg> Drop for AsyncFeedbackReceiver<'a, T> {
 }
 
 impl<'a, T: ActionMsg> Future for AsyncFeedbackReceiver<'a, T> {
-    type Output = Result<<T as ActionMsg>::Feedback, DynError>;
+    type Output = Result<<T as ActionMsg>::Feedback>;
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         if is_halt() {
@@ -726,7 +722,7 @@ impl<'a, T: ActionMsg> Drop for AsyncStatusReceiver<'a, T> {
 }
 
 impl<'a, T: ActionMsg> Future for AsyncStatusReceiver<'a, T> {
-    type Output = Result<GoalStatusArray, DynError>;
+    type Output = Result<GoalStatusArray>;
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         if is_halt() {

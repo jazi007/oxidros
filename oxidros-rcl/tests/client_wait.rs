@@ -5,13 +5,13 @@ pub mod common;
 use oxidros_rcl::msg::common_interfaces::example_interfaces::srv::{
     AddTwoInts_Request, AddTwoInts_Response,
 };
-use oxidros_rcl::{RecvResult, context::Context, error::DynError};
+use oxidros_rcl::{RecvResult, context::Context, error::Result};
 use std::time::Duration;
 
 const SERVICE_NAME2: &str = "test_service2";
 
 #[test]
-fn test_client_wait() -> Result<(), DynError> {
+fn test_client_wait() -> Result<()> {
     // create a context
     let ctx = Context::new()?;
 

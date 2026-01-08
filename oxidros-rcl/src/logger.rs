@@ -64,7 +64,7 @@
 //! ```
 
 use crate::{
-    error::{DynError, OResult},
+    error::{OResult, Result},
     rcl,
 };
 use num_derive::{FromPrimitive, ToPrimitive};
@@ -212,7 +212,7 @@ impl Logger {
         function_name: &str,
         file_name: &str,
         line_number: u64,
-    ) -> Result<(), DynError> {
+    ) -> Result<()> {
         init_once()?; // first of all, initialize the logging system
 
         if !self.is_enable_for(severity) {
@@ -252,7 +252,7 @@ impl Logger {
         function_name: &str,
         file_name: &str,
         line_number: u64,
-    ) -> Result<(), DynError> {
+    ) -> Result<()> {
         self.write(msg, Severity::Info, function_name, file_name, line_number)
     }
 
@@ -264,7 +264,7 @@ impl Logger {
         function_name: &str,
         file_name: &str,
         line_number: u64,
-    ) -> Result<(), DynError> {
+    ) -> Result<()> {
         self.write(msg, Severity::Warn, function_name, file_name, line_number)
     }
 
@@ -276,7 +276,7 @@ impl Logger {
         function_name: &str,
         file_name: &str,
         line_number: u64,
-    ) -> Result<(), DynError> {
+    ) -> Result<()> {
         self.write(msg, Severity::Error, function_name, file_name, line_number)
     }
 
@@ -288,7 +288,7 @@ impl Logger {
         function_name: &str,
         file_name: &str,
         line_number: u64,
-    ) -> Result<(), DynError> {
+    ) -> Result<()> {
         self.write(msg, Severity::Fatal, function_name, file_name, line_number)
     }
 
@@ -300,7 +300,7 @@ impl Logger {
         function_name: &str,
         file_name: &str,
         line_number: u64,
-    ) -> Result<(), DynError> {
+    ) -> Result<()> {
         self.write(msg, Severity::Debug, function_name, file_name, line_number)
     }
 

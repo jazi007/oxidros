@@ -19,7 +19,7 @@ use libc::atexit;
 
 use crate::{
     context::{Context, remove_context},
-    error::{DynError, OResult},
+    error::{OResult, Result},
     msg::{ServiceMsg, TypeSupport},
     parameter::ParameterServer,
     qos, rcl,
@@ -95,7 +95,7 @@ impl Node {
         rcl::MTSafeFn::rcl_node_get_namespace(&self.node)
     }
 
-    pub fn create_parameter_server(self: &Arc<Self>) -> Result<ParameterServer, DynError> {
+    pub fn create_parameter_server(self: &Arc<Self>) -> Result<ParameterServer> {
         match self.init_param_server.set(()) {
             Ok(()) => ParameterServer::new(self.clone()),
             Err(_) => Err("a parameter server has been already created".into()),

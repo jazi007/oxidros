@@ -1,7 +1,7 @@
 use std::{ptr::null_mut, sync::Arc};
 
 use crate::{
-    error::{DynError, OResult},
+    error::{OResult, Result},
     msg::TypeSupport,
     rcl,
 };
@@ -26,7 +26,7 @@ impl<T: TypeSupport> PublisherLoanedMessage<T> {
         }
     }
 
-    pub(crate) fn send(self) -> Result<(), DynError> {
+    pub(crate) fn send(self) -> Result<()> {
         match self {
             PublisherLoanedMessage::Copied(msg) => {
                 if let Err(e) = rcl::MTSafeFn::rcl_publish(

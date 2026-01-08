@@ -152,7 +152,7 @@
 
 use crate::{
     PhantomUnsync, RecvResult,
-    error::{DynError, OError, OResult},
+    error::{OError, OResult, Result},
     get_allocator,
     helper::is_unpin,
     is_halt,
@@ -354,7 +354,7 @@ impl<T: TypeSupport> Subscriber<T> {
     /// - `RCLError::SubscriptionInvalid` if the subscription is invalid, or
     /// - `RCLError::BadAlloc if allocating` memory failed, or
     /// - `RCLError::Error` if an unspecified error occurs.
-    pub fn recv_blocking(&self) -> Result<TakenMsg<T>, DynError> {
+    pub fn recv_blocking(&self) -> Result<TakenMsg<T>> {
         let mut selector = self.subscription.node.context.create_selector()?;
         selector.add_rcl_subscription(self.subscription.clone(), None, false);
         loop {
@@ -410,7 +410,7 @@ impl<T: TypeSupport> Subscriber<T> {
     /// - `RCLError::SubscriptionInvalid` if the subscription is invalid, or
     /// - `RCLError::BadAlloc` if allocating memory failed, or
     /// - `RCLError::Error` if an unspecified error occurs.
-    pub async fn recv(&mut self) -> Result<TakenMsg<T>, DynError> {
+    pub async fn recv(&mut self) -> Result<TakenMsg<T>> {
         AsyncReceiver {
             subscriber: self,
             is_waiting: false,
@@ -445,7 +445,7 @@ impl<'a, T> AsyncReceiver<'a, T> {
 }
 
 impl<'a, T: TypeSupport> Future for AsyncReceiver<'a, T> {
-    type Output = Result<TakenMsg<T>, DynError>;
+    type Output = Result<TakenMsg<T>>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
         if is_halt() {
