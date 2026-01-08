@@ -6,7 +6,7 @@
 use crate::{
     attachment::generate_gid,
     context::Context,
-    error::Result,
+    error::{Result, Ros2ArgsResultExt},
     keyexpr::{EntityKind, liveliness_node_keyexpr},
     service::{client::Client, server::Server},
     topic::{publisher::Publisher, subscriber::Subscriber},
@@ -181,7 +181,7 @@ impl Node {
     /// The fully qualified and potentially remapped name.
     pub fn expand_and_remap_name(&self, name: &str, kind: NameKind) -> Result<String> {
         // Validate the input name
-        ros2args::names::validate_topic_name(name)?;
+        ros2args::names::validate_topic_name(name).map_name_err()?;
 
         // Get the effective namespace (use "/" if empty)
         let namespace = if self.inner.namespace.is_empty() {
@@ -191,7 +191,8 @@ impl Node {
         };
 
         // Expand the name (handles ~, relative, and absolute names)
-        let expanded = ros2args::names::expand_topic_name(namespace, &self.inner.name, name)?;
+        let expanded =
+            ros2args::names::expand_topic_name(namespace, &self.inner.name, name).map_name_err()?;
 
         // Apply remapping rules
         let ros2_args = self.inner.context.ros2_args();
@@ -231,19 +232,18 @@ impl Node {
                 };
                 if let Ok(expanded_from) =
                     ros2args::names::expand_topic_name(namespace, node_name, &rule.from)
+                    && expanded_from == fq_name
                 {
-                    if expanded_from == fq_name {
-                        // Expand the rule's to field as well
-                        if rule.to.starts_with('/') {
-                            return rule.to.clone();
-                        }
-                        if let Ok(expanded_to) =
-                            ros2args::names::expand_topic_name(namespace, node_name, &rule.to)
-                        {
-                            return expanded_to;
-                        }
+                    // Expand the rule's to field as well
+                    if rule.to.starts_with('/') {
                         return rule.to.clone();
                     }
+                    if let Ok(expanded_to) =
+                        ros2args::names::expand_topic_name(namespace, node_name, &rule.to)
+                    {
+                        return expanded_to;
+                    }
+                    return rule.to.clone();
                 }
             }
         }

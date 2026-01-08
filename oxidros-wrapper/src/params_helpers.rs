@@ -2,7 +2,7 @@
 //!  - Load yaml files
 //!
 use crate::common::Result;
-use oxidros::parameter::Value;
+use oxidros::{oxidros_core, parameter::Value};
 use std::{collections::BTreeMap, io::Read, path::Path};
 use yaml_rust2::{Yaml, YamlLoader, yaml::Hash};
 
@@ -59,10 +59,13 @@ fn parse_node_params(values: &Hash) -> Result<BTreeMap<String, Value>> {
 /// A helper function to load a yaml file of parameters
 pub fn load_prameters_file<P: AsRef<Path>>(path: P) -> Result<NodesParameters> {
     let mut parameters = NodesParameters::default();
-    let mut file = std::fs::File::open(path)?;
+    let mut file =
+        std::fs::File::open(path).map_err(|e| oxidros_core::Error::Other(e.to_string()))?;
     let mut s = String::new();
-    file.read_to_string(&mut s)?;
-    let docs = YamlLoader::load_from_str(&s)?;
+    file.read_to_string(&mut s)
+        .map_err(|e| oxidros_core::Error::Other(e.to_string()))?;
+    let docs =
+        YamlLoader::load_from_str(&s).map_err(|e| oxidros_core::Error::Other(e.to_string()))?;
     for doc in docs {
         let Yaml::Hash(h) = doc else {
             log::warn!("Unexpected Yaml type");
@@ -89,10 +92,13 @@ pub fn load_prameters_from_env() -> Result<NodesParameters> {
     let Some(path) = args.next() else {
         return Ok(parameters);
     };
-    let mut file = std::fs::File::open(path)?;
+    let mut file =
+        std::fs::File::open(path).map_err(|e| oxidros_core::Error::Other(e.to_string()))?;
     let mut s = String::new();
-    file.read_to_string(&mut s)?;
-    let docs = YamlLoader::load_from_str(&s)?;
+    file.read_to_string(&mut s)
+        .map_err(|e| oxidros_core::Error::Other(e.to_string()))?;
+    let docs =
+        YamlLoader::load_from_str(&s).map_err(|e| oxidros_core::Error::Other(e.to_string()))?;
     for doc in docs {
         let Yaml::Hash(h) = doc else {
             log::warn!("Unexpected Yaml type");

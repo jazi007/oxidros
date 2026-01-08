@@ -60,7 +60,7 @@ where
             .reply(self.query.key_expr().clone(), payload)
             .attachment(ZBytes::from(attachment_bytes.to_vec()))
             .wait()
-            .map_err(Error::Zenoh)?;
+            .map_err(|e| Error::Zenoh(e.to_string()))?;
 
         Ok(())
     }

@@ -54,11 +54,13 @@ pub use qos::QosMapping;
 pub use service::ServiceRequest;
 
 // Re-export core types
-pub use oxidros_core::error::OResult;
 pub use oxidros_core::{
-    Descriptor, DurabilityPolicy, DynError, FloatingPointRange, HistoryPolicy, IntegerRange,
-    LivelinessPolicy, OError, Parameter, Profile, ReliabilityPolicy, TypeSupport, Value,
+    Descriptor, DurabilityPolicy, FloatingPointRange, HistoryPolicy, IntegerRange,
+    LivelinessPolicy, Parameter, Profile, ReliabilityPolicy, TypeSupport, Value,
 };
+
+// Re-export error types for compatibility
+pub use oxidros_core::error::{ActionError, RclError};
 
 // Re-export selector callback result
 pub use oxidros_core::selector::CallbackResult;

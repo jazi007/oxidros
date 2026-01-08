@@ -1,6 +1,6 @@
 //! Parameter types and structures for ROS2 parameter server.
 
-use crate::{DynError, helper::Contains};
+use crate::{Result, helper::Contains};
 use num_traits::Zero;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -241,14 +241,14 @@ impl Display for Value {
 /// # Example
 ///
 /// ```
-/// use oxidros_core::{error::DynError, parameter::{Parameters, Parameter, Value}};
+/// use oxidros_core::{error::Result, parameter::{Parameters, Parameter, Value}};
 ///
 /// fn get_param<'a>(params: &'a Parameters, name: &str) -> Option<&'a Parameter>
 /// {
 ///     params.get_parameter(name)
 /// }
 ///
-/// fn set_param(params: &mut Parameters, name: String, value: Value) -> Result<(), DynError>
+/// fn set_param(params: &mut Parameters, name: String, value: Value) -> Result<()>
 /// {
 ///     params.set_parameter(name, value, false /* read_only */, Some("description".to_string()))
 /// }
@@ -275,7 +275,7 @@ impl Parameters {
         self.params.get(name)
     }
 
-    pub fn add_parameter(&mut self, name: String, parameter: Parameter) -> Result<(), DynError> {
+    pub fn add_parameter(&mut self, name: String, parameter: Parameter) -> Result<()> {
         if self.params.get_mut(&name).is_some() {
             let msg: String = format!("{} is already declared", name);
             Err(msg.into())
@@ -294,7 +294,7 @@ impl Parameters {
         value: Value,
         read_only: bool,
         description: Option<String>,
-    ) -> Result<(), DynError> {
+    ) -> Result<()> {
         if value == Value::NotSet {
             Err("Value::NotSet cannot be used as a statically typed value".into())
         } else if let Some(param) = self.params.get_mut(&name) {
@@ -342,7 +342,7 @@ impl Parameters {
         value: Value,
         read_only: bool,
         description: Option<String>,
-    ) -> Result<(), DynError> {
+    ) -> Result<()> {
         if let Some(param) = self.params.get_mut(&name) {
             if !param.descriptor.dynamic_typing {
                 let msg = format!("{} is a statically typed value", name);
@@ -378,7 +378,7 @@ impl Parameters {
         min: f64,
         max: f64,
         step: f64,
-    ) -> Result<(), DynError> {
+    ) -> Result<()> {
         let range = FloatingPointRange { min, max, step };
 
         if let Some(param) = self.params.get_mut(name) {
@@ -412,13 +412,7 @@ impl Parameters {
         }
     }
 
-    pub fn set_integer_range(
-        &mut self,
-        name: &str,
-        min: i64,
-        max: i64,
-        step: usize,
-    ) -> Result<(), DynError> {
+    pub fn set_integer_range(&mut self, name: &str, min: i64, max: i64, step: usize) -> Result<()> {
         let range = IntegerRange { min, max, step };
 
         if let Some(param) = self.params.get_mut(name) {

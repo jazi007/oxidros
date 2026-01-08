@@ -1706,6 +1706,7 @@ dependencies = [
  "num-traits",
  "parking_lot",
  "ros2-types",
+ "thiserror 2.0.17",
 ]
 
 [[package]]

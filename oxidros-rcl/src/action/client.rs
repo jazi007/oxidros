@@ -120,7 +120,7 @@ where
             &mut is_available as *mut _,
         ) {
             Ok(()) => Ok(is_available),
-            Err(RCLActionError::RCLError(OError::NodeInvalid)) => {
+            Err(RCLActionError::Rcl(OError::NodeInvalid)) => {
                 // TODO: soft failure in case of shutdown context
                 eprintln!("Invalid node (the shutdown has started?)");
                 Ok(false)

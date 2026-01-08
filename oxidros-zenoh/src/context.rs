@@ -8,7 +8,7 @@
 //! See [rmw_zenoh design - Contexts](https://github.com/ros2/rmw_zenoh/blob/rolling/docs/design.md#contexts)
 
 use crate::{
-    error::{Error, Result},
+    error::{Error, Result, Ros2ArgsResultExt},
     graph_cache::GraphCache,
     node::Node,
 };
@@ -80,7 +80,7 @@ impl Context {
     /// - The Zenoh session cannot be opened
     pub fn new() -> Result<Arc<Self>> {
         // Parse ROS2 arguments from environment
-        let ros2_args = Ros2Args::from_env().map_err(Error::InvalidName)?;
+        let ros2_args = Ros2Args::from_env().map_name_err()?;
 
         Self::with_args(ros2_args)
     }
@@ -124,7 +124,7 @@ impl Context {
     ///
     /// This parses ROS2 arguments from `std::env::args()`.
     pub fn with_domain_id(domain_id: u32) -> Result<Arc<Self>> {
-        let ros2_args = Ros2Args::from_env().map_err(Error::InvalidName)?;
+        let ros2_args = Ros2Args::from_env().map_name_err()?;
         Self::with_args_and_domain_id(ros2_args, domain_id)
     }
 
@@ -132,7 +132,7 @@ impl Context {
     ///
     /// This parses ROS2 arguments from `std::env::args()`.
     pub fn with_config(domain_id: u32, config: zenoh::Config) -> Result<Arc<Self>> {
-        let ros2_args = Ros2Args::from_env().map_err(Error::InvalidName)?;
+        let ros2_args = Ros2Args::from_env().map_name_err()?;
         Self::with_full_config(ros2_args, domain_id, config)
     }
 
@@ -207,13 +207,13 @@ impl Context {
     /// Returns an error if the name or namespace is invalid.
     pub fn create_node(self: &Arc<Self>, name: &str, namespace: Option<&str>) -> Result<Arc<Node>> {
         // Validate node name
-        ros2args::names::validate_node_name(name)?;
+        ros2args::names::validate_node_name(name).map_name_err()?;
 
         // Validate namespace if provided
         if let Some(ns) = namespace
             && !ns.is_empty()
         {
-            ros2args::names::validate_namespace(ns)?;
+            ros2args::names::validate_namespace(ns).map_name_err()?;
         }
 
         // Get enclave from ROS2 args

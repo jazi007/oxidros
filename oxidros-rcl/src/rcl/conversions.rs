@@ -6,7 +6,7 @@ use std::fmt;
 use std::slice::from_raw_parts;
 use std::time::Duration;
 
-use oxidros_core::RCLActionError;
+use crate::error::{ActionError, RCLActionError};
 
 use super::RclRetErr;
 
@@ -256,7 +256,7 @@ impl From<&super::rcl_variant_t> for oxidros_core::parameter::Value {
     }
 }
 
-impl From<RclRetErr> for oxidros_core::OError {
+impl From<RclRetErr> for crate::error::OError {
     fn from(value: RclRetErr) -> Self {
         let value = value.0 as u32;
         match value {
@@ -302,9 +302,9 @@ impl From<RclRetErr> for oxidros_core::OError {
     }
 }
 
-impl From<oxidros_core::OError> for RclRetErr {
-    fn from(value: oxidros_core::OError) -> Self {
-        use oxidros_core::OError::*;
+impl From<oxidros_core::RclError> for RclRetErr {
+    fn from(value: oxidros_core::RclError) -> Self {
+        use oxidros_core::RclError::*;
         let err = match value {
             Error => super::RCL_RET_ERROR,
             Timeout => super::RCL_RET_TIMEOUT,
@@ -352,17 +352,17 @@ impl From<oxidros_core::OError> for RclRetErr {
 impl From<RCLActionError> for RclRetErr {
     fn from(val: RCLActionError) -> Self {
         match val {
-            RCLActionError::NameInvalid => super::RCL_RET_ACTION_NAME_INVALID.into(),
-            RCLActionError::GoalAccepted => super::RCL_RET_ACTION_GOAL_ACCEPTED.into(),
-            RCLActionError::GoalRejected => super::RCL_RET_ACTION_GOAL_REJECTED.into(),
-            RCLActionError::ClientInvalid => super::RCL_RET_ACTION_CLIENT_INVALID.into(),
-            RCLActionError::ClientTakeFailed => super::RCL_RET_ACTION_CLIENT_TAKE_FAILED.into(),
-            RCLActionError::ServerInvalid => super::RCL_RET_ACTION_SERVER_INVALID.into(),
-            RCLActionError::ServerTakeFailed => super::RCL_RET_ACTION_SERVER_TAKE_FAILED.into(),
-            RCLActionError::GoalHandleInvalid => super::RCL_RET_ACTION_GOAL_HANDLE_INVALID.into(),
-            RCLActionError::GoalEventInvalid => super::RCL_RET_ACTION_GOAL_EVENT_INVALID.into(),
-            RCLActionError::RCLError(err) => err.into(),
-            RCLActionError::InvalidRetVal => (!0).into(),
+            ActionError::NameInvalid => super::RCL_RET_ACTION_NAME_INVALID.into(),
+            ActionError::GoalAccepted => super::RCL_RET_ACTION_GOAL_ACCEPTED.into(),
+            ActionError::GoalRejected => super::RCL_RET_ACTION_GOAL_REJECTED.into(),
+            ActionError::ClientInvalid => super::RCL_RET_ACTION_CLIENT_INVALID.into(),
+            ActionError::ClientTakeFailed => super::RCL_RET_ACTION_CLIENT_TAKE_FAILED.into(),
+            ActionError::ServerInvalid => super::RCL_RET_ACTION_SERVER_INVALID.into(),
+            ActionError::ServerTakeFailed => super::RCL_RET_ACTION_SERVER_TAKE_FAILED.into(),
+            ActionError::GoalHandleInvalid => super::RCL_RET_ACTION_GOAL_HANDLE_INVALID.into(),
+            ActionError::GoalEventInvalid => super::RCL_RET_ACTION_GOAL_EVENT_INVALID.into(),
+            ActionError::Rcl(err) => err.into(),
+            ActionError::InvalidRetVal => (!0).into(),
         }
     }
 }

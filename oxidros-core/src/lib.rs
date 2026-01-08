@@ -15,8 +15,10 @@ pub mod qos;
 pub mod selector;
 pub mod time;
 
-// Re-export commonly used items
-pub use error::{DynError, OError, RCLActionError};
+// Re-export commonly used error types
+pub use error::{ActionError, Error, RclError, Result};
+
+// Re-export message traits
 pub use msg::{
     ActionGoal, ActionMsg, ActionResult, GetUUID, GoalResponse, ResultResponse, ServiceMsg,
     TryClone, TypeSupport,

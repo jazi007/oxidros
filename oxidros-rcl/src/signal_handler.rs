@@ -50,6 +50,12 @@ impl Display for Signaled {
 
 impl Error for Signaled {}
 
+impl From<Signaled> for oxidros_core::Error {
+    fn from(value: Signaled) -> Self {
+        Self::Other(value.to_string())
+    }
+}
+
 #[cfg(not(target_os = "windows"))]
 pub(crate) fn init() {
     INITIALIZER.get_or_init(|| {

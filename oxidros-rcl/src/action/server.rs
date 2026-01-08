@@ -802,14 +802,14 @@ impl From<crate::rcl::builtin_interfaces__msg__Time> for RclTime {
 fn rcl_action_accept_new_goal(
     server: *mut rcl_action_server_t,
     goal_info: &action_msgs__msg__GoalInfo,
-) -> Result<*mut rcl_action_goal_handle_t, Box<rcl::rcutils_error_string_t>> {
+) -> crate::error::Result<*mut rcl_action_goal_handle_t> {
     let goal_handle = {
         let guard = rcl::MT_UNSAFE_FN.lock();
         guard.rcl_action_accept_new_goal(server, goal_info)
     };
     if goal_handle.is_null() {
         let msg = unsafe { rcl::rcutils_get_error_string() };
-        return Err(Box::new(msg));
+        return Err(crate::error::rcutils_error_string_to_err(msg));
     }
 
     Ok(goal_handle)

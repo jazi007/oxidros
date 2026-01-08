@@ -56,7 +56,7 @@ impl Context {
     /// // Create a context.
     /// let ctx = Context::new().unwrap();
     /// ```
-    pub fn new() -> Result<Arc<Self>, DynError> {
+    pub fn new() -> Result<Arc<Self>> {
         signal_handler::init();
 
         {

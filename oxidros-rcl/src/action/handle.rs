@@ -1,12 +1,12 @@
 //! Goal handle representing each action goal.
 
-use oxidros_core::{OError, TryClone};
+use oxidros_core::TryClone;
 use parking_lot::Mutex;
 use std::{collections::BTreeMap, rc::Rc, sync::Arc};
 
 use super::{GoalEvent, GoalStatus, server::ServerData};
 use crate::{
-    error::{DynError, RCLActionError, RCLActionResult},
+    error::{DynError, OError, RCLActionError, RCLActionResult},
     logger::{Logger, pr_error_in},
     msg::ActionMsg,
     rcl,

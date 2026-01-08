@@ -210,106 +210,104 @@ pub fn map_rust_type_to_field_type(
     // wrapper types with angle-bracketed generic args). This makes the
     // derive attribute-driven instead of relying on the outer type
     // being literally `Vec`.
-    if field_opts.sequence {
-        if let Type::Path(type_path) = ty {
-            if let Some(PathSegment {
-                ident,
-                arguments: PathArguments::AngleBracketed(args),
-            }) = type_path.path.segments.last()
-            {
-                // First, try to extract a type generic (e.g., Vec<GoalStatus>)
-                if let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first() {
-                    // Prevent outer `sequence` attr from influencing inner mapping
-                    let mut inner_opts = field_opts.clone();
-                    inner_opts.sequence = false;
-                    let inner_field_type = map_rust_type_to_field_type(inner_ty, &inner_opts);
-                    if let Some(cap) = field_opts.capacity {
-                        return quote! {
-                            {
-                                let inner = #inner_field_type;
-                                if inner.type_id == ros2_types::FIELD_TYPE_NESTED_TYPE {
-                                    ros2_types::types::FieldType::nested_bounded_sequence(&inner.nested_type_name, #cap)
-                                } else {
-                                    ros2_types::types::FieldType::bounded_sequence(inner.type_id, #cap)
-                                }
-                            }
-                        };
-                    } else {
-                        return quote! {
-                            {
-                                let inner = #inner_field_type;
-                                if inner.type_id == ros2_types::FIELD_TYPE_NESTED_TYPE {
-                                    ros2_types::types::FieldType::nested_sequence(&inner.nested_type_name)
-                                } else {
-                                    ros2_types::types::FieldType::sequence(inner.type_id)
-                                }
-                            }
-                        };
-                    }
-                }
-
-                // If no type generic, check if this is a wrapper type like GoalStatusSeq<0>
-                // The const generic is the capacity, and we need to infer the element type
-                let type_name = ident.to_string();
-                if type_name.ends_with("Seq") {
-                    let base_type_name = &type_name[..type_name.len() - 3]; // Strip "Seq"
-
-                    // Check if this is a primitive sequence type
-                    let primitive_type_id = match base_type_name {
-                        "Bool" => Some(quote! { ros2_types::FIELD_TYPE_BOOLEAN }),
-                        "I8" => Some(quote! { ros2_types::FIELD_TYPE_INT8 }),
-                        "U8" => Some(quote! { ros2_types::FIELD_TYPE_UINT8 }),
-                        "I16" => Some(quote! { ros2_types::FIELD_TYPE_INT16 }),
-                        "U16" => Some(quote! { ros2_types::FIELD_TYPE_UINT16 }),
-                        "I32" => Some(quote! { ros2_types::FIELD_TYPE_INT32 }),
-                        "U32" => Some(quote! { ros2_types::FIELD_TYPE_UINT32 }),
-                        "I64" => Some(quote! { ros2_types::FIELD_TYPE_INT64 }),
-                        "U64" => Some(quote! { ros2_types::FIELD_TYPE_UINT64 }),
-                        "F32" => Some(quote! { ros2_types::FIELD_TYPE_FLOAT }),
-                        "F64" => Some(quote! { ros2_types::FIELD_TYPE_DOUBLE }),
-                        "RosString" => Some(quote! { ros2_types::FIELD_TYPE_STRING }),
-                        "RosWString" => Some(quote! { ros2_types::FIELD_TYPE_WSTRING }),
-                        _ => None,
-                    };
-
-                    if let Some(type_id) = primitive_type_id {
-                        // This is a primitive sequence type
-                        if let Some(cap) = field_opts.capacity {
-                            return quote! { ros2_types::types::FieldType::bounded_sequence(#type_id, #cap) };
+    if field_opts.sequence
+        && let Type::Path(type_path) = ty
+        && let Some(PathSegment {
+            ident,
+            arguments: PathArguments::AngleBracketed(args),
+        }) = type_path.path.segments.last()
+    {
+        // First, try to extract a type generic (e.g., Vec<GoalStatus>)
+        if let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first() {
+            // Prevent outer `sequence` attr from influencing inner mapping
+            let mut inner_opts = field_opts.clone();
+            inner_opts.sequence = false;
+            let inner_field_type = map_rust_type_to_field_type(inner_ty, &inner_opts);
+            if let Some(cap) = field_opts.capacity {
+                return quote! {
+                    {
+                        let inner = #inner_field_type;
+                        if inner.type_id == ros2_types::FIELD_TYPE_NESTED_TYPE {
+                            ros2_types::types::FieldType::nested_bounded_sequence(&inner.nested_type_name, #cap)
                         } else {
-                            return quote! { ros2_types::types::FieldType::sequence(#type_id) };
+                            ros2_types::types::FieldType::bounded_sequence(inner.type_id, #cap)
                         }
                     }
-
-                    // This is a nested sequence wrapper type - the element type is inferred
-                    // by stripping "Seq" from the type name and looking up that type
-                    // We build the element type path by modifying the current path
-                    let mut element_path = type_path.path.clone();
-                    if let Some(last_seg) = element_path.segments.last_mut() {
-                        last_seg.ident = syn::Ident::new(base_type_name, last_seg.ident.span());
-                        last_seg.arguments = PathArguments::None;
+                };
+            } else {
+                return quote! {
+                    {
+                        let inner = #inner_field_type;
+                        if inner.type_id == ros2_types::FIELD_TYPE_NESTED_TYPE {
+                            ros2_types::types::FieldType::nested_sequence(&inner.nested_type_name)
+                        } else {
+                            ros2_types::types::FieldType::sequence(inner.type_id)
+                        }
                     }
-                    let element_ty: Type = Type::Path(syn::TypePath {
-                        qself: type_path.qself.clone(),
-                        path: element_path,
-                    });
+                };
+            }
+        }
 
-                    if let Some(cap) = field_opts.capacity {
-                        return quote! {
-                            {
-                                let desc = <#element_ty as ros2_types::TypeDescription>::type_description();
-                                ros2_types::types::FieldType::nested_bounded_sequence(&desc.type_description.type_name, #cap)
-                            }
-                        };
-                    } else {
-                        return quote! {
-                            {
-                                let desc = <#element_ty as ros2_types::TypeDescription>::type_description();
-                                ros2_types::types::FieldType::nested_sequence(&desc.type_description.type_name)
-                            }
-                        };
-                    }
+        // If no type generic, check if this is a wrapper type like GoalStatusSeq<0>
+        // The const generic is the capacity, and we need to infer the element type
+        let type_name = ident.to_string();
+        if type_name.ends_with("Seq") {
+            let base_type_name = &type_name[..type_name.len() - 3]; // Strip "Seq"
+
+            // Check if this is a primitive sequence type
+            let primitive_type_id = match base_type_name {
+                "Bool" => Some(quote! { ros2_types::FIELD_TYPE_BOOLEAN }),
+                "I8" => Some(quote! { ros2_types::FIELD_TYPE_INT8 }),
+                "U8" => Some(quote! { ros2_types::FIELD_TYPE_UINT8 }),
+                "I16" => Some(quote! { ros2_types::FIELD_TYPE_INT16 }),
+                "U16" => Some(quote! { ros2_types::FIELD_TYPE_UINT16 }),
+                "I32" => Some(quote! { ros2_types::FIELD_TYPE_INT32 }),
+                "U32" => Some(quote! { ros2_types::FIELD_TYPE_UINT32 }),
+                "I64" => Some(quote! { ros2_types::FIELD_TYPE_INT64 }),
+                "U64" => Some(quote! { ros2_types::FIELD_TYPE_UINT64 }),
+                "F32" => Some(quote! { ros2_types::FIELD_TYPE_FLOAT }),
+                "F64" => Some(quote! { ros2_types::FIELD_TYPE_DOUBLE }),
+                "RosString" => Some(quote! { ros2_types::FIELD_TYPE_STRING }),
+                "RosWString" => Some(quote! { ros2_types::FIELD_TYPE_WSTRING }),
+                _ => None,
+            };
+
+            if let Some(type_id) = primitive_type_id {
+                // This is a primitive sequence type
+                if let Some(cap) = field_opts.capacity {
+                    return quote! { ros2_types::types::FieldType::bounded_sequence(#type_id, #cap) };
+                } else {
+                    return quote! { ros2_types::types::FieldType::sequence(#type_id) };
                 }
+            }
+
+            // This is a nested sequence wrapper type - the element type is inferred
+            // by stripping "Seq" from the type name and looking up that type
+            // We build the element type path by modifying the current path
+            let mut element_path = type_path.path.clone();
+            if let Some(last_seg) = element_path.segments.last_mut() {
+                last_seg.ident = syn::Ident::new(base_type_name, last_seg.ident.span());
+                last_seg.arguments = PathArguments::None;
+            }
+            let element_ty: Type = Type::Path(syn::TypePath {
+                qself: type_path.qself.clone(),
+                path: element_path,
+            });
+
+            if let Some(cap) = field_opts.capacity {
+                return quote! {
+                    {
+                        let desc = <#element_ty as ros2_types::TypeDescription>::type_description();
+                        ros2_types::types::FieldType::nested_bounded_sequence(&desc.type_description.type_name, #cap)
+                    }
+                };
+            } else {
+                return quote! {
+                    {
+                        let desc = <#element_ty as ros2_types::TypeDescription>::type_description();
+                        ros2_types::types::FieldType::nested_sequence(&desc.type_description.type_name)
+                    }
+                };
             }
         }
     }

@@ -87,4 +87,8 @@ fn main() {
         .expect("Failed to generate ros2msg");
     // Generate runtime_c.rs using bindgen
     oxidros_build::generate_runtime_c(out_path);
+
+    // Link ROS2 libraries (required for tests and standalone use)
+    oxidros_build::link_rcl_ros2_libs();
+    oxidros_build::link_msg_ros2_libs();
 }

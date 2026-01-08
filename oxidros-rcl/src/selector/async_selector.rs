@@ -80,7 +80,8 @@ impl AsyncSelector {
 
     pub(crate) fn halt(&mut self) -> Result<(), DynError> {
         if let Some(SelectorData { tx, cond, th, .. }) = self.data.take() {
-            tx.send(Command::Halt)?;
+            tx.send(Command::Halt)
+                .map_err(|_| crate::error::Error::ChannelClosed)?;
             cond.trigger()?;
 
             yield_now();
@@ -97,7 +98,8 @@ impl AsyncSelector {
     ) -> Result<(), DynError> {
         loop {
             if let Some(SelectorData { tx, cond, .. }) = &self.data {
-                tx.send(cmd)?;
+                tx.send(cmd)
+                    .map_err(|_| crate::error::Error::ChannelClosed)?;
                 cond.trigger()?;
                 return Ok(());
             } else {

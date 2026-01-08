@@ -287,11 +287,11 @@ fn collect_interface_files(pkg_path: PathBuf) -> Vec<PathBuf> {
             // First pass: collect all .idl files (priority)
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.extension().is_some_and(|e| e == "idl") {
-                    if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                        seen_bases.insert(format!("{}/{}", subdir, stem));
-                        files.push(path);
-                    }
+                if path.extension().is_some_and(|e| e == "idl")
+                    && let Some(stem) = path.file_stem().and_then(|s| s.to_str())
+                {
+                    seen_bases.insert(format!("{}/{}", subdir, stem));
+                    files.push(path);
                 }
             }
         }
@@ -300,14 +300,14 @@ fn collect_interface_files(pkg_path: PathBuf) -> Vec<PathBuf> {
         if let Ok(entries) = std::fs::read_dir(&dir_path) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                    if ext == *subdir {
-                        // Native file extension matches subdirectory (e.g., .srv in srv/)
-                        if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                            let key = format!("{}/{}", subdir, stem);
-                            if !seen_bases.contains(&key) {
-                                files.push(path);
-                            }
+                if let Some(ext) = path.extension().and_then(|e| e.to_str())
+                    && ext == *subdir
+                {
+                    // Native file extension matches subdirectory (e.g., .srv in srv/)
+                    if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                        let key = format!("{}/{}", subdir, stem);
+                        if !seen_bases.contains(&key) {
+                            files.push(path);
                         }
                     }
                 }

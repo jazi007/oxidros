@@ -92,5 +92,7 @@ impl<T: 'static + Send + TypeSupport> Stream for SubscriberStream<T> {
 /// Get ROS Time
 pub fn get_time_now() -> Result<Duration> {
     let mut time = oxidros::clock::Clock::new()?;
-    Ok(Duration::from_nanos(time.get_now()?.try_into()?))
+    Ok(Duration::from_nanos(time.get_now()?.try_into().map_err(
+        |e: std::num::TryFromIntError| oxidros::error::Error::Other(e.to_string()),
+    )?))
 }
