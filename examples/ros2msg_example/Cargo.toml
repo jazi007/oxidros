@@ -13,6 +13,7 @@ build = "build.rs"
 [dependencies]
 # ros2-types provides the Ros2Msg derive macro for FFI code generation
 ros2-types = { path = "../../ros2-types", features = ["derive"] }
+oxidros-msg = { path = "../../oxidros-msg" }
 
 [build-dependencies]
 oxidros-build = { path = "../../oxidros-build" }

@@ -303,3 +303,85 @@ diagnostic_msgs/KeyValue[] values
     assert!(idl.contains("struct DiagnosticStatus {"));
     assert!(idl.contains("octet level;"));
 }
+
+#[test]
+fn test_list_nodes_service_to_idl() {
+    // Test composition_interfaces/srv/ListNodes.srv pattern:
+    // Empty request, response with string arrays
+    let srv_content = r#"
+---
+string[] full_node_names
+uint64[] unique_ids
+"#;
+
+    let srv = parse_service_string("composition_interfaces", "ListNodes", srv_content).unwrap();
+    let idl = service_to_idl(&srv, "composition_interfaces", "srv/ListNodes.srv");
+
+    // Print the generated IDL for debugging
+    println!("=== Generated IDL ===\n{}\n=== End IDL ===", idl);
+
+    // Check header
+    assert!(
+        idl.contains("// generated from rosidl_adapter/resource/srv.idl.em"),
+        "Missing srv.idl.em header"
+    );
+    assert!(
+        idl.contains("// with input from composition_interfaces/srv/ListNodes.srv"),
+        "Missing source file path"
+    );
+
+    // Check module structure
+    assert!(
+        idl.contains("module composition_interfaces {"),
+        "Missing package module"
+    );
+    assert!(idl.contains("module srv {"), "Missing srv module");
+
+    // Check both request and response structs exist
+    assert!(
+        idl.contains("struct ListNodes_Request {"),
+        "Missing ListNodes_Request struct"
+    );
+    assert!(
+        idl.contains("struct ListNodes_Response {"),
+        "Missing ListNodes_Response struct"
+    );
+
+    // Request should have structure_needs_at_least_one_member (empty struct)
+    let request_section = idl
+        .split("struct ListNodes_Request")
+        .nth(1)
+        .expect("Should have Request section");
+    assert!(
+        request_section.contains("uint8 structure_needs_at_least_one_member;"),
+        "Empty request should have dummy member"
+    );
+
+    // Response should have the actual fields
+    let response_section = idl
+        .split("struct ListNodes_Response")
+        .nth(1)
+        .expect("Should have Response section");
+    assert!(
+        response_section.contains("sequence<string> full_node_names;"),
+        "Response should have full_node_names field"
+    );
+    assert!(
+        response_section.contains("sequence<uint64> unique_ids;"),
+        "Response should have unique_ids field"
+    );
+
+    // Make sure there's no duplication
+    let request_count = idl.matches("struct ListNodes_Request").count();
+    let response_count = idl.matches("struct ListNodes_Response").count();
+    assert_eq!(
+        request_count, 1,
+        "Should have exactly one ListNodes_Request, found {}",
+        request_count
+    );
+    assert_eq!(
+        response_count, 1,
+        "Should have exactly one ListNodes_Response, found {}",
+        response_count
+    );
+}

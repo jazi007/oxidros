@@ -2361,6 +2361,7 @@ name = "ros2msg_example"
 version = "0.1.0"
 dependencies = [
  "oxidros-build",
+ "oxidros-msg",
  "ros2-types",
 ]
 

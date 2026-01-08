@@ -567,3 +567,424 @@ fn test_generator_bounded_string_sequence() {
     );
     assert!(content.contains("pub names: Vec<::std::string::String>"));
 }
+
+#[test]
+fn test_generator_list_nodes_service() {
+    // Test the ListNodes.srv pattern: empty request, response with arrays
+    let temp_dir = TempDir::new().unwrap();
+    let output_dir = temp_dir.path().join("generated");
+
+    let srv_file = create_test_srv_file(
+        &temp_dir,
+        "composition_interfaces",
+        "ListNodes",
+        "---\nstring[] full_node_names\nuint64[] unique_ids\n",
+    );
+
+    let result = Generator::new()
+        .derive_debug(true)
+        .include(srv_file.to_str().unwrap())
+        .output_dir(output_dir.to_str().unwrap())
+        .generate();
+
+    assert!(result.is_ok(), "Failed to generate: {:?}", result.err());
+
+    let generated_file = output_dir
+        .join("composition_interfaces")
+        .join("srv")
+        .join("list_nodes.rs");
+    assert!(generated_file.exists(), "Generated file not found");
+
+    let content = fs::read_to_string(&generated_file).unwrap();
+    println!("=== Generated Rust Code ===\n{}\n=== End ===", content);
+
+    // Must have both request and response structs
+    assert!(
+        content.contains("pub struct ListNodes_Request"),
+        "Missing ListNodes_Request struct. Content:\n{}",
+        content
+    );
+    assert!(
+        content.contains("pub struct ListNodes_Response"),
+        "Missing ListNodes_Response struct. Content:\n{}",
+        content
+    );
+
+    // Request should have dummy member (empty struct)
+    assert!(
+        content.contains("structure_needs_at_least_one_member"),
+        "Empty request should have dummy member. Content:\n{}",
+        content
+    );
+
+    // Response should have the actual fields
+    assert!(
+        content.contains("full_node_names"),
+        "Missing full_node_names field. Content:\n{}",
+        content
+    );
+    assert!(
+        content.contains("unique_ids"),
+        "Missing unique_ids field. Content:\n{}",
+        content
+    );
+}
+
+#[test]
+fn test_generator_real_list_nodes_service() {
+    // Test with actual ROS2 ListNodes.srv from filesystem
+    use std::path::Path;
+    let srv_path = Path::new("/opt/ros/jazzy/share/composition_interfaces/srv/ListNodes.srv");
+    if !srv_path.exists() {
+        eprintln!("Skipping test - ListNodes.srv not found");
+        return;
+    }
+
+    let temp_dir = TempDir::new().unwrap();
+    let output_dir = temp_dir.path().join("generated");
+
+    let result = Generator::new()
+        .derive_debug(true)
+        .include(srv_path.to_str().unwrap())
+        .output_dir(output_dir.to_str().unwrap())
+        .generate();
+
+    assert!(result.is_ok(), "Failed to generate: {:?}", result.err());
+
+    let generated_file = output_dir
+        .join("composition_interfaces")
+        .join("srv")
+        .join("list_nodes.rs");
+    assert!(
+        generated_file.exists(),
+        "Generated file not found at {:?}",
+        generated_file
+    );
+
+    let content = fs::read_to_string(&generated_file).unwrap();
+    println!("=== Generated from real file ===\n{}\n=== End ===", content);
+
+    // Must have both request and response structs
+    assert!(
+        content.contains("pub struct ListNodes_Request"),
+        "Missing ListNodes_Request struct"
+    );
+    assert!(
+        content.contains("pub struct ListNodes_Response"),
+        "Missing ListNodes_Response struct"
+    );
+}
+
+#[test]
+fn test_generator_multiple_files_same_package() {
+    // Test with multiple .srv files from same package to check for file overwriting
+    use std::path::Path;
+    let list_nodes_path =
+        Path::new("/opt/ros/jazzy/share/composition_interfaces/srv/ListNodes.srv");
+    let load_node_path = Path::new("/opt/ros/jazzy/share/composition_interfaces/srv/LoadNode.srv");
+    let unload_node_path =
+        Path::new("/opt/ros/jazzy/share/composition_interfaces/srv/UnloadNode.srv");
+
+    if !list_nodes_path.exists() {
+        eprintln!("Skipping test - files not found");
+        return;
+    }
+
+    let temp_dir = TempDir::new().unwrap();
+    let output_dir = temp_dir.path().join("generated");
+
+    let ament_paths = vec![PathBuf::from("/opt/ros/jazzy/share")];
+
+    // Include all three services like oxidros-build does
+    let result = Generator::new()
+        .header("// Auto-generated")
+        .derive_debug(true)
+        .include(list_nodes_path.to_str().unwrap())
+        .include(load_node_path.to_str().unwrap())
+        .include(unload_node_path.to_str().unwrap())
+        .output_dir(output_dir.to_str().unwrap())
+        .allowlist_recursively(true)
+        .package_search_paths(ament_paths)
+        .generate();
+
+    assert!(result.is_ok(), "Failed to generate: {:?}", result.err());
+
+    // Check ListNodes
+    let list_nodes_file = output_dir
+        .join("composition_interfaces")
+        .join("srv")
+        .join("list_nodes.rs");
+    assert!(list_nodes_file.exists(), "ListNodes file not found");
+
+    let list_nodes_content = fs::read_to_string(&list_nodes_file).unwrap();
+    println!("=== ListNodes ===\n{}\n", list_nodes_content);
+    assert!(
+        list_nodes_content.contains("pub struct ListNodes_Request"),
+        "Missing ListNodes_Request"
+    );
+    assert!(
+        list_nodes_content.contains("pub struct ListNodes_Response"),
+        "Missing ListNodes_Response"
+    );
+
+    // Check LoadNode
+    let load_node_file = output_dir
+        .join("composition_interfaces")
+        .join("srv")
+        .join("load_node.rs");
+    assert!(load_node_file.exists(), "LoadNode file not found");
+
+    let load_node_content = fs::read_to_string(&load_node_file).unwrap();
+    println!("=== LoadNode ===\n{}\n", load_node_content);
+    assert!(
+        load_node_content.contains("pub struct LoadNode_Request"),
+        "Missing LoadNode_Request"
+    );
+    assert!(
+        load_node_content.contains("pub struct LoadNode_Response"),
+        "Missing LoadNode_Response"
+    );
+}
+
+/// Callback that generates ros2 attributes similar to oxidros-build's RosCallbacks
+struct FullRos2Callbacks;
+
+impl ParseCallbacks for FullRos2Callbacks {
+    fn add_attributes(&self, info: &ros2msg::generator::ItemInfo) -> Vec<String> {
+        let package = info.package();
+        let interface_type = match info.interface_kind() {
+            ros2msg::generator::InterfaceKind::Message => "msg",
+            ros2msg::generator::InterfaceKind::Service => "srv",
+            ros2msg::generator::InterfaceKind::Action => "action",
+        };
+        vec![
+            format!("#[ros2(package = \"{}\", interface_type = \"{}\")]", package, interface_type),
+            "#[cfg_attr(not(feature = \"rcl\"), derive(ros2_types::serde::Serialize, ros2_types::serde::Deserialize))]".to_string(),
+            "#[cfg_attr(not(feature = \"rcl\"), serde(crate = \"ros2_types::serde\"))]".to_string(),
+        ]
+    }
+
+    fn add_derives(&self, _info: &ros2msg::generator::ItemInfo) -> Vec<String> {
+        vec![
+            "ros2_types::Ros2Msg".to_string(),
+            "ros2_types::TypeDescription".to_string(),
+        ]
+    }
+}
+
+#[test]
+fn test_generator_with_full_ros2_callbacks() {
+    // Test with callbacks similar to oxidros-build's RosCallbacks
+    use std::path::Path;
+    let srv_path = Path::new("/opt/ros/jazzy/share/composition_interfaces/srv/ListNodes.srv");
+    if !srv_path.exists() {
+        eprintln!("Skipping test - ListNodes.srv not found");
+        return;
+    }
+
+    let temp_dir = TempDir::new().unwrap();
+    let output_dir = temp_dir.path().join("generated");
+    let ament_paths = vec![PathBuf::from("/opt/ros/jazzy/share")];
+
+    let result = Generator::new()
+        .header("// Auto-generated")
+        .derive_debug(true)
+        .parse_callbacks(Box::new(FullRos2Callbacks))
+        .include(srv_path.to_str().unwrap())
+        .output_dir(output_dir.to_str().unwrap())
+        .emit_rerun_if_changed(true)
+        .allowlist_recursively(true)
+        .package_search_paths(ament_paths)
+        .generate();
+
+    assert!(result.is_ok(), "Failed to generate: {:?}", result.err());
+
+    let generated_file = output_dir
+        .join("composition_interfaces")
+        .join("srv")
+        .join("list_nodes.rs");
+    assert!(generated_file.exists(), "Generated file not found");
+
+    let content = fs::read_to_string(&generated_file).unwrap();
+    println!("=== With FullRos2Callbacks ===\n{}\n=== End ===", content);
+
+    // Must have both request and response structs
+    assert!(
+        content.contains("pub struct ListNodes_Request"),
+        "Missing ListNodes_Request. Content:\n{}",
+        content
+    );
+    assert!(
+        content.contains("pub struct ListNodes_Response"),
+        "Missing ListNodes_Response. Content:\n{}",
+        content
+    );
+}
+
+#[test]
+fn test_generator_all_composition_services_with_callbacks() {
+    // Test with ALL composition_interfaces services to find file overwriting issues
+    use std::path::Path;
+    let list_nodes_path =
+        Path::new("/opt/ros/jazzy/share/composition_interfaces/srv/ListNodes.srv");
+    let load_node_path = Path::new("/opt/ros/jazzy/share/composition_interfaces/srv/LoadNode.srv");
+    let unload_node_path =
+        Path::new("/opt/ros/jazzy/share/composition_interfaces/srv/UnloadNode.srv");
+
+    if !list_nodes_path.exists() {
+        eprintln!("Skipping test - files not found");
+        return;
+    }
+
+    let temp_dir = TempDir::new().unwrap();
+    let output_dir = temp_dir.path().join("generated");
+    let ament_paths = vec![PathBuf::from("/opt/ros/jazzy/share")];
+
+    let result = Generator::new()
+        .header("// Auto-generated")
+        .derive_debug(true)
+        .parse_callbacks(Box::new(FullRos2Callbacks))
+        .include(list_nodes_path.to_str().unwrap())
+        .include(load_node_path.to_str().unwrap())
+        .include(unload_node_path.to_str().unwrap())
+        .output_dir(output_dir.to_str().unwrap())
+        .emit_rerun_if_changed(true)
+        .allowlist_recursively(true)
+        .package_search_paths(ament_paths)
+        .generate();
+
+    assert!(result.is_ok(), "Failed to generate: {:?}", result.err());
+
+    // Check each service file
+    for (name, req_name, resp_name) in [
+        ("list_nodes.rs", "ListNodes_Request", "ListNodes_Response"),
+        ("load_node.rs", "LoadNode_Request", "LoadNode_Response"),
+        (
+            "unload_node.rs",
+            "UnloadNode_Request",
+            "UnloadNode_Response",
+        ),
+    ] {
+        let file_path = output_dir
+            .join("composition_interfaces")
+            .join("srv")
+            .join(name);
+        assert!(file_path.exists(), "File not found: {}", name);
+
+        let content = fs::read_to_string(&file_path).unwrap();
+        println!("=== {} ===\n{}\n", name, content);
+
+        assert!(
+            content.contains(&format!("pub struct {}", req_name)),
+            "Missing {} in {}. Content:\n{}",
+            req_name,
+            name,
+            content
+        );
+        assert!(
+            content.contains(&format!("pub struct {}", resp_name)),
+            "Missing {} in {}. Content:\n{}",
+            resp_name,
+            name,
+            content
+        );
+    }
+}
+
+#[test]
+fn test_generator_with_allowlist_recursively() {
+    // Test with allowlist_recursively enabled, simulating how oxidros-build works
+    use std::path::Path;
+    let srv_path = Path::new("/opt/ros/jazzy/share/composition_interfaces/srv/ListNodes.srv");
+    if !srv_path.exists() {
+        eprintln!("Skipping test - ListNodes.srv not found");
+        return;
+    }
+
+    let temp_dir = TempDir::new().unwrap();
+    let output_dir = temp_dir.path().join("generated");
+
+    let ament_paths = vec![PathBuf::from("/opt/ros/jazzy/share")];
+
+    let result = Generator::new()
+        .header("// Auto-generated")
+        .derive_debug(true)
+        .include(srv_path.to_str().unwrap())
+        .output_dir(output_dir.to_str().unwrap())
+        .allowlist_recursively(true)
+        .package_search_paths(ament_paths)
+        .generate();
+
+    assert!(result.is_ok(), "Failed to generate: {:?}", result.err());
+
+    let generated_file = output_dir
+        .join("composition_interfaces")
+        .join("srv")
+        .join("list_nodes.rs");
+    assert!(
+        generated_file.exists(),
+        "Generated file not found at {:?}",
+        generated_file
+    );
+
+    let content = fs::read_to_string(&generated_file).unwrap();
+    println!(
+        "=== With allowlist_recursively ===\n{}\n=== End ===",
+        content
+    );
+
+    // Must have both request and response structs
+    assert!(
+        content.contains("pub struct ListNodes_Request"),
+        "Missing ListNodes_Request struct"
+    );
+    assert!(
+        content.contains("pub struct ListNodes_Response"),
+        "Missing ListNodes_Response struct"
+    );
+}
+
+#[test]
+fn test_generator_idl_parameter_value() {
+    // Test generating from ParameterValue.idl file
+    use std::path::Path;
+    let idl_path = Path::new("/opt/ros/jazzy/share/rcl_interfaces/msg/ParameterValue.idl");
+    if !idl_path.exists() {
+        eprintln!("Skipping test - ParameterValue.idl not found");
+        return;
+    }
+
+    let temp_dir = TempDir::new().unwrap();
+    let output_dir = temp_dir.path().join("generated");
+
+    let result = Generator::new()
+        .derive_debug(true)
+        .include(idl_path.to_str().unwrap())
+        .output_dir(output_dir.to_str().unwrap())
+        .generate();
+
+    assert!(result.is_ok(), "Failed to generate: {:?}", result.err());
+
+    let generated_file = output_dir
+        .join("rcl_interfaces")
+        .join("msg")
+        .join("parameter_value.rs");
+    assert!(
+        generated_file.exists(),
+        "Generated file not found at {:?}",
+        generated_file
+    );
+
+    let content = fs::read_to_string(&generated_file).unwrap();
+    println!(
+        "=== Generated from ParameterValue.idl ===\n{}\n=== End ===",
+        content
+    );
+
+    // Must have the ParameterValue struct
+    assert!(
+        content.contains("pub struct ParameterValue"),
+        "Missing ParameterValue struct. Content:\n{}",
+        content
+    );
+}
