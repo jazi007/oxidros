@@ -50,7 +50,7 @@ mod rcl_impl {
                     }
                 }
 
-                pub fn as_slice_mut(&mut self) -> &mut [$ty_orig] {
+                pub fn as_mut_slice(&mut self) -> &mut [$ty_orig] {
                     if self.0.data.is_null() {
                         &mut []
                     } else {
@@ -66,7 +66,7 @@ mod rcl_impl {
                 }
 
                 pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, $ty_orig> {
-                    self.as_slice_mut().iter_mut()
+                    self.as_mut_slice().iter_mut()
                 }
 
                 pub fn len(&self) -> usize {
@@ -234,6 +234,8 @@ mod rcl_impl {
 // ============================================================================
 #[cfg(not(feature = "rcl"))]
 mod non_rcl_impl {
+    use ros2_types::serde::{Deserialize, Deserializer, Serialize, Serializer};
+
     macro_rules! def_sequence {
         ($ty: ident, $ty_orig:ty) => {
             /// A sequence of elements.
@@ -259,7 +261,7 @@ mod non_rcl_impl {
                     &self.0
                 }
 
-                pub fn as_slice_mut(&mut self) -> &mut [$ty_orig] {
+                pub fn as_mut_slice(&mut self) -> &mut [$ty_orig] {
                     &mut self.0
                 }
 
@@ -301,6 +303,32 @@ mod non_rcl_impl {
             impl<const N: usize> Default for $ty<N> {
                 fn default() -> Self {
                     Self::null()
+                }
+            }
+
+            impl<const N: usize> Serialize for $ty<N> {
+                fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+                where
+                    S: Serializer,
+                {
+                    self.0.serialize(serializer)
+                }
+            }
+
+            impl<'de, const N: usize> Deserialize<'de> for $ty<N> {
+                fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+                where
+                    D: Deserializer<'de>,
+                {
+                    let vec = Vec::<$ty_orig>::deserialize(deserializer)?;
+                    if N != 0 && vec.len() > N {
+                        return Err(ros2_types::serde::de::Error::custom(format!(
+                            "sequence length {} exceeds maximum {}",
+                            vec.len(),
+                            N
+                        )));
+                    }
+                    Ok($ty(vec))
                 }
             }
 

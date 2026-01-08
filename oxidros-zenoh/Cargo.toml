@@ -15,12 +15,15 @@ categories = ["network-programming", "science::robotics"]
 zenoh = { version = "1.0", features = ["unstable"] }
 zenoh-ext = { version = "1.0", features = ["unstable"] }
 tokio = { version = "1", features = ["time", "rt"] }
-flume = "0.11"
+flume = "0.12"
 
 # Oxidros workspace crates
 oxidros-core = { path = "../oxidros-core" }
-ros2-types = { path = "../ros2-types", features = ["native"] }
+ros2-types = { path = "../ros2-types" }
 ros2args = { path = "../ros2args" }
+
+# Optional: ROS2 message types (requires AMENT_PREFIX_PATH for building)
+oxidros-msg = { path = "../oxidros-msg" }
 
 # Utilities
 thiserror.workspace = true
@@ -28,6 +31,7 @@ log.workspace = true
 serde.workspace = true
 parking_lot = "0.12"
 uuid = { version = "1", features = ["v4"] }
+yaml-rust2 = "0.11"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "macros"] }

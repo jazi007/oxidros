@@ -6,7 +6,7 @@ use std::env;
 use std::path::Path;
 
 use ros2msg::generator::{
-    Generator, InterfaceKind, ItemInfo, ModuleInfo, ModuleLevel, ParseCallbacks,
+    FieldInfo, Generator, InterfaceKind, ItemInfo, ModuleInfo, ModuleLevel, ParseCallbacks,
 };
 
 /// Callbacks for generating ROS2 FFI code using ros2-types-derive
@@ -33,7 +33,7 @@ impl ParseCallbacks for Ros2FfiCallbacks {
             InterfaceKind::Action => "action",
         };
         // For action types, add uuid_path so the derive macro knows how to find unique_identifier_msgs
-        if matches!(info.interface_kind(), InterfaceKind::Action) {
+        let mut attributes = if matches!(info.interface_kind(), InterfaceKind::Action) {
             vec![format!(
                 "#[ros2(package = \"{}\", interface_type = \"{}\", uuid_path = \"{}\")]",
                 package, interface_type, self.uuid_path
@@ -43,12 +43,92 @@ impl ParseCallbacks for Ros2FfiCallbacks {
                 "#[ros2(package = \"{}\", interface_type = \"{}\")]",
                 package, interface_type
             )]
+        };
+        attributes.push("#[cfg_attr(not(feature = \"rcl\"), derive(ros2_types::serde::Serialize, ros2_types::serde::Deserialize))]".to_string());
+        attributes.push(
+            "#[cfg_attr(not(feature = \"rcl\"), serde(crate = \"ros2_types::serde\"))]".to_string(),
+        );
+        attributes
+    }
+
+    /// Adds BigArray attribute for fields with large arrays (> 32 elements).
+    ///
+    /// serde only supports arrays up to 32 elements by default. For larger arrays,
+    /// we use `serde_big_array::BigArray` which is re-exported as `ros2_types::BigArray`.
+    fn add_field_attributes(&self, field_info: &FieldInfo) -> Vec<String> {
+        let mut attrs = Vec::new();
+
+        // Build #[ros2(...)] attributes for type hash metadata
+        let mut ros2_parts = Vec::new();
+
+        // Add type override if present
+        if let Some(type_override) = field_info.ros2_type_override() {
+            ros2_parts.push(format!("ros2_type = \"{}\"", type_override));
         }
+
+        // If the field is a sequence (not a fixed-size array), mark it explicitly
+        // so derives know. Fixed-size arrays have `array_size()` set and are
+        // represented as arrays in ROS2, not sequences.
+        //
+        // Detection methods:
+        // 1. ROS type name starts with "sequence" (explicit IDL sequence)
+        // 2. Has capacity but no array_size (bounded sequence)
+        // 3. Rust field type is Vec<...> without array_size (unbounded sequence)
+        // 4. Rust field type contains "Seq<" (custom sequence types like BoolSeq<0>, GoalStatusSeq<0>)
+        let ros_type_name = field_info.ros_type_name();
+        let rust_type = field_info.field_type();
+        let is_sequence = ros_type_name.starts_with("sequence")
+            || (field_info.capacity().is_some() && field_info.array_size().is_none())
+            || (rust_type.starts_with("Vec<") && field_info.array_size().is_none())
+            || rust_type.contains("Seq<");
+
+        if is_sequence {
+            ros2_parts.push("sequence".to_string());
+        }
+
+        // Detect string types (RosString<N>, RosWString<N>)
+        let is_string = rust_type.contains("RosString<");
+        let is_wstring = rust_type.contains("RosWString<");
+
+        if is_string {
+            ros2_parts.push("string".to_string());
+        }
+        if is_wstring {
+            ros2_parts.push("wstring".to_string());
+        }
+
+        // Add capacity if present
+        if let Some(capacity) = field_info.capacity() {
+            ros2_parts.push(format!("capacity = {}", capacity));
+        }
+
+        // Add default value if present
+        if let Some(default_value) = field_info.default_value() {
+            ros2_parts.push(format!("default = \"{}\"", default_value));
+        }
+
+        if !ros2_parts.is_empty() {
+            attrs.push(format!("#[ros2({})]", ros2_parts.join(", ")));
+        }
+
+        // Add serde_big_array attribute for large fixed-size arrays (> 32 elements)
+        if let Some(size) = field_info.array_size()
+            && size > 32
+        {
+            attrs.push(
+                "#[cfg_attr(not(feature = \"rcl\"), serde(with = \"ros2_types::BigArray\"))]"
+                    .to_string(),
+            );
+        }
+        attrs
     }
 
     /// Add derives for ROS2 types including Ros2Msg from ros2-types-derive
     fn add_derives(&self, _info: &ItemInfo) -> Vec<String> {
-        vec!["ros2_types::Ros2Msg".to_string()]
+        vec![
+            "ros2_types::Ros2Msg".to_string(),
+            "ros2_types::TypeDescription".to_string(),
+        ]
     }
 
     /// Custom type mapping for ROS2 FFI types - strings

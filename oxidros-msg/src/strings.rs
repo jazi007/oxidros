@@ -63,7 +63,7 @@ mod rcl_impl {
             }
         }
 
-        pub fn as_slice_mut(&mut self) -> &mut [std::os::raw::c_char] {
+        pub fn as_mut_slice(&mut self) -> &mut [std::os::raw::c_char] {
             if self.0.data.is_null() {
                 &mut []
             } else {
@@ -165,7 +165,7 @@ mod rcl_impl {
             }
         }
 
-        pub fn as_slice_mut(&mut self) -> &mut [RosString<STRLEN>] {
+        pub fn as_mut_slice(&mut self) -> &mut [RosString<STRLEN>] {
             if self.0.data.is_null() {
                 &mut []
             } else {
@@ -181,7 +181,7 @@ mod rcl_impl {
         }
 
         pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, RosString<STRLEN>> {
-            self.as_slice_mut().iter_mut()
+            self.as_mut_slice().iter_mut()
         }
 
         pub fn len(&self) -> usize {
@@ -287,7 +287,7 @@ mod rcl_impl {
             }
         }
 
-        pub fn as_slice_mut(&mut self) -> &mut [u16] {
+        pub fn as_mut_slice(&mut self) -> &mut [u16] {
             if self.0.data.is_null() {
                 &mut []
             } else {
@@ -389,7 +389,7 @@ mod rcl_impl {
             }
         }
 
-        pub fn as_slice_mut(&mut self) -> &mut [RosWString<STRLEN>] {
+        pub fn as_mut_slice(&mut self) -> &mut [RosWString<STRLEN>] {
             if self.0.data.is_null() {
                 &mut []
             } else {
@@ -407,7 +407,7 @@ mod rcl_impl {
         }
 
         pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, RosWString<STRLEN>> {
-            self.as_slice_mut().iter_mut()
+            self.as_mut_slice().iter_mut()
         }
 
         pub fn len(&self) -> usize {
@@ -469,6 +469,7 @@ mod rcl_impl {
 #[cfg(not(feature = "rcl"))]
 mod non_rcl_impl {
     use super::*;
+    use ros2_types::serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     /// String.
     /// `N` represents the maximum number of characters excluding `\0`.
@@ -537,6 +538,32 @@ mod non_rcl_impl {
         }
     }
 
+    impl<const N: usize> Serialize for RosString<N> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            self.0.serialize(serializer)
+        }
+    }
+
+    impl<'de, const N: usize> Deserialize<'de> for RosString<N> {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            let s = String::deserialize(deserializer)?;
+            if N > 0 && s.len() > N {
+                return Err(ros2_types::serde::de::Error::custom(format!(
+                    "string length {} exceeds maximum {}",
+                    s.len(),
+                    N
+                )));
+            }
+            Ok(Self(s))
+        }
+    }
+
     unsafe impl<const N: usize> Sync for RosString<N> {}
     unsafe impl<const N: usize> Send for RosString<N> {}
 
@@ -569,7 +596,7 @@ mod non_rcl_impl {
             &self.0
         }
 
-        pub fn as_slice_mut(&mut self) -> &mut [RosString<STRLEN>] {
+        pub fn as_mut_slice(&mut self) -> &mut [RosString<STRLEN>] {
             &mut self.0
         }
 
@@ -611,6 +638,34 @@ mod non_rcl_impl {
     impl<const STRLEN: usize, const SEQLEN: usize> Default for RosStringSeq<STRLEN, SEQLEN> {
         fn default() -> Self {
             Self::null()
+        }
+    }
+
+    impl<const STRLEN: usize, const SEQLEN: usize> Serialize for RosStringSeq<STRLEN, SEQLEN> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            self.0.serialize(serializer)
+        }
+    }
+
+    impl<'de, const STRLEN: usize, const SEQLEN: usize> Deserialize<'de>
+        for RosStringSeq<STRLEN, SEQLEN>
+    {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            let vec = Vec::<RosString<STRLEN>>::deserialize(deserializer)?;
+            if SEQLEN != 0 && vec.len() > SEQLEN {
+                return Err(ros2_types::serde::de::Error::custom(format!(
+                    "sequence length {} exceeds maximum {}",
+                    vec.len(),
+                    SEQLEN
+                )));
+            }
+            Ok(Self(vec))
         }
     }
 
@@ -684,6 +739,31 @@ mod non_rcl_impl {
         }
     }
 
+    impl<const N: usize> Serialize for RosWString<N> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            self.0.serialize(serializer)
+        }
+    }
+
+    impl<'de, const N: usize> Deserialize<'de> for RosWString<N> {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            let s = String::deserialize(deserializer)?;
+            if N > 0 && s.encode_utf16().count() > N {
+                return Err(ros2_types::serde::de::Error::custom(format!(
+                    "wstring length exceeds maximum {}",
+                    N
+                )));
+            }
+            Ok(Self(s))
+        }
+    }
+
     unsafe impl<const N: usize> Sync for RosWString<N> {}
     unsafe impl<const N: usize> Send for RosWString<N> {}
 
@@ -716,7 +796,7 @@ mod non_rcl_impl {
             &self.0
         }
 
-        pub fn as_slice_mut(&mut self) -> &mut [RosWString<STRLEN>] {
+        pub fn as_mut_slice(&mut self) -> &mut [RosWString<STRLEN>] {
             &mut self.0
         }
 
@@ -758,6 +838,34 @@ mod non_rcl_impl {
     impl<const STRLEN: usize, const SEQLEN: usize> Default for RosWStringSeq<STRLEN, SEQLEN> {
         fn default() -> Self {
             Self::null()
+        }
+    }
+
+    impl<const STRLEN: usize, const SEQLEN: usize> Serialize for RosWStringSeq<STRLEN, SEQLEN> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            self.0.serialize(serializer)
+        }
+    }
+
+    impl<'de, const STRLEN: usize, const SEQLEN: usize> Deserialize<'de>
+        for RosWStringSeq<STRLEN, SEQLEN>
+    {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            let vec = Vec::<RosWString<STRLEN>>::deserialize(deserializer)?;
+            if SEQLEN != 0 && vec.len() > SEQLEN {
+                return Err(ros2_types::serde::de::Error::custom(format!(
+                    "sequence length {} exceeds maximum {}",
+                    vec.len(),
+                    SEQLEN
+                )));
+            }
+            Ok(Self(vec))
         }
     }
 

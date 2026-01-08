@@ -69,6 +69,16 @@ pub struct Ros2FieldOpts {
     #[darling(default)]
     pub sequence: bool,
 
+    /// Explicitly mark this field as a string type.
+    /// Use `#[ros2(string)]` on the field (flag-style).
+    #[darling(default)]
+    pub string: bool,
+
+    /// Explicitly mark this field as a wide string type.
+    /// Use `#[ros2(wstring)]` on the field (flag-style).
+    #[darling(default)]
+    pub wstring: bool,
+
     /// Default value for the field
     #[darling(default)]
     pub default: Option<String>,

@@ -12,7 +12,7 @@ use crate::{
     qos::QosMapping,
 };
 use oxidros_core::qos::Profile;
-use ros2_types::TypeSupport;
+use ros2_types::{TypeDescription, TypeSupport};
 use std::{marker::PhantomData, sync::Arc};
 use zenoh::Wait;
 
@@ -62,35 +62,35 @@ pub struct Subscriber<T> {
     _phantom: PhantomData<T>,
 }
 
-impl<T: TypeSupport> Subscriber<T> {
+impl<T: TypeSupport + TypeDescription> Subscriber<T> {
     /// Create a new subscriber.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - Parent node
+    /// * `topic_name` - Original topic name (for display)
+    /// * `fq_topic_name` - Fully qualified topic name (already expanded and remapped)
+    /// * `qos` - QoS profile
+    /// * `entity_kind` - Entity kind for liveliness
     pub(crate) fn new(
         node: Arc<Node>,
         topic_name: &str,
+        fq_topic_name: &str,
         qos: Profile,
         entity_kind: EntityKind,
     ) -> Result<Self> {
         // Validate QoS
         QosMapping::validate(&qos);
 
-        // Build fully qualified topic name
-        let fq_topic_name = if topic_name.starts_with('/') {
-            topic_name.to_string()
-        } else if node.namespace().is_empty() {
-            format!("/{}", topic_name)
-        } else {
-            format!("{}/{}", node.namespace(), topic_name)
-        };
-
         // Get type info
         let type_name = T::type_name();
-        let type_hash = "RIHS01_TODO"; // TODO: Calculate from TypeDescription
+        let type_hash = T::compute_hash()?;
 
         // Build key expression with wildcard for type hash
         // This allows receiving from publishers with different (compatible) type hashes
         let key_expr = topic_keyexpr(
             node.context().domain_id(),
-            &fq_topic_name,
+            fq_topic_name,
             type_name,
             "*", // Wildcard to match any hash
         );
@@ -129,9 +129,9 @@ impl<T: TypeSupport> Subscriber<T> {
             node.enclave(),
             node.namespace(),
             node.name(),
-            &fq_topic_name,
+            fq_topic_name,
             type_name,
-            type_hash,
+            &type_hash,
             &qos,
         );
 
@@ -140,7 +140,7 @@ impl<T: TypeSupport> Subscriber<T> {
         Ok(Subscriber {
             node,
             topic_name: topic_name.to_string(),
-            fq_topic_name,
+            fq_topic_name: fq_topic_name.to_string(),
             gid,
             receiver,
             _liveliness_token: liveliness_token,
@@ -148,7 +148,9 @@ impl<T: TypeSupport> Subscriber<T> {
             _phantom: PhantomData,
         })
     }
+}
 
+impl<T: TypeSupport> Subscriber<T> {
     /// Get the topic name.
     pub fn topic_name(&self) -> &str {
         &self.topic_name

@@ -9,6 +9,7 @@ license-file.workspace = true
 # Build script for generating ROS2 message types
 build = "build.rs"
 
+
 [dependencies]
 # ros2-types provides the Ros2Msg derive macro for FFI code generation
 ros2-types = { path = "../../ros2-types", features = ["derive"] }

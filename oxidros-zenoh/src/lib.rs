@@ -43,6 +43,8 @@ mod qos;
 pub mod service;
 pub mod topic;
 
+pub mod parameter;
+
 // Re-exports
 pub use context::Context;
 pub use error::{Error, Result};
@@ -52,7 +54,14 @@ pub use qos::QosMapping;
 pub use service::ServiceRequest;
 
 // Re-export core types
+pub use oxidros_core::error::OResult;
 pub use oxidros_core::{
-    DurabilityPolicy, DynError, HistoryPolicy, LivelinessPolicy, Parameter, Profile,
-    ReliabilityPolicy, TypeSupport,
+    Descriptor, DurabilityPolicy, DynError, FloatingPointRange, HistoryPolicy, IntegerRange,
+    LivelinessPolicy, OError, Parameter, Profile, ReliabilityPolicy, TypeSupport, Value,
 };
+
+// Re-export selector callback result
+pub use oxidros_core::selector::CallbackResult;
+
+// Re-export parameter storage
+pub use oxidros_core::parameter::Parameters;

@@ -21,7 +21,9 @@ pub trait TypeSupport: 'static {
     ///
     /// The actual type of this pointer depends on the implementation
     /// (e.g., `rosidl_message_type_support_t` in RCL).
-    fn type_support() -> *const c_void;
+    fn type_support() -> *const c_void {
+        std::ptr::null()
+    }
 
     /// Serialize this message to CDR-encoded bytes.
     ///
@@ -72,7 +74,9 @@ pub trait ServiceMsg {
     type Response: TypeSupport;
 
     /// Returns an opaque pointer to the service type support structure.
-    fn type_support() -> *const c_void;
+    fn type_support() -> *const c_void {
+        std::ptr::null()
+    }
 }
 
 /// Trait for ROS2 action message types.
@@ -90,7 +94,9 @@ pub trait ActionMsg {
     type Feedback: TypeSupport + GetUUID;
 
     /// Returns an opaque pointer to the action type support structure.
-    fn type_support() -> *const c_void;
+    fn type_support() -> *const c_void {
+        std::ptr::null()
+    }
 
     /// The goal content type (the actual goal data).
     type GoalContent: TypeSupport;
@@ -126,7 +132,9 @@ pub trait ActionGoal {
     type Response: TypeSupport + GoalResponse;
 
     /// Returns an opaque pointer to the goal service type support structure.
-    fn type_support() -> *const c_void;
+    fn type_support() -> *const c_void {
+        std::ptr::null()
+    }
 }
 
 /// Trait for types that contain a UUID.
@@ -158,7 +166,9 @@ pub trait ActionResult {
     type Response: TypeSupport + ResultResponse;
 
     /// Returns an opaque pointer to the result service type support structure.
-    fn type_support() -> *const c_void;
+    fn type_support() -> *const c_void {
+        std::ptr::null()
+    }
 }
 
 /// Trait for action result response types.
@@ -174,7 +184,18 @@ pub trait ResultResponse {
 ///
 /// This is compatible with ROS2's builtin_interfaces/Time.
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub struct UnsafeTime {
     /// Seconds since UNIX epoch.
     pub sec: i32,
@@ -239,7 +260,18 @@ impl From<UnsafeTime> for SystemTime {
 /// The "Unsafe" prefix indicates this is subject to the year-2038 problem
 /// on 32-bit systems since `sec` is an `i32`.
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub struct UnsafeDuration {
     /// Seconds component.
     pub sec: i32,
@@ -473,6 +505,34 @@ impl<T> Drop for SequenceRaw<T> {
                 let _ = Vec::from_raw_parts(self.data, self.size, self.capacity);
             }
         }
+    }
+}
+
+// Serde implementations for non-rcl: serialize as a sequence
+#[cfg(not(feature = "rcl"))]
+impl<T: serde::Serialize> serde::Serialize for SequenceRaw<T> {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeSeq;
+        let slice = self.as_slice();
+        let mut seq = serializer.serialize_seq(Some(slice.len()))?;
+        for element in slice {
+            seq.serialize_element(element)?;
+        }
+        seq.end()
+    }
+}
+
+#[cfg(not(feature = "rcl"))]
+impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for SequenceRaw<T> {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let vec = Vec::<T>::deserialize(deserializer)?;
+        Ok(Self::from_vec(vec))
     }
 }
 

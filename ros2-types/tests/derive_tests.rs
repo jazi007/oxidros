@@ -20,7 +20,7 @@ use ros2_types::{Ros2Msg, TypeDescription};
 // =============================================================================
 
 /// Test a simple message type like builtin_interfaces/Time
-#[derive(Debug, Ros2Msg, TypeDescription)]
+#[derive(Debug, Ros2Msg, TypeDescription, serde::Serialize, serde::Deserialize)]
 #[ros2(package = "builtin_interfaces", interface_type = "msg")]
 #[repr(C)]
 pub struct Time {
@@ -72,7 +72,7 @@ fn test_time_type_description() {
 // =============================================================================
 
 /// A simple point message
-#[derive(Debug, Ros2Msg, TypeDescription)]
+#[derive(Debug, Ros2Msg, TypeDescription, serde::Serialize, serde::Deserialize)]
 #[ros2(package = "geometry_msgs", interface_type = "msg")]
 #[repr(C)]
 pub struct Point {
@@ -82,7 +82,7 @@ pub struct Point {
 }
 
 /// A pose message that contains nested Point
-#[derive(Debug, Ros2Msg, TypeDescription)]
+#[derive(Debug, Ros2Msg, TypeDescription, serde::Serialize, serde::Deserialize)]
 #[ros2(package = "geometry_msgs", interface_type = "msg")]
 #[repr(C)]
 pub struct Pose {
@@ -115,7 +115,7 @@ fn test_nested_type_description() {
 // =============================================================================
 
 /// Service request for AddTwoInts
-#[derive(Debug, Ros2Msg, TypeDescription)]
+#[derive(Debug, Ros2Msg, TypeDescription, serde::Serialize, serde::Deserialize)]
 #[ros2(
     package = "example_interfaces",
     interface_type = "srv",
@@ -128,7 +128,7 @@ pub struct AddTwoInts_Request {
 }
 
 /// Service response for AddTwoInts
-#[derive(Debug, Ros2Msg, TypeDescription)]
+#[derive(Debug, Ros2Msg, TypeDescription, serde::Serialize, serde::Deserialize)]
 #[ros2(package = "example_interfaces", interface_type = "srv")]
 #[repr(C)]
 pub struct AddTwoInts_Response {
@@ -173,7 +173,7 @@ fn test_service_type_description() {
 
 /// Action goal for Fibonacci
 /// Note: skip_wrapper = true because we don't have unique_identifier_msgs::msg::UUID in tests
-#[derive(Debug, Ros2Msg, TypeDescription)]
+#[derive(Debug, Ros2Msg, TypeDescription, serde::Serialize, serde::Deserialize)]
 #[ros2(
     package = "example_interfaces",
     interface_type = "action",
@@ -185,7 +185,7 @@ pub struct Fibonacci_Goal {
 }
 
 /// Action result for Fibonacci (simplified - no sequence)
-#[derive(Debug, Ros2Msg, TypeDescription)]
+#[derive(Debug, Ros2Msg, TypeDescription, serde::Serialize, serde::Deserialize)]
 #[ros2(package = "example_interfaces", interface_type = "action")]
 #[repr(C)]
 pub struct Fibonacci_Result {
@@ -193,7 +193,7 @@ pub struct Fibonacci_Result {
 }
 
 /// Action feedback for Fibonacci (simplified - no sequence)
-#[derive(Debug, Ros2Msg, TypeDescription)]
+#[derive(Debug, Ros2Msg, TypeDescription, serde::Serialize, serde::Deserialize)]
 #[ros2(package = "example_interfaces", interface_type = "action")]
 #[repr(C)]
 pub struct Fibonacci_Feedback {
@@ -247,7 +247,7 @@ fn test_action_type_descriptions() {
 // =============================================================================
 
 /// Empty service request (like std_srvs/Trigger)
-#[derive(Debug, Ros2Msg, TypeDescription)]
+#[derive(Debug, Ros2Msg, TypeDescription, serde::Serialize, serde::Deserialize)]
 #[ros2(package = "std_srvs", interface_type = "srv")]
 #[repr(C)]
 pub struct Trigger_Request {
@@ -255,7 +255,7 @@ pub struct Trigger_Request {
 }
 
 /// Empty service response
-#[derive(Debug, Ros2Msg, TypeDescription)]
+#[derive(Debug, Ros2Msg, TypeDescription, serde::Serialize, serde::Deserialize)]
 #[ros2(package = "std_srvs", interface_type = "srv")]
 #[repr(C)]
 pub struct Trigger_Response {
@@ -281,7 +281,7 @@ fn test_empty_struct_type_description() {
 // =============================================================================
 
 /// Test struct with all ROS2 primitive types
-#[derive(Debug, Ros2Msg, TypeDescription)]
+#[derive(Debug, Ros2Msg, TypeDescription, serde::Serialize, serde::Deserialize)]
 #[ros2(package = "test_msgs", interface_type = "msg")]
 #[repr(C)]
 pub struct AllPrimitives {

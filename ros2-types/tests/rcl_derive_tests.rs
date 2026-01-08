@@ -12,7 +12,7 @@
 use ros2_types::{Ros2Msg, TypeDescription};
 
 /// Test struct to verify rcl code generation compiles
-#[derive(Debug, Ros2Msg, TypeDescription)]
+#[derive(Debug, Ros2Msg, TypeDescription, serde::Serialize, serde::Deserialize)]
 #[ros2(package = "test_msgs", interface_type = "msg")]
 #[repr(C)]
 pub struct RclTestMsg {
@@ -21,7 +21,7 @@ pub struct RclTestMsg {
 
 /// Service request for rcl test
 /// Note: skip_wrapper = true because we generate the wrapper via ros2_service! below
-#[derive(Debug, Ros2Msg, TypeDescription)]
+#[derive(Debug, Ros2Msg, TypeDescription, serde::Serialize, serde::Deserialize)]
 #[ros2(package = "test_msgs", interface_type = "srv", skip_wrapper = true)]
 #[repr(C)]
 pub struct RclTest_Request {
@@ -29,7 +29,7 @@ pub struct RclTest_Request {
 }
 
 /// Service response for rcl test
-#[derive(Debug, Ros2Msg, TypeDescription)]
+#[derive(Debug, Ros2Msg, TypeDescription, serde::Serialize, serde::Deserialize)]
 #[ros2(package = "test_msgs", interface_type = "srv")]
 #[repr(C)]
 pub struct RclTest_Response {

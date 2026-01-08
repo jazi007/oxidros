@@ -1,3 +1,5 @@
+#![cfg(feature = "rcl")]
+
 pub mod common;
 
 use oxidros_rcl::{context::Context, msg::common_interfaces::example_interfaces::msg::Int64};

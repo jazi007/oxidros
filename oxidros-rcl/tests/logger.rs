@@ -1,3 +1,5 @@
+#![cfg(feature = "rcl")]
+
 use oxidros_rcl::{logger::Logger, *};
 
 #[test]

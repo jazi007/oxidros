@@ -1,3 +1,5 @@
+#![cfg(feature = "rcl")]
+
 use oxidros_rcl::{context::Context, msg::common_interfaces::std_msgs};
 use std::{error::Error, time::Duration};
 

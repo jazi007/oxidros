@@ -90,10 +90,11 @@ pub const SEPARATOR: char = ':';
 /// oxidros_build::ros2_env_var_changed();
 /// ```
 pub fn ros2_env_var_changed() {
-    let distro_env = std::env::var_os("ROS_DISTRO").expect("Source your ros2 env");
-    let distro = distro_env.to_string_lossy();
-    println!("cargo:rustc-cfg=feature=\"{distro}\"");
-    println!("cargo:rustc-cfg=feature=\"rcl\"");
+    if let Some(distro_env) = std::env::var_os("ROS_DISTRO") {
+        let distro = distro_env.to_string_lossy();
+        println!("cargo:rustc-cfg=feature=\"{distro}\"");
+        println!("cargo:rustc-cfg=feature=\"rcl\"");
+    }
     println!("cargo:rerun-if-env-changed=AMENT_PREFIX_PATH");
     println!("cargo:rerun-if-env-changed=CMAKE_PREFIX_PATH");
     println!("cargo:rerun-if-env-changed=ROS_DISTRO");

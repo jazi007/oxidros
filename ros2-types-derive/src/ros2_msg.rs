@@ -68,7 +68,6 @@ pub fn derive_ros2_msg_impl(input: DeriveInput) -> Result<TokenStream, syn::Erro
     let rcl_impl = generate_rcl_impl(&opts, &field_opts);
     let pure_impl = generate_pure_impl(&opts, &field_opts);
     let common_impl = generate_common_impl(&opts);
-    let native_impl = generate_native_impl(&opts);
 
     // Generate service/action wrappers (must be at module level, not inside const _)
     let wrapper_impl = generate_wrapper_impl(&opts);
@@ -86,13 +85,6 @@ pub fn derive_ros2_msg_impl(input: DeriveInput) -> Result<TokenStream, syn::Erro
         const _: () = {
             #pure_impl
         };
-
-        // Native implementations (CDR serialization for non-RCL backends)
-        #[cfg(feature = "native")]
-        const _: () = {
-            #native_impl
-        };
-
         // Service/Action wrappers (at module level so they're accessible)
         #wrapper_impl
     };
@@ -100,27 +92,76 @@ pub fn derive_ros2_msg_impl(input: DeriveInput) -> Result<TokenStream, syn::Erro
     Ok(expanded)
 }
 
+/// Generate common FFI declarations for serialization (rcutils, rmw functions)
+/// and the rcl_serialized_message_t struct.
+///
+/// This is shared between base message types and action wrapper types.
+fn generate_serialization_ffi_decls() -> TokenStream {
+    quote! {
+        fn rcutils_get_zero_initialized_uint8_array() -> rcl_serialized_message_t;
+        fn rcutils_uint8_array_init(
+            array: *mut rcl_serialized_message_t,
+            size: usize,
+            allocator: *const std::ffi::c_void,
+        ) -> i32;
+        fn rcutils_get_default_allocator() -> std::ffi::c_void;
+        fn rcutils_uint8_array_fini(array: *mut rcl_serialized_message_t);
+        fn rmw_serialize(
+            msg: *const std::ffi::c_void,
+            type_support: *const std::ffi::c_void,
+            serialized_msg: *mut rcl_serialized_message_t,
+        ) -> i32;
+        fn rmw_deserialize(
+            buffer: *const u8,
+            buffer_size: usize,
+            type_support: *const std::ffi::c_void,
+            msg: *mut std::ffi::c_void,
+            bytes_read: *mut usize,
+        ) -> i32;
+    }
+}
+
+/// Generate the rcl_serialized_message_t struct definition.
+///
+/// This is the C struct used for serialization/deserialization.
+fn generate_serialized_message_struct() -> TokenStream {
+    quote! {
+        #[repr(C)]
+        struct rcl_serialized_message_t {
+            buffer: *mut u8,
+            buffer_length: usize,
+            buffer_capacity: usize,
+            allocator: *const std::ffi::c_void,
+        }
+    }
+}
+
 /// Get the default expression for a type, handling large arrays specially
 ///
 /// Arrays with more than 32 elements don't implement Default in Rust's std library,
 /// so we need to use alternative initialization methods.
 fn get_default_expr_for_type(ty: &syn::Type) -> TokenStream {
-    if let syn::Type::Array(array) = ty {
-        // Check if it's a large array (size > 32)
-        if let syn::Expr::Lit(syn::ExprLit {
-            lit: syn::Lit::Int(lit_int),
-            ..
-        }) = &array.len
-            && let Ok(size) = lit_int.base10_parse::<usize>()
-            && size > 32
-        {
-            // For large arrays, use array initialization with default element
-            let elem_ty = &array.elem;
-            return quote! { [<#elem_ty as Default>::default(); #size] };
-        }
+    if let Some((elem_ty, size)) = get_large_array_info(ty) {
+        // For large arrays, use array initialization with default element
+        return quote! { [<#elem_ty as Default>::default(); #size] };
     }
     // Fall back to Default::default() for all other types
     quote! { Default::default() }
+}
+
+/// Check if a type is a large array (> 32 elements) and return (element_type, size)
+fn get_large_array_info(ty: &syn::Type) -> Option<(&syn::Type, usize)> {
+    if let syn::Type::Array(array) = ty
+        && let syn::Expr::Lit(syn::ExprLit {
+            lit: syn::Lit::Int(lit_int),
+            ..
+        }) = &array.len
+        && let Ok(size) = lit_int.base10_parse::<usize>()
+        && size > 32
+    {
+        return Some((&array.elem, size));
+    }
+    None
 }
 
 /// Generate service/action wrapper implementations
@@ -233,6 +274,10 @@ fn generate_rcl_base_impl(name: &syn::Ident, package: &str, interface_type: &str
     // Sequence types
     let seq_raw_type = format_ident!("{}SeqRaw", name);
     let seq_type = format_ident!("{}Seq", name);
+    let ts_impl = generate_rcl_type_support_impl(name, package, interface_type);
+
+    let serialization_ffi = generate_serialization_ffi_decls();
+    let serialized_msg_struct = generate_serialized_message_struct();
 
     quote! {
         // FFI function declarations
@@ -246,15 +291,12 @@ fn generate_rcl_base_impl(name: &syn::Ident, package: &str, interface_type: &str
             fn #seq_are_equal_fn(lhs: *const #seq_raw_type, rhs: *const #seq_raw_type) -> bool;
             fn #seq_copy_fn(lhs: *const #seq_raw_type, rhs: *mut #seq_raw_type) -> bool;
             fn #type_support_fn() -> *const std::ffi::c_void;
+            #serialization_ffi
         }
 
-        // TypeSupport implementation
-        impl ros2_types::TypeSupport for #name {
-            fn type_support() -> *const std::ffi::c_void {
-                unsafe { #type_support_fn() }
-            }
-        }
+        #serialized_msg_struct
 
+        #ts_impl
         // Constructor using FFI init
         impl #name {
             /// Create a new instance initialized by the ROS2 C library
@@ -382,8 +424,26 @@ fn generate_pure_impl(opts: &Ros2TypeOpts, field_opts: &[Ros2FieldOpts]) -> Toke
         .map(|f| {
             let field_name = f.ident.as_ref().unwrap();
             if let Some(ref default_val) = f.default {
-                // Parse the default value - for now, simple handling
-                let default_expr: TokenStream = default_val.parse().unwrap_or_else(|_| {
+                // Parse the default value - handle type coercion for floats
+                let ty = &f.ty;
+                let is_float = if let syn::Type::Path(tp) = ty {
+                    tp.path
+                        .segments
+                        .last()
+                        .map(|s| s.ident == "f32" || s.ident == "f64")
+                        .unwrap_or(false)
+                } else {
+                    false
+                };
+
+                // For floats, ensure the literal has a decimal point
+                let coerced_val = if is_float && !default_val.contains('.') {
+                    format!("{}.0", default_val)
+                } else {
+                    default_val.clone()
+                };
+
+                let default_expr: TokenStream = coerced_val.parse().unwrap_or_else(|_| {
                     quote! { Default::default() }
                 });
                 quote! { #field_name: #default_expr }
@@ -422,6 +482,7 @@ fn generate_pure_impl(opts: &Ros2TypeOpts, field_opts: &[Ros2FieldOpts]) -> Toke
     // Sequence types
     let seq_raw_type = format_ident!("{}SeqRaw", name);
     let seq_type = format_ident!("{}Seq", name);
+    let ts_impl = generate_native_type_support_impl(name, &opts.package, &opts.interface_type);
 
     quote! {
         // Constructor - always succeeds for pure Rust types
@@ -431,6 +492,8 @@ fn generate_pure_impl(opts: &Ros2TypeOpts, field_opts: &[Ros2FieldOpts]) -> Toke
                 Some(Self::default())
             }
         }
+
+        #ts_impl
 
         impl Default for #name {
             fn default() -> Self {
@@ -532,42 +595,52 @@ fn generate_pure_impl(opts: &Ros2TypeOpts, field_opts: &[Ros2FieldOpts]) -> Toke
                 self.0 == other.0
             }
         }
+
+        // Serde Serialize for sequence
+        impl<const N: usize> ros2_types::serde::Serialize for #seq_type<N>
+        where
+            #name: ros2_types::serde::Serialize,
+        {
+            fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+            where
+                S: ros2_types::serde::Serializer,
+            {
+                self.0.serialize(serializer)
+            }
+        }
+
+        // Serde Deserialize for sequence
+        impl<'de, const N: usize> ros2_types::serde::Deserialize<'de> for #seq_type<N>
+        where
+            #name: ros2_types::serde::Deserialize<'de>,
+        {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+            where
+                D: ros2_types::serde::Deserializer<'de>,
+            {
+                let inner = #seq_raw_type::deserialize(deserializer)?;
+                if N != 0 && inner.len() > N {
+                    return Err(ros2_types::serde::de::Error::custom(
+                        format!("sequence length {} exceeds maximum {}", inner.len(), N)
+                    ));
+                }
+                Ok(Self(inner))
+            }
+        }
     }
 }
 
-/// Generate native implementations (CDR serialization for non-RCL backends)
-///
-/// This generates:
-/// - `to_bytes()` using cdr-encoding serialization (Little Endian, as per DDS/ROS2)
-/// - `from_bytes()` using cdr-encoding deserialization  
-/// - `type_name()` returning DDS-formatted type name
-///
-/// These implementations are used by Zenoh, iceoryx2, ros2-client,
-/// or any other native Rust ROS2 implementation.
-///
-/// # Requirements
-///
-/// The struct must derive `serde::Serialize` and `serde::Deserialize`:
-/// ```ignore
-/// #[derive(Ros2Msg, serde::Serialize, serde::Deserialize)]
-/// #[ros2(package = "std_msgs", interface_type = "msg")]
-/// pub struct MyMessage { ... }
-/// ```
-fn generate_native_impl(opts: &Ros2TypeOpts) -> TokenStream {
-    let name = &opts.ident;
-    let package = &opts.package;
-    let interface_type = &opts.interface_type;
-
+fn generate_native_type_support_impl(
+    name: &syn::Ident,
+    package: &str,
+    interface_type: &str,
+) -> TokenStream {
     // DDS type name format: "pkg_name::interface_type::dds_::TypeName_"
     let dds_type_name = format!("{}::{}::dds_::{}_", package, interface_type, name);
 
     quote! {
+        // TypeSupport implementation
         impl ros2_types::TypeSupport for #name {
-            fn type_support() -> *const std::ffi::c_void {
-                // Native implementation doesn't use type support pointers
-                std::ptr::null()
-            }
-
             fn to_bytes(&self) -> ros2_types::Result<Vec<u8>> {
                 ros2_types::cdr_encoding::to_vec::<Self, ros2_types::byteorder::LittleEndian>(self)
                     .map_err(|e| ros2_types::Error::CdrError(e.to_string()))
@@ -581,6 +654,84 @@ fn generate_native_impl(opts: &Ros2TypeOpts) -> TokenStream {
 
             fn type_name() -> &'static str {
                 #dds_type_name
+            }
+        }
+    }
+}
+
+fn generate_rcl_type_support_impl(
+    name: &syn::Ident,
+    package: &str,
+    interface_type: &str,
+) -> TokenStream {
+    // DDS type name format: "pkg_name::interface_type::dds_::TypeName_"
+    let dds_type_name = format!("{}::{}::dds_::{}_", package, interface_type, name);
+    let type_support_fn = format_ident!(
+        "rosidl_typesupport_c__get_message_type_support_handle__{}__{}__{}",
+        package,
+        interface_type,
+        name
+    );
+    let dds_lit = syn::LitStr::new(&dds_type_name, proc_macro2::Span::call_site());
+    quote! {
+        // TypeSupport implementation
+        impl ros2_types::TypeSupport for #name {
+            fn type_support() -> *const std::ffi::c_void {
+                unsafe { #type_support_fn() }
+            }
+
+            fn to_bytes(&self) -> ros2_types::Result<Vec<u8>> {
+                let ts = Self::type_support();
+                let mut msg_buf: rcl_serialized_message_t = unsafe { rcutils_get_zero_initialized_uint8_array() };
+                let ret_init = unsafe {
+                    rcutils_uint8_array_init(
+                        &mut msg_buf as *mut rcl_serialized_message_t,
+                        0,
+                        &rcutils_get_default_allocator() as *const _,
+                    )
+                };
+                if ret_init != 0 {
+                    return Err(ros2_types::Error::CdrError("rcutils_uint8_array_init failed".to_string()));
+                }
+                let ret = unsafe {
+                    rmw_serialize(
+                        self as *const _ as *const std::ffi::c_void,
+                        ts,
+                        &mut msg_buf as *mut rcl_serialized_message_t,
+                    )
+                };
+                let result = if ret == 0 {
+                    let slice = unsafe { std::slice::from_raw_parts(msg_buf.buffer, msg_buf.buffer_length) };
+                    Ok(slice.to_vec())
+                } else {
+                    Err(ros2_types::Error::CdrError("rmw_serialize failed".to_string()))
+                };
+                unsafe { rcutils_uint8_array_fini(&mut msg_buf as *mut rcl_serialized_message_t) };
+                result
+            }
+
+            fn from_bytes(bytes: &[u8]) -> ros2_types::Result<Self> {
+                let ts = Self::type_support();
+                let mut msg = unsafe { std::mem::zeroed() };
+                let mut read = 0usize;
+                let ret = unsafe {
+                    rmw_deserialize(
+                        bytes.as_ptr(),
+                        bytes.len(),
+                        ts,
+                        &mut msg as *mut _ as *mut std::ffi::c_void,
+                        &mut read as *mut usize,
+                    )
+                };
+                if ret == 0 {
+                    Ok(msg)
+                } else {
+                    Err(ros2_types::Error::CdrError("rmw_deserialize failed".to_string()))
+                }
+            }
+
+            fn type_name() -> &'static str {
+                #dds_lit
             }
         }
     }
@@ -601,7 +752,6 @@ pub fn generate_service_wrapper(package: &str, service_name: &str) -> TokenStrea
     );
 
     let service_doc = format!("Service wrapper for {}", service_name);
-
     quote! {
         #[doc = #service_doc]
         #[derive(Debug)]
@@ -612,11 +762,11 @@ pub fn generate_service_wrapper(package: &str, service_name: &str) -> TokenStrea
             fn #type_support_fn() -> *const std::ffi::c_void;
         }
 
-        #[cfg(feature = "rcl")]
         impl ros2_types::ServiceMsg for #service_ident {
             type Request = #request_ident;
             type Response = #response_ident;
 
+            #[cfg(feature = "rcl")]
             fn type_support() -> *const std::ffi::c_void {
                 unsafe { #type_support_fn() }
             }
@@ -717,6 +867,30 @@ pub fn generate_action_wrapper(
     };
 
     let action_doc = format!("Action wrapper for {}", action_name);
+    let ts_send_goal_req_impl_rcl =
+        generate_rcl_type_support_impl(&send_goal_request_ident, package, "action");
+    let ts_send_goal_resp_impl_rcl =
+        generate_rcl_type_support_impl(&send_goal_response_ident, package, "action");
+    let ts_get_result_req_impl_rcl =
+        generate_rcl_type_support_impl(&get_result_request_ident, package, "action");
+    let ts_get_result_resp_impl_rcl =
+        generate_rcl_type_support_impl(&get_result_response_ident, package, "action");
+    let ts_feedback_message_impl_rcl =
+        generate_rcl_type_support_impl(&feedback_message_ident, package, "action");
+
+    let ts_send_goal_req_impl_native =
+        generate_native_type_support_impl(&send_goal_request_ident, package, "action");
+    let ts_send_goal_resp_impl_native =
+        generate_native_type_support_impl(&send_goal_response_ident, package, "action");
+    let ts_get_result_req_impl_native =
+        generate_native_type_support_impl(&get_result_request_ident, package, "action");
+    let ts_get_result_resp_impl_native =
+        generate_native_type_support_impl(&get_result_response_ident, package, "action");
+    let ts_feedback_message_impl_native =
+        generate_native_type_support_impl(&feedback_message_ident, package, "action");
+
+    let serialization_ffi = generate_serialization_ffi_decls();
+    let serialized_msg_struct = generate_serialized_message_struct();
 
     quote! {
         // =============================================================================
@@ -734,7 +908,10 @@ pub fn generate_action_wrapper(
             fn #get_result_request_type_support_fn() -> *const std::ffi::c_void;
             fn #get_result_response_type_support_fn() -> *const std::ffi::c_void;
             fn #feedback_message_type_support_fn() -> *const std::ffi::c_void;
+            #serialization_ffi
         }
+
+        #serialized_msg_struct
 
         // =============================================================================
         // SendGoal service types
@@ -743,6 +920,8 @@ pub fn generate_action_wrapper(
         /// Request message for sending a goal
         #[repr(C)]
         #[derive(Debug)]
+        #[cfg_attr(not(feature = "rcl"), derive(ros2_types::serde::Serialize, ros2_types::serde::Deserialize))]
+        #[cfg_attr(not(feature = "rcl"), serde(crate = "ros2_types::serde"))]
         pub struct #send_goal_request_ident {
             pub goal_id: #uuid_type,
             pub goal: #goal_ident,
@@ -751,6 +930,8 @@ pub fn generate_action_wrapper(
         /// Response message for goal acceptance
         #[repr(C)]
         #[derive(Debug)]
+        #[cfg_attr(not(feature = "rcl"), derive(ros2_types::serde::Serialize, ros2_types::serde::Deserialize))]
+        #[cfg_attr(not(feature = "rcl"), serde(crate = "ros2_types::serde"))]
         pub struct #send_goal_response_ident {
             pub accepted: bool,
             pub stamp: ros2_types::UnsafeTime,
@@ -760,11 +941,11 @@ pub fn generate_action_wrapper(
         #[derive(Debug)]
         pub struct #send_goal_ident;
 
-        #[cfg(feature = "rcl")]
         impl ros2_types::ActionGoal for #send_goal_ident {
             type Request = #send_goal_request_ident;
             type Response = #send_goal_response_ident;
 
+            #[cfg(feature = "rcl")]
             fn type_support() -> *const std::ffi::c_void {
                 unsafe { #send_goal_type_support_fn() }
             }
@@ -777,11 +958,9 @@ pub fn generate_action_wrapper(
         }
 
         #[cfg(feature = "rcl")]
-        impl ros2_types::TypeSupport for #send_goal_request_ident {
-            fn type_support() -> *const std::ffi::c_void {
-                unsafe { #send_goal_request_type_support_fn() }
-            }
-        }
+        #ts_send_goal_req_impl_rcl
+        #[cfg(not(feature = "rcl"))]
+        #ts_send_goal_req_impl_native
 
         impl ros2_types::GoalResponse for #send_goal_response_ident {
             fn is_accepted(&self) -> bool {
@@ -801,11 +980,9 @@ pub fn generate_action_wrapper(
         }
 
         #[cfg(feature = "rcl")]
-        impl ros2_types::TypeSupport for #send_goal_response_ident {
-            fn type_support() -> *const std::ffi::c_void {
-                unsafe { #send_goal_response_type_support_fn() }
-            }
-        }
+        #ts_send_goal_resp_impl_rcl
+        #[cfg(not(feature = "rcl"))]
+        #ts_send_goal_resp_impl_native
 
         // =============================================================================
         // GetResult service types
@@ -814,6 +991,8 @@ pub fn generate_action_wrapper(
         /// Request message for getting action result
         #[repr(C)]
         #[derive(Debug)]
+        #[cfg_attr(not(feature = "rcl"), derive(ros2_types::serde::Serialize, ros2_types::serde::Deserialize))]
+        #[cfg_attr(not(feature = "rcl"), serde(crate = "ros2_types::serde"))]
         pub struct #get_result_request_ident {
             pub goal_id: #uuid_type,
         }
@@ -821,6 +1000,8 @@ pub fn generate_action_wrapper(
         /// Response message containing the result
         #[repr(C)]
         #[derive(Debug)]
+        #[cfg_attr(not(feature = "rcl"), derive(ros2_types::serde::Serialize, ros2_types::serde::Deserialize))]
+        #[cfg_attr(not(feature = "rcl"), serde(crate = "ros2_types::serde"))]
         pub struct #get_result_response_ident {
             pub status: u8,
             pub result: #result_ident,
@@ -830,11 +1011,11 @@ pub fn generate_action_wrapper(
         #[derive(Debug)]
         pub struct #get_result_ident;
 
-        #[cfg(feature = "rcl")]
         impl ros2_types::ActionResult for #get_result_ident {
             type Request = #get_result_request_ident;
             type Response = #get_result_response_ident;
 
+            #[cfg(feature = "rcl")]
             fn type_support() -> *const std::ffi::c_void {
                 unsafe { #get_result_type_support_fn() }
             }
@@ -847,11 +1028,9 @@ pub fn generate_action_wrapper(
         }
 
         #[cfg(feature = "rcl")]
-        impl ros2_types::TypeSupport for #get_result_request_ident {
-            fn type_support() -> *const std::ffi::c_void {
-                unsafe { #get_result_request_type_support_fn() }
-            }
-        }
+        #ts_get_result_req_impl_rcl
+        #[cfg(not(feature = "rcl"))]
+        #ts_get_result_req_impl_native
 
         impl ros2_types::ResultResponse for #get_result_response_ident {
             fn get_status(&self) -> u8 {
@@ -860,11 +1039,9 @@ pub fn generate_action_wrapper(
         }
 
         #[cfg(feature = "rcl")]
-        impl ros2_types::TypeSupport for #get_result_response_ident {
-            fn type_support() -> *const std::ffi::c_void {
-                unsafe { #get_result_response_type_support_fn() }
-            }
-        }
+        #ts_get_result_resp_impl_rcl
+        #[cfg(not(feature = "rcl"))]
+        #ts_get_result_resp_impl_native
 
         // =============================================================================
         // Feedback message
@@ -873,6 +1050,8 @@ pub fn generate_action_wrapper(
         /// Feedback message with goal UUID
         #[repr(C)]
         #[derive(Debug)]
+        #[cfg_attr(not(feature = "rcl"), derive(ros2_types::serde::Serialize, ros2_types::serde::Deserialize))]
+        #[cfg_attr(not(feature = "rcl"), serde(crate = "ros2_types::serde"))]
         pub struct #feedback_message_ident {
             pub goal_id: #uuid_type,
             pub feedback: #feedback_ident,
@@ -885,11 +1064,9 @@ pub fn generate_action_wrapper(
         }
 
         #[cfg(feature = "rcl")]
-        impl ros2_types::TypeSupport for #feedback_message_ident {
-            fn type_support() -> *const std::ffi::c_void {
-                unsafe { #feedback_message_type_support_fn() }
-            }
-        }
+        #ts_feedback_message_impl_rcl
+        #[cfg(not(feature = "rcl"))]
+        #ts_feedback_message_impl_native
 
         // =============================================================================
         // Action wrapper
@@ -899,12 +1076,12 @@ pub fn generate_action_wrapper(
         #[derive(Debug)]
         pub struct #action_ident;
 
-        #[cfg(feature = "rcl")]
         impl ros2_types::ActionMsg for #action_ident {
             type Goal = #send_goal_ident;
             type Result = #get_result_ident;
             type Feedback = #feedback_message_ident;
 
+            #[cfg(feature = "rcl")]
             fn type_support() -> *const std::ffi::c_void {
                 unsafe { #action_type_support_fn() }
             }

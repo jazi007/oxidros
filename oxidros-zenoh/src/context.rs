@@ -13,6 +13,7 @@ use crate::{
     node::Node,
 };
 use parking_lot::Mutex;
+use ros2args::Ros2Args;
 use std::{
     env,
     sync::{
@@ -43,6 +44,8 @@ struct ContextInner {
     next_node_id: AtomicU32,
     /// Graph cache for entity discovery.
     graph_cache: Arc<Mutex<GraphCache>>,
+    /// Parsed ROS2 command-line arguments.
+    ros2_args: Ros2Args,
 }
 
 /// ROS2 context wrapping a Zenoh session.
@@ -65,25 +68,39 @@ impl Context {
     /// Create a new context with default configuration.
     ///
     /// This will:
-    /// 1. Read `ROS_DOMAIN_ID` from environment (default: 0)
-    /// 2. Read `ZENOH_SESSION_CONFIG_URI` for custom config (optional)
-    /// 3. Open a Zenoh session in peer mode connecting to localhost:7447
+    /// 1. Parse ROS2 command-line arguments from `std::env::args()`
+    /// 2. Read `ROS_DOMAIN_ID` from environment (default: 0)
+    /// 3. Read `ZENOH_SESSION_CONFIG_URI` for custom config (optional)
+    /// 4. Open a Zenoh session in peer mode connecting to localhost:7447
     ///
     /// # Errors
     ///
-    /// Returns an error if the Zenoh session cannot be opened.
-    pub fn new() -> Result<Self> {
+    /// Returns an error if:
+    /// - ROS2 arguments are malformed
+    /// - The Zenoh session cannot be opened
+    pub fn new() -> Result<Arc<Self>> {
+        // Parse ROS2 arguments from environment
+        let ros2_args = Ros2Args::from_env().map_err(Error::InvalidName)?;
+
+        Self::with_args(ros2_args)
+    }
+
+    /// Create a new context with pre-parsed ROS2 arguments.
+    ///
+    /// This is useful when you want to parse arguments yourself or
+    /// provide custom arguments programmatically.
+    pub fn with_args(ros2_args: Ros2Args) -> Result<Arc<Self>> {
         // Get domain ID from environment
         let domain_id = env::var(ROS_DOMAIN_ID)
             .ok()
             .and_then(|s| s.parse().ok())
             .unwrap_or(0);
 
-        Self::with_domain_id(domain_id)
+        Self::with_args_and_domain_id(ros2_args, domain_id)
     }
 
-    /// Create a new context with a specific domain ID.
-    pub fn with_domain_id(domain_id: u32) -> Result<Self> {
+    /// Create a new context with pre-parsed ROS2 arguments and specific domain ID.
+    pub fn with_args_and_domain_id(ros2_args: Ros2Args, domain_id: u32) -> Result<Arc<Self>> {
         // Build Zenoh config
         let mut config = zenoh::Config::default();
 
@@ -100,11 +117,33 @@ impl Context {
                 .map_err(|e| Error::InvalidConfig(format!("Failed to set endpoints: {:?}", e)))?;
         }
 
-        Self::with_config(domain_id, config)
+        Self::with_full_config(ros2_args, domain_id, config)
+    }
+
+    /// Create a new context with a specific domain ID (legacy API).
+    ///
+    /// This parses ROS2 arguments from `std::env::args()`.
+    pub fn with_domain_id(domain_id: u32) -> Result<Arc<Self>> {
+        let ros2_args = Ros2Args::from_env().map_err(Error::InvalidName)?;
+        Self::with_args_and_domain_id(ros2_args, domain_id)
     }
 
     /// Create a new context with custom Zenoh configuration.
-    pub fn with_config(domain_id: u32, config: zenoh::Config) -> Result<Self> {
+    ///
+    /// This parses ROS2 arguments from `std::env::args()`.
+    pub fn with_config(domain_id: u32, config: zenoh::Config) -> Result<Arc<Self>> {
+        let ros2_args = Ros2Args::from_env().map_err(Error::InvalidName)?;
+        Self::with_full_config(ros2_args, domain_id, config)
+    }
+
+    /// Create a new context with full configuration.
+    ///
+    /// This is the most flexible constructor that allows specifying all options.
+    pub fn with_full_config(
+        ros2_args: Ros2Args,
+        domain_id: u32,
+        config: zenoh::Config,
+    ) -> Result<Arc<Self>> {
         // Open Zenoh session
         let session = zenoh::open(config).wait()?;
 
@@ -120,9 +159,10 @@ impl Context {
             session_id,
             next_node_id: AtomicU32::new(0),
             graph_cache: Arc::new(Mutex::new(graph_cache)),
+            ros2_args,
         });
 
-        let ctx = Context { inner };
+        let ctx = Arc::new(Context { inner });
 
         // Start liveliness subscription for graph discovery
         ctx.start_graph_discovery()?;
@@ -145,6 +185,16 @@ impl Context {
         &self.inner.session
     }
 
+    /// Get a reference to the parsed ROS2 command-line arguments.
+    pub fn ros2_args(&self) -> &Ros2Args {
+        &self.inner.ros2_args
+    }
+
+    /// Get the enclave from ROS2 arguments (for SROS2 security).
+    pub fn enclave(&self) -> Option<&str> {
+        self.inner.ros2_args.enclave.as_deref()
+    }
+
     /// Create a new node.
     ///
     /// # Arguments
@@ -155,35 +205,35 @@ impl Context {
     /// # Errors
     ///
     /// Returns an error if the name or namespace is invalid.
-    pub fn create_node(&self, name: &str, namespace: Option<&str>) -> Result<Arc<Node>> {
+    pub fn create_node(self: &Arc<Self>, name: &str, namespace: Option<&str>) -> Result<Arc<Node>> {
         // Validate node name
         ros2args::names::validate_node_name(name)?;
 
         // Validate namespace if provided
-        if let Some(ns) = namespace {
-            if !ns.is_empty() {
-                ros2args::names::validate_namespace(ns)?;
-            }
+        if let Some(ns) = namespace
+            && !ns.is_empty()
+        {
+            ros2args::names::validate_namespace(ns)?;
         }
+
+        // Get enclave from ROS2 args
+        let enclave = self.inner.ros2_args.enclave.as_deref().unwrap_or("");
 
         // Allocate node ID
         let node_id = self.inner.next_node_id.fetch_add(1, Ordering::SeqCst);
 
-        Node::new(self.clone(), node_id, name, namespace.unwrap_or(""))
+        Node::new(
+            Arc::clone(self),
+            node_id,
+            name,
+            namespace.unwrap_or(""),
+            enclave,
+        )
     }
 
     /// Get a snapshot of the graph cache.
     pub fn graph_cache(&self) -> GraphCache {
         self.inner.graph_cache.lock().clone()
-    }
-
-    /// Allocate a new entity ID.
-    #[allow(dead_code)]
-    pub(crate) fn allocate_entity_id(&self) -> u32 {
-        // For simplicity, use a global counter
-        // In a more complete implementation, this would be per-node
-        static ENTITY_COUNTER: AtomicU32 = AtomicU32::new(10); // Start at 10 to match rmw_zenoh
-        ENTITY_COUNTER.fetch_add(1, Ordering::SeqCst)
     }
 
     /// Start graph discovery by subscribing to liveliness tokens.

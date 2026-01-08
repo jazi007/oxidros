@@ -11,7 +11,7 @@ use crate::{
     node::Node,
 };
 use oxidros_core::qos::Profile;
-use ros2_types::TypeSupport;
+use ros2_types::{TypeDescription, TypeSupport};
 use std::{marker::PhantomData, sync::Arc};
 use zenoh::{Wait, bytes::ZBytes, query::Query};
 
@@ -60,7 +60,7 @@ where
             .reply(self.query.key_expr().clone(), payload)
             .attachment(ZBytes::from(attachment_bytes.to_vec()))
             .wait()
-            .map_err(|e| Error::Zenoh(e.into()))?;
+            .map_err(Error::Zenoh)?;
 
         Ok(())
     }
@@ -102,30 +102,33 @@ pub struct Server<T: oxidros_core::ServiceMsg> {
 
 impl<T: oxidros_core::ServiceMsg> Server<T>
 where
-    T::Request: TypeSupport,
-    T::Response: TypeSupport,
+    T::Request: TypeSupport + TypeDescription,
+    T::Response: TypeSupport + TypeDescription,
 {
     /// Create a new service server.
-    pub(crate) fn new(node: Arc<Node>, service_name: &str, qos: Profile) -> Result<Self> {
-        // Build fully qualified service name
-        let fq_service_name = if service_name.starts_with('/') {
-            service_name.to_string()
-        } else if node.namespace().is_empty() {
-            format!("/{}", service_name)
-        } else {
-            format!("{}/{}", node.namespace(), service_name)
-        };
-
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - Parent node
+    /// * `service_name` - Original service name (for display)
+    /// * `fq_service_name` - Fully qualified service name (already expanded and remapped)
+    /// * `qos` - QoS profile
+    pub(crate) fn new(
+        node: Arc<Node>,
+        service_name: &str,
+        fq_service_name: &str,
+        qos: Profile,
+    ) -> Result<Self> {
         // Get type info
         let type_name = T::Request::type_name();
-        let type_hash = "RIHS01_TODO"; // TODO: Calculate from TypeDescription
+        let type_hash = T::Request::compute_hash()?;
 
         // Build key expression
         let key_expr = topic_keyexpr(
             node.context().domain_id(),
-            &fq_service_name,
+            fq_service_name,
             type_name,
-            type_hash,
+            &type_hash,
         );
 
         // Create channel for incoming requests
@@ -166,9 +169,9 @@ where
             node.enclave(),
             node.namespace(),
             node.name(),
-            &fq_service_name,
+            fq_service_name,
             type_name,
-            type_hash,
+            &type_hash,
             &qos,
         );
 
@@ -182,7 +185,7 @@ where
         Ok(Server {
             node,
             service_name: service_name.to_string(),
-            fq_service_name,
+            fq_service_name: fq_service_name.to_string(),
             gid,
             receiver,
             _liveliness_token: liveliness_token,
@@ -190,7 +193,13 @@ where
             _phantom: PhantomData,
         })
     }
+}
 
+impl<T: oxidros_core::ServiceMsg> Server<T>
+where
+    T::Request: TypeSupport,
+    T::Response: TypeSupport,
+{
     /// Get the service name.
     pub fn service_name(&self) -> &str {
         &self.service_name

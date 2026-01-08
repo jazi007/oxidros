@@ -38,6 +38,7 @@
 mod error;
 mod hash;
 mod traits;
+
 mod type_description;
 pub mod types;
 
@@ -65,7 +66,7 @@ pub use types::{
 pub use ros2_types_derive::{Ros2Msg, TypeDescription, ros2_action, ros2_service};
 
 // Re-export cdr-encoding dependencies for generated code
-#[cfg(feature = "native")]
 pub use byteorder;
-#[cfg(feature = "native")]
 pub use cdr_encoding;
+pub use serde;
+pub use serde_big_array::BigArray;

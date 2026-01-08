@@ -24,6 +24,10 @@
 //!   - Deadlock freedom
 //!   - Termination
 //!   - Initialization is performed just once
+
+// This crate requires the rcl feature to be enabled
+#![cfg(feature = "rcl")]
+
 //!
 //! # Important Types
 //!
