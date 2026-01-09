@@ -2,7 +2,7 @@
 //!  - Load yaml files
 //!
 use crate::common::Result;
-use oxidros::{oxidros_core, parameter::Value};
+use oxidros::oxidros_core::{self, Value};
 use std::{collections::BTreeMap, io::Read, path::Path};
 use yaml_rust2::{Yaml, YamlLoader, yaml::Hash};
 

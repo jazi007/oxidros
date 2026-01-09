@@ -1,8 +1,8 @@
 //! A trait for simplifying cmmunication
 //!
 use oxidros::{
-    msg::{ServiceMsg, TypeSupport},
-    node::Node,
+    msg::TypeSupport,
+    prelude::{Node, ServiceMsg},
     topic::{publisher::Publisher, subscriber::Subscriber},
 };
 use std::sync::Arc;

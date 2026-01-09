@@ -1,6 +1,7 @@
 use std::time::Duration;
 
-use oxidros_wrapper::oxidros::msg::common_interfaces::std_msgs;
+use oxidros::oxidros_msg::common_interfaces::std_msgs;
+use oxidros::prelude::Context;
 use oxidros_wrapper::prelude::*;
 use tokio::runtime::Builder;
 use tokio::time::interval;

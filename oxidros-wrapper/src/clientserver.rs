@@ -3,7 +3,7 @@
 use crate::common::Result;
 use log::{debug, error, trace};
 use oxidros::{
-    msg::ServiceMsg,
+    prelude::ServiceMsg,
     service::{client::Client as SdClient, server::Server as SdServer},
 };
 use std::{fmt::Debug, time::Duration};

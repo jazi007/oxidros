@@ -38,7 +38,7 @@ pub mod prelude;
 
 // Re-export the selected backend
 #[cfg(all(feature = "rcl", not(feature = "zenoh")))]
-pub use oxidros_rcl;
+pub use oxidros_rcl::{self, action, clock, logger, service, topic};
 
 #[cfg(all(feature = "zenoh", not(feature = "rcl")))]
 pub use oxidros_zenoh;
@@ -47,4 +47,7 @@ pub use oxidros_zenoh;
 pub use oxidros_core::{self, error};
 
 // Re-export message types
-pub use oxidros_msg;
+pub use oxidros_msg::{self, msg};
+pub mod qos {
+    pub use oxidros_core::qos::*;
+}

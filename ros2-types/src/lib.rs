@@ -45,8 +45,8 @@ pub mod types;
 pub use error::{Error, Result};
 pub use hash::{calculate_type_hash, parse_rihs_string};
 pub use traits::{
-    ActionGoal, ActionMsg, ActionResult, GetUUID, GoalResponse, ResultResponse, SequenceRaw,
-    ServiceMsg, TryClone, TypeSupport, UnsafeDuration, UnsafeTime, CdrSerde
+    ActionGoal, ActionMsg, ActionResult, CdrSerde, GetUUID, GoalResponse, ResultResponse,
+    SequenceRaw, ServiceMsg, TryClone, TypeSupport, UnsafeDuration, UnsafeTime,
 };
 pub use type_description::{
     ActionTypeDescription, MessageTypeName, ServiceTypeDescription, TypeDescription,

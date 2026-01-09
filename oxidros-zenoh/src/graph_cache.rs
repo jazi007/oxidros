@@ -275,8 +275,17 @@ mod tests {
         assert_eq!(info.namespace, "");
         assert_eq!(info.node_name, "talker");
         assert_eq!(info.topic_name, Some("/chatter".to_string()));
-        assert_eq!(info.type_name, Some("std_msgs::msg::dds_::String_".to_string()));
-        assert_eq!(info.type_hash, Some("RIHS01_df668c740482bbd48fb39d76a70dfd4bd59db1288021743503259e948f6b1a18".to_string()));
+        assert_eq!(
+            info.type_name,
+            Some("std_msgs::msg::dds_::String_".to_string())
+        );
+        assert_eq!(
+            info.type_hash,
+            Some(
+                "RIHS01_df668c740482bbd48fb39d76a70dfd4bd59db1288021743503259e948f6b1a18"
+                    .to_string()
+            )
+        );
     }
 
     // =========================================================================
@@ -295,7 +304,10 @@ mod tests {
         assert_eq!(info.kind, EntityKind::Subscriber);
         assert_eq!(info.node_name, "listener");
         assert_eq!(info.topic_name, Some("/chatter".to_string()));
-        assert_eq!(info.type_name, Some("std_msgs::msg::dds_::String_".to_string()));
+        assert_eq!(
+            info.type_name,
+            Some("std_msgs::msg::dds_::String_".to_string())
+        );
     }
 
     // =========================================================================
@@ -315,8 +327,17 @@ mod tests {
         assert_eq!(info.kind, EntityKind::ServiceServer);
         assert_eq!(info.node_name, "add_two_ints_server");
         assert_eq!(info.topic_name, Some("/add_two_ints".to_string()));
-        assert_eq!(info.type_name, Some("example_interfaces::srv::dds_::AddTwoInts_".to_string()));
-        assert_eq!(info.type_hash, Some("RIHS01_e118de6bf5eeb66a2491b5bda11202e7b68f198d6f67922cf30364858239c81a".to_string()));
+        assert_eq!(
+            info.type_name,
+            Some("example_interfaces::srv::dds_::AddTwoInts_".to_string())
+        );
+        assert_eq!(
+            info.type_hash,
+            Some(
+                "RIHS01_e118de6bf5eeb66a2491b5bda11202e7b68f198d6f67922cf30364858239c81a"
+                    .to_string()
+            )
+        );
     }
 
     // =========================================================================
@@ -336,7 +357,10 @@ mod tests {
         assert_eq!(info.kind, EntityKind::ServiceClient);
         assert_eq!(info.node_name, "add_two_ints_client");
         assert_eq!(info.topic_name, Some("/add_two_ints".to_string()));
-        assert_eq!(info.type_name, Some("example_interfaces::srv::dds_::AddTwoInts_".to_string()));
+        assert_eq!(
+            info.type_name,
+            Some("example_interfaces::srv::dds_::AddTwoInts_".to_string())
+        );
     }
 
     // =========================================================================
@@ -446,7 +470,10 @@ mod tests {
         let pubs = cache.get_publishers_info("/chatter");
         assert_eq!(pubs.len(), 1);
         assert_eq!(pubs[0].node_name, "talker");
-        assert_eq!(pubs[0].type_name, Some("std_msgs::msg::dds_::String_".to_string()));
+        assert_eq!(
+            pubs[0].type_name,
+            Some("std_msgs::msg::dds_::String_".to_string())
+        );
     }
 
     #[test]

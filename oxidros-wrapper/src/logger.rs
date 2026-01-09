@@ -1,8 +1,10 @@
 //! Implement logger for ros2 logging
 //!
 use log::*;
-use oxidros::logger::Logger as SdLogger;
-use oxidros::{pr_debug, pr_error, pr_info, pr_warn};
+use oxidros::{
+    logger::Logger as SdLogger,
+    oxidros_rcl::{pr_debug, pr_error, pr_info, pr_warn},
+};
 use std::sync::Arc;
 
 use log::{Level, Metadata, Record};

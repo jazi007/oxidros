@@ -3,7 +3,7 @@
 use futures_util::ready;
 use oxidros::{
     msg::TypeSupport,
-    node::Node,
+    prelude::Node,
     qos::{DurabilityPolicy, HistoryPolicy, Profile, ReliabilityPolicy},
     topic::subscriber::{Subscriber, TakenMsg},
 };

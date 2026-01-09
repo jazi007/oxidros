@@ -3,8 +3,8 @@
 use std::pin::Pin;
 
 use oxidros::{
-    RecvResult,
     msg::TypeSupport,
+    oxidros_rcl::RecvResult,
     topic::{
         publisher::Publisher,
         subscriber::{Subscriber, TakenMsg},

@@ -436,8 +436,8 @@ mod tests {
             2,
             "aac3178e146ba6f1fc6e6a4085e77f21",
             0,
-            "",        // no enclave
-            "",        // no namespace
+            "", // no enclave
+            "", // no namespace
             "listener",
         );
         assert_eq!(
@@ -448,30 +448,13 @@ mod tests {
 
     #[test]
     fn test_liveliness_node_with_namespace() {
-        let key = liveliness_node_keyexpr(
-            0,
-            "abcd1234",
-            1,
-            "",
-            "/robot1",
-            "my_node",
-        );
-        assert_eq!(
-            key,
-            "@ros2_lv/0/abcd1234/1/1/NN/%/%robot1/my_node"
-        );
+        let key = liveliness_node_keyexpr(0, "abcd1234", 1, "", "/robot1", "my_node");
+        assert_eq!(key, "@ros2_lv/0/abcd1234/1/1/NN/%/%robot1/my_node");
     }
 
     #[test]
     fn test_liveliness_node_with_enclave() {
-        let key = liveliness_node_keyexpr(
-            0,
-            "session123",
-            0,
-            "/my_enclave",
-            "/ns",
-            "secure_node",
-        );
+        let key = liveliness_node_keyexpr(0, "session123", 0, "/my_enclave", "/ns", "secure_node");
         assert_eq!(
             key,
             "@ros2_lv/0/session123/0/0/NN/%my_enclave/%ns/secure_node"
@@ -715,8 +698,8 @@ mod tests {
 
     #[test]
     fn test_qos_to_keyexpr_with_deadline() {
-        use std::time::Duration;
         use oxidros_core::qos::LivelinessPolicy;
+        use std::time::Duration;
         let qos = Profile {
             deadline: Duration::new(5, 123456789),
             depth: 42,

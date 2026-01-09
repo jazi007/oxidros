@@ -95,13 +95,9 @@ pub mod prelude {
     pub use crate::common::{ArcNode, Attributes, Result, create_qos};
     pub use crate::communicate::Communicate;
     pub use crate::pubsub::{Publish, Subscribe};
-    pub use oxidros::{
-        context::Context,
-        node::{Node, NodeOptions},
-        topic::{
-            publisher::Publisher,
-            subscriber::{Subscriber, TakenMsg},
-        },
+    pub use oxidros::topic::{
+        publisher::Publisher,
+        subscriber::{Subscriber, TakenMsg},
     };
     pub use tokio_stream::{Stream, StreamExt};
 }
