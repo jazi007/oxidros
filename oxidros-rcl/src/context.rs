@@ -223,20 +223,20 @@ impl oxidros_core::api::RosContext for Context {
     type Node = Node;
     type Selector = Selector;
 
-    fn create_node(
+    fn new_node(
         self: &Arc<Self>,
         name: &str,
         namespace: Option<&str>,
     ) -> oxidros_core::Result<Arc<Self::Node>> {
-        Context::create_node(self, name, namespace, Default::default())
+        self.create_node(name, namespace, Default::default())
             .map_err(oxidros_core::Error::Rcl)
     }
 
-    fn create_selector(self: &Arc<Self>) -> oxidros_core::Result<Self::Selector> {
-        Context::create_selector(self).map_err(oxidros_core::Error::Rcl)
+    fn new_selector(self: &Arc<Self>) -> oxidros_core::Result<Self::Selector> {
+        self.create_selector().map_err(oxidros_core::Error::Rcl)
     }
 
-    fn domain_id(&self) -> u32 {
+    fn ros_domain_id(&self) -> u32 {
         // RCL context doesn't expose domain_id directly,
         // but it's typically 0 unless overridden by ROS_DOMAIN_ID env var
         std::env::var("ROS_DOMAIN_ID")

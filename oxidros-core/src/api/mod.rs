@@ -70,17 +70,13 @@ pub trait RosContext: Send + Sync + Sized {
     /// # Errors
     ///
     /// Returns an error if the name is invalid or node creation fails.
-    fn create_node(
-        self: &Arc<Self>,
-        name: &str,
-        namespace: Option<&str>,
-    ) -> Result<Arc<Self::Node>>;
+    fn new_node(self: &Arc<Self>, name: &str, namespace: Option<&str>) -> Result<Arc<Self::Node>>;
 
     /// Create a new selector for event-driven execution.
-    fn create_selector(self: &Arc<Self>) -> Result<Self::Selector>;
+    fn new_selector(self: &Arc<Self>) -> Result<Self::Selector>;
 
     /// Get the domain ID.
-    fn domain_id(&self) -> u32;
+    fn ros_domain_id(&self) -> u32;
 }
 
 // ============================================================================
@@ -117,7 +113,7 @@ pub trait RosNode: Send + Sync + Sized {
     ///
     /// * `topic_name` - Topic name (can be relative or absolute)
     /// * `qos` - Optional QoS profile (uses default if None)
-    fn create_publisher<T: TypeSupport>(
+    fn new_publisher<T: TypeSupport>(
         self: &Arc<Self>,
         topic_name: &str,
         qos: Option<Profile>,
@@ -129,7 +125,7 @@ pub trait RosNode: Send + Sync + Sized {
     ///
     /// * `topic_name` - Topic name (can be relative or absolute)
     /// * `qos` - Optional QoS profile (uses default if None)
-    fn create_subscriber<T: TypeSupport>(
+    fn new_subscriber<T: TypeSupport>(
         self: &Arc<Self>,
         topic_name: &str,
         qos: Option<Profile>,
@@ -141,7 +137,7 @@ pub trait RosNode: Send + Sync + Sized {
     ///
     /// * `service_name` - Service name (can be relative or absolute)
     /// * `qos` - Optional QoS profile (uses default if None)
-    fn create_client<T: ServiceMsg>(
+    fn new_client<T: ServiceMsg>(
         self: &Arc<Self>,
         service_name: &str,
         qos: Option<Profile>,
@@ -153,7 +149,7 @@ pub trait RosNode: Send + Sync + Sized {
     ///
     /// * `service_name` - Service name (can be relative or absolute)
     /// * `qos` - Optional QoS profile (uses default if None)
-    fn create_server<T: ServiceMsg>(
+    fn new_server<T: ServiceMsg>(
         self: &Arc<Self>,
         service_name: &str,
         qos: Option<Profile>,
@@ -174,7 +170,7 @@ pub trait RosPublisher<T: TypeSupport>: Send + Sync {
     /// # Errors
     ///
     /// Returns an error if serialization fails or the publish operation fails.
-    fn send(&self, msg: &T) -> Result<()>;
+    fn publish(&self, msg: &T) -> Result<()>;
 }
 
 // ============================================================================
@@ -197,7 +193,7 @@ pub trait RosSubscriber<T: TypeSupport>: Send {
     /// # Errors
     ///
     /// Returns an error if deserialization fails or the subscription is closed.
-    fn recv(&mut self) -> impl std::future::Future<Output = Result<TakenMsg<T>>> + Send;
+    fn recv_msg(&mut self) -> impl std::future::Future<Output = Result<TakenMsg<T>>> + Send;
 
     /// Try to receive a message without blocking.
     ///
@@ -208,7 +204,7 @@ pub trait RosSubscriber<T: TypeSupport>: Send {
     /// # Errors
     ///
     /// Returns an error if deserialization fails or the subscription is closed.
-    fn try_recv(&mut self) -> Result<Option<TakenMsg<T>>>;
+    fn try_recv_msg(&mut self) -> Result<Option<TakenMsg<T>>>;
 }
 
 // ============================================================================
@@ -221,12 +217,12 @@ pub trait RosClient<T: ServiceMsg>: Send {
     fn service_name(&self) -> Cow<'_, str>;
 
     /// Check if the service is available.
-    fn is_service_available(&self) -> bool;
+    fn service_available(&self) -> bool;
 
     /// Send a request and wait for a response.
     ///
     /// Uses a default timeout (implementation-specific).
-    fn call(
+    fn call_service(
         &mut self,
         request: &T::Request,
     ) -> impl std::future::Future<Output = Result<T::Response>> + Send;
@@ -247,12 +243,12 @@ pub trait RosServer<T: ServiceMsg>: Send {
     /// Receive a request asynchronously.
     ///
     /// This method waits until a request is available.
-    fn recv(&mut self) -> impl std::future::Future<Output = Result<Self::Request>> + Send;
+    fn recv_request(&mut self) -> impl std::future::Future<Output = Result<Self::Request>> + Send;
 
     /// Try to receive a request without blocking.
     ///
     /// Returns `Ok(None)` if no request is currently available.
-    fn try_recv(&mut self) -> Result<Option<Self::Request>>;
+    fn try_recv_request(&mut self) -> Result<Option<Self::Request>>;
 }
 
 // ============================================================================
@@ -302,7 +298,7 @@ pub trait RosSelector: Sized {
     /// # Returns
     ///
     /// `true` if successfully added, `false` if context mismatch.
-    fn add_subscriber<T: TypeSupport + 'static>(
+    fn add_subscriber_handler<T: TypeSupport + 'static>(
         &mut self,
         subscriber: Self::Subscriber<T>,
         handler: Box<dyn FnMut(TakenMsg<T>)>,
@@ -316,7 +312,7 @@ pub trait RosSelector: Sized {
     /// # Returns
     ///
     /// `true` if successfully added, `false` if context mismatch.
-    fn add_server<T: ServiceMsg + 'static>(
+    fn add_server_handler<T: ServiceMsg + 'static>(
         &mut self,
         server: Self::Server<T>,
         handler: Box<dyn FnMut(T::Request) -> T::Response>,
@@ -325,7 +321,7 @@ pub trait RosSelector: Sized {
     /// Register a parameter server with a callback.
     ///
     /// The callback is invoked when parameters are updated.
-    fn add_parameter_server(
+    fn add_parameter_server_handler(
         &mut self,
         param_server: Self::ParameterServer,
         handler: ParameterHandler,
@@ -338,7 +334,7 @@ pub trait RosSelector: Sized {
     /// # Returns
     ///
     /// A timer ID that can be used to remove the timer.
-    fn add_timer(&mut self, duration: Duration, handler: Box<dyn FnMut()>) -> u64;
+    fn add_timer_handler(&mut self, duration: Duration, handler: Box<dyn FnMut()>) -> u64;
 
     /// Add a repeating wall timer.
     ///
@@ -347,10 +343,15 @@ pub trait RosSelector: Sized {
     /// # Returns
     ///
     /// A timer ID that can be used to remove the timer.
-    fn add_wall_timer(&mut self, name: &str, period: Duration, handler: Box<dyn FnMut()>) -> u64;
+    fn add_wall_timer_handler(
+        &mut self,
+        name: &str,
+        period: Duration,
+        handler: Box<dyn FnMut()>,
+    ) -> u64;
 
     /// Remove a timer by its ID.
-    fn remove_timer(&mut self, id: u64);
+    fn delete_timer(&mut self, id: u64);
 
     /// Register an action server with handlers.
     ///
@@ -365,7 +366,7 @@ pub trait RosSelector: Sized {
     ///
     /// `Ok(true)` if successfully added, `Ok(false)` if context mismatch,
     /// `Err(NotSupported)` if actions are not supported by this backend.
-    fn add_action_server<T, GR, A, CR>(
+    fn add_action_server_handler<T, GR, A, CR>(
         &mut self,
         server: Self::ActionServer<T>,
         goal_handler: GR,
@@ -389,7 +390,7 @@ pub trait RosSelector: Sized {
     ///
     /// `Ok(true)` if successfully added, `Ok(false)` if context mismatch,
     /// `Err(NotSupported)` if actions are not supported by this backend.
-    fn add_action_client<T: ActionMsg + 'static>(
+    fn add_action_client_handler<T: ActionMsg + 'static>(
         &mut self,
         client: Self::ActionClient<T>,
     ) -> Result<bool>;
@@ -397,7 +398,7 @@ pub trait RosSelector: Sized {
     /// Wait for events and invoke registered callbacks.
     ///
     /// Blocks until at least one event occurs.
-    fn wait(&mut self) -> Result<()>;
+    fn spin_once(&mut self) -> Result<()>;
 
     /// Wait for events with a timeout.
     ///
@@ -406,5 +407,5 @@ pub trait RosSelector: Sized {
     /// - `Ok(true)` - At least one event occurred
     /// - `Ok(false)` - Timeout elapsed with no events
     /// - `Err(_)` - An error occurred
-    fn wait_timeout(&mut self, timeout: Duration) -> Result<bool>;
+    fn spin_timeout(&mut self, timeout: Duration) -> Result<bool>;
 }

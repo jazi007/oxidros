@@ -642,14 +642,11 @@ fn generate_native_type_support_impl(
         // TypeSupport implementation
         impl ros2_types::TypeSupport for #name {
             fn to_bytes(&self) -> ros2_types::Result<Vec<u8>> {
-                ros2_types::cdr_encoding::to_vec::<Self, ros2_types::byteorder::LittleEndian>(self)
-                    .map_err(|e| ros2_types::Error::CdrError(e.to_string()))
+                <Self as ros2_types::CdrSerde>::serialize(self)
             }
 
             fn from_bytes(bytes: &[u8]) -> ros2_types::Result<Self> {
-                ros2_types::cdr_encoding::from_bytes::<Self, ros2_types::byteorder::LittleEndian>(bytes)
-                    .map(|(msg, _bytes_consumed)| msg)
-                    .map_err(|e| ros2_types::Error::CdrError(e.to_string()))
+                <Self as ros2_types::CdrSerde>::deserialize(bytes)
             }
 
             fn type_name() -> &'static str {
@@ -677,14 +674,11 @@ fn generate_native_type_support_impl_no_hash(
         // TypeSupport implementation (without type_hash override)
         impl ros2_types::TypeSupport for #name {
             fn to_bytes(&self) -> ros2_types::Result<Vec<u8>> {
-                ros2_types::cdr_encoding::to_vec::<Self, ros2_types::byteorder::LittleEndian>(self)
-                    .map_err(|e| ros2_types::Error::CdrError(e.to_string()))
+                <Self as ros2_types::CdrSerde>::serialize(self)
             }
 
             fn from_bytes(bytes: &[u8]) -> ros2_types::Result<Self> {
-                ros2_types::cdr_encoding::from_bytes::<Self, ros2_types::byteorder::LittleEndian>(bytes)
-                    .map(|(msg, _bytes_consumed)| msg)
-                    .map_err(|e| ros2_types::Error::CdrError(e.to_string()))
+                <Self as ros2_types::CdrSerde>::deserialize(bytes)
             }
 
             fn type_name() -> &'static str {
@@ -788,7 +782,7 @@ pub fn generate_service_wrapper(package: &str, service_name: &str) -> TokenStrea
     );
 
     let service_doc = format!("Service wrapper for {}", service_name);
-    let dds_type_name = format!("{}::src::dds_::{}_", package, service_name);
+    let dds_type_name = format!("{}::srv::dds_::{}_", package, service_name);
     quote! {
         #[doc = #service_doc]
         #[derive(Debug, ros2_types::ServiceTypeDescription)]

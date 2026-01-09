@@ -1,22 +1,18 @@
+use oxidros::oxidros_msg::common_interfaces::std_msgs::msg::String;
+use oxidros::{error::Result, prelude::*};
 use std::time::Duration;
-
-use oxidros::{
-    context::Context, error::Result, logger::Logger, msg::common_interfaces::std_msgs::msg::String,
-    pr_info,
-};
 
 fn main() -> Result<()> {
     let ctx = Context::new()?;
-    let node = ctx.create_node("simple", None, Default::default())?;
-    let publisher = node.create_publisher::<String>("chatter", None)?;
+    let node = ctx.new_node("simple", None)?;
+    let publisher = node.new_publisher::<String>("chatter", None)?;
     let mut msg = String::new().unwrap();
     let mut index = 0;
-    let logger = Logger::new("simple");
     loop {
         msg.data.assign(&format!("Hello World: {index}"));
-        pr_info!(logger, "{}", msg.data.get_string());
+        println!("{}", msg.data.get_string());
         index += 1;
-        publisher.send(&msg)?;
+        publisher.publish(&msg)?;
         std::thread::sleep(Duration::from_secs(1));
     }
 }

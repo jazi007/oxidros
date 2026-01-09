@@ -427,35 +427,35 @@ impl oxidros_core::api::RosNode for Node {
         std::borrow::Cow::Owned(Node::fully_qualified_name(self))
     }
 
-    fn create_publisher<T: TypeSupport>(
+    fn new_publisher<T: TypeSupport>(
         self: &Arc<Self>,
         topic_name: &str,
         qos: Option<Profile>,
     ) -> Result<Self::Publisher<T>> {
-        Node::create_publisher(self, topic_name, qos)
+        self.create_publisher(topic_name, qos)
     }
 
-    fn create_subscriber<T: TypeSupport>(
+    fn new_subscriber<T: TypeSupport>(
         self: &Arc<Self>,
         topic_name: &str,
         qos: Option<Profile>,
     ) -> Result<Self::Subscriber<T>> {
-        Node::create_subscriber(self, topic_name, qos)
+        self.create_subscriber(topic_name, qos)
     }
 
-    fn create_client<T: oxidros_core::ServiceMsg>(
+    fn new_client<T: oxidros_core::ServiceMsg>(
         self: &Arc<Self>,
         service_name: &str,
         qos: Option<Profile>,
     ) -> Result<Self::Client<T>> {
-        Node::create_client(self, service_name, qos)
+        self.create_client(service_name, qos)
     }
 
-    fn create_server<T: oxidros_core::ServiceMsg>(
+    fn new_server<T: oxidros_core::ServiceMsg>(
         self: &Arc<Self>,
         service_name: &str,
         qos: Option<Profile>,
     ) -> Result<Self::Server<T>> {
-        Node::create_server(self, service_name, qos)
+        self.create_server(service_name, qos)
     }
 }

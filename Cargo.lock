@@ -1687,7 +1687,11 @@ name = "oxidros"
 version = "0.1.0"
 dependencies = [
  "oxidros-build",
+ "oxidros-core",
+ "oxidros-msg",
  "oxidros-rcl",
+ "oxidros-zenoh",
+ "tokio",
 ]
 
 [[package]]

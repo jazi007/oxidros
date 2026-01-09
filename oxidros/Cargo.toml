@@ -7,13 +7,23 @@ repository.workspace = true
 license-file.workspace = true
 
 [dependencies]
+oxidros-core = { path = "../oxidros-core" }
+oxidros-msg = { path = "../oxidros-msg" }
 oxidros-rcl = { path = "../oxidros-rcl" }
+oxidros-zenoh = { path = "../oxidros-zenoh"}
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
 
 [build-dependencies]
 oxidros-build = { path = "../oxidros-build" }
 
 [features]
 default = []
-humble = ["oxidros-rcl/humble"]
-jazzy = ["oxidros-rcl/jazzy"]
-kilted = ["oxidros-rcl/kilted"]
+rcl = ["oxidros-msg/rcl"]
+zenoh = []
+
+# RCL distribution features (require rcl feature)
+humble = ["rcl", "oxidros-rcl/humble", "oxidros-msg/humble"]
+jazzy = ["rcl", "oxidros-rcl/jazzy", "oxidros-msg/jazzy"]
+kilted = ["rcl", "oxidros-rcl/kilted", "oxidros-msg/kilted"]

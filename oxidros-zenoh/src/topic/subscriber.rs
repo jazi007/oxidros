@@ -217,14 +217,14 @@ impl<T: TypeSupport> oxidros_core::api::RosSubscriber<T> for Subscriber<T> {
         Subscriber::topic_name(self)
     }
 
-    async fn recv(&mut self) -> crate::error::Result<oxidros_core::message::TakenMsg<T>> {
-        let msg = Subscriber::recv(self).await?;
+    async fn recv_msg(&mut self) -> crate::error::Result<oxidros_core::message::TakenMsg<T>> {
+        let msg = self.recv().await?;
         // Zenoh always copies messages (no loaned message support)
         Ok(oxidros_core::message::TakenMsg::Copied(msg.data))
     }
 
-    fn try_recv(&mut self) -> crate::error::Result<Option<oxidros_core::message::TakenMsg<T>>> {
-        match Subscriber::try_recv(self)? {
+    fn try_recv_msg(&mut self) -> crate::error::Result<Option<oxidros_core::message::TakenMsg<T>>> {
+        match self.try_recv()? {
             Some(msg) => Ok(Some(oxidros_core::message::TakenMsg::Copied(msg.data))),
             None => Ok(None),
         }

@@ -345,8 +345,8 @@ impl<T: TypeSupport> oxidros_core::api::RosPublisher<T> for Publisher<T> {
         self.get_topic_name()
     }
 
-    fn send(&self, msg: &T) -> oxidros_core::Result<()> {
+    fn publish(&self, msg: &T) -> oxidros_core::Result<()> {
         // Publisher::send already returns oxidros_core::Result
-        Publisher::send(self, msg)
+        self.send(msg)
     }
 }

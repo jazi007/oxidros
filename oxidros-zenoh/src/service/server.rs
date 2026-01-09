@@ -29,7 +29,7 @@ where
     T::Response: TypeSupport,
 {
     /// Send a response to this request.
-    pub fn respond(self, response: T::Response) -> Result<()> {
+    pub fn send(self, response: T::Response) -> Result<()> {
         self.sender.send(response)
     }
 }
@@ -312,7 +312,7 @@ where
     }
 
     fn respond(self, response: T::Response) -> Result<()> {
-        ServiceRequest::respond(self, response)
+        self.send(response)
     }
 }
 
@@ -331,11 +331,11 @@ where
         std::borrow::Cow::Borrowed(Server::service_name(self))
     }
 
-    async fn recv(&mut self) -> Result<Self::Request> {
-        Server::recv(self).await
+    async fn recv_request(&mut self) -> Result<Self::Request> {
+        self.recv().await
     }
 
-    fn try_recv(&mut self) -> Result<Option<Self::Request>> {
-        Server::try_recv(self)
+    fn try_recv_request(&mut self) -> Result<Option<Self::Request>> {
+        self.try_recv()
     }
 }

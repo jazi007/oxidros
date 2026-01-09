@@ -250,12 +250,12 @@ where
         std::borrow::Cow::Borrowed(Client::service_name(self))
     }
 
-    fn is_service_available(&self) -> bool {
-        Client::is_service_available(self)
+    fn service_available(&self) -> bool {
+        self.is_service_available()
     }
 
-    async fn call(&mut self, request: &T::Request) -> crate::error::Result<T::Response> {
-        let response = Client::call(self, request).await?;
+    async fn call_service(&mut self, request: &T::Request) -> crate::error::Result<T::Response> {
+        let response = self.call(request).await?;
         Ok(response.response)
     }
 }

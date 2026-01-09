@@ -278,19 +278,19 @@ impl oxidros_core::api::RosContext for Context {
     type Node = Node;
     type Selector = crate::selector::Selector;
 
-    fn create_node(
+    fn new_node(
         self: &Arc<Self>,
         name: &str,
         namespace: Option<&str>,
     ) -> crate::error::Result<Arc<Self::Node>> {
-        Context::create_node(self, name, namespace)
+        self.create_node(name, namespace)
     }
 
-    fn create_selector(self: &Arc<Self>) -> crate::error::Result<Self::Selector> {
+    fn new_selector(self: &Arc<Self>) -> crate::error::Result<Self::Selector> {
         Ok(crate::selector::Selector::new())
     }
 
-    fn domain_id(&self) -> u32 {
-        Context::domain_id(self)
+    fn ros_domain_id(&self) -> u32 {
+        self.domain_id()
     }
 }

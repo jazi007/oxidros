@@ -478,12 +478,12 @@ impl<T: ServiceMsg> oxidros_core::api::RosClient<T> for Client<T> {
         std::borrow::Cow::Borrowed(&self.service_name)
     }
 
-    fn is_service_available(&self) -> bool {
-        Client::is_service_available(self).unwrap_or(false)
+    fn service_available(&self) -> bool {
+        self.is_service_available().unwrap_or(false)
     }
 
-    async fn call(&mut self, request: &T::Request) -> oxidros_core::Result<T::Response> {
-        let (response, _header) = Client::send(self, request)?.recv().await?;
+    async fn call_service(&mut self, request: &T::Request) -> oxidros_core::Result<T::Response> {
+        let (response, _header) = self.send(request)?.recv().await?;
         Ok(response)
     }
 }

@@ -46,7 +46,7 @@ pub use error::{Error, Result};
 pub use hash::{calculate_type_hash, parse_rihs_string};
 pub use traits::{
     ActionGoal, ActionMsg, ActionResult, GetUUID, GoalResponse, ResultResponse, SequenceRaw,
-    ServiceMsg, TryClone, TypeSupport, UnsafeDuration, UnsafeTime,
+    ServiceMsg, TryClone, TypeSupport, UnsafeDuration, UnsafeTime, CdrSerde
 };
 pub use type_description::{
     ActionTypeDescription, MessageTypeName, ServiceTypeDescription, TypeDescription,
@@ -71,7 +71,5 @@ pub use ros2_types_derive::{
 };
 
 // Re-export cdr-encoding dependencies for generated code
-pub use byteorder;
-pub use cdr_encoding;
 pub use serde;
 pub use serde_big_array::BigArray;

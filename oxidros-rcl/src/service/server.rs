@@ -525,14 +525,14 @@ impl<T: ServiceMsg> oxidros_core::api::RosServer<T> for Server<T> {
         std::borrow::Cow::Borrowed(&self.service_name)
     }
 
-    async fn recv(&mut self) -> oxidros_core::Result<Self::Request> {
+    async fn recv_request(&mut self) -> oxidros_core::Result<Self::Request> {
         // Server::recv returns Result which already uses oxidros_core::Error
-        let (sender, request, _header) = Server::recv(self).await?;
+        let (sender, request, _header) = self.recv().await?;
         Ok(RclServiceRequest { sender, request })
     }
 
-    fn try_recv(&mut self) -> oxidros_core::Result<Option<Self::Request>> {
-        match Server::try_recv(self) {
+    fn try_recv_request(&mut self) -> oxidros_core::Result<Option<Self::Request>> {
+        match self.try_recv() {
             RecvResult::Ok((sender, request, _header)) => {
                 Ok(Some(RclServiceRequest { sender, request }))
             }

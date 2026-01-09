@@ -585,3 +585,30 @@ impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for SequenceRaw<T>
 
 unsafe impl<T: Send> Send for SequenceRaw<T> {}
 unsafe impl<T: Sync> Sync for SequenceRaw<T> {}
+
+pub trait CdrSerde: Sized {
+    fn serialize(&self) -> crate::error::Result<Vec<u8>>;
+    fn deserialize(bytes: &[u8]) -> crate::error::Result<Self>;
+}
+
+impl<T: serde::Serialize + serde::de::DeserializeOwned> CdrSerde for T {
+    fn serialize(&self) -> crate::error::Result<Vec<u8>> {
+        // Prepend CDR encapsulation header (0x00 0x01 0x00 0x00 = CDR LE)
+        let mut result = vec![0x00, 0x01, 0x00, 0x00];
+        let mut buffer = cdr_encoding::to_vec::<T, byteorder::LittleEndian>(self)
+            .map_err(|e| crate::Error::CdrError(e.to_string()))?;
+        result.append(&mut buffer);
+        Ok(result)
+    }
+    fn deserialize(bytes: &[u8]) -> crate::error::Result<Self> {
+        if bytes.len() < 4 {
+            return Err(crate::Error::CdrError(format!(
+                "Bad encoding {} is less than 4",
+                bytes.len()
+            )));
+        }
+        let v = cdr_encoding::from_bytes::<T, byteorder::LittleEndian>(&bytes[4..])
+            .map_err(|e| crate::Error::CdrError(e.to_string()))?;
+        Ok(v.0)
+    }
+}
