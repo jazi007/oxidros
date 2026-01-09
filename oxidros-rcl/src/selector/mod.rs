@@ -59,7 +59,7 @@ use crate::{
     PhantomUnsend, PhantomUnsync, RecvResult,
     action::{self, SendGoalServiceRequest, handle::GoalHandle},
     context::Context,
-    error::{OError, OResult, RCLActionResult, Result},
+    error::Result,
     get_allocator,
     logger::{Logger, pr_error_in, pr_fatal_in},
     msg::{ActionMsg, GetUUID, ServiceMsg, TypeSupport, interfaces::action_msgs::msg::GoalInfo},
@@ -74,6 +74,7 @@ use crate::{
     topic::subscriber::{RCLSubscription, Subscriber},
 };
 use oxidros_core::{
+    Error, RclError,
     delta_list::DeltaList,
     message::TakenMsg,
     selector::{
@@ -193,7 +194,7 @@ pub struct Selector {
 }
 
 impl Selector {
-    pub(crate) fn new(context: Arc<Context>) -> OResult<Self> {
+    pub(crate) fn new(context: Arc<Context>) -> Result<Self> {
         let mut wait_set = rcl::MTSafeFn::rcl_get_zero_initialized_wait_set();
 
         {
@@ -1215,8 +1216,8 @@ impl Selector {
             let wait_start = SystemTime::now();
 
             match rcl::MTSafeFn::rcl_wait(&mut self.wait_set, timeout_nanos) {
-                Err(OError::Timeout) => (),
-                Err(e) => return Err(e.into()),
+                Err(Error::Rcl(RclError::Timeout)) => (),
+                Err(e) => return Err(e),
                 _ => {
                     #[cfg(feature = "rcl_stat")]
                     {
@@ -1287,7 +1288,7 @@ impl Selector {
     }
 
     /// Calculates how many entities (e.g. subscriptions, timers) the selector has to wait for.
-    fn get_num_entities(&self) -> RCLActionResult<EntitySize> {
+    fn get_num_entities(&self) -> Result<EntitySize> {
         // Action servers and action clients work on several underlying entities.
         let mut action_server_subscriptions_size = 0;
         let mut action_server_guard_conditions_size = 0;
@@ -1421,7 +1422,7 @@ fn notify<K, V>(m: &mut BTreeMap<*const K, ConditionHandler<V>>, array: *const *
 fn notify_action_server(
     m: &mut BTreeMap<*const rcl_action_server_t, Vec<ActionServerConditionHandler>>,
     wait_set: *const rcl::rcl_wait_set_t,
-) -> RCLActionResult<()> {
+) -> Result<()> {
     let mut ret = Ok(());
 
     m.retain(|server, handlers| {
@@ -1477,7 +1478,7 @@ fn notify_action_server(
 fn notify_action_client(
     m: &mut BTreeMap<*const rcl_action_client_t, ActionClientConditionHandler>,
     wait_set: *const rcl::rcl_wait_set_t,
-) -> RCLActionResult<()> {
+) -> Result<()> {
     let mut ret = Ok(());
 
     m.retain(|client, handler| {

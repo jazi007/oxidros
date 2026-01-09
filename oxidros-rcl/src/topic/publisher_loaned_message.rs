@@ -1,10 +1,6 @@
 use std::{ptr::null_mut, sync::Arc};
 
-use crate::{
-    error::{OResult, Result},
-    msg::TypeSupport,
-    rcl,
-};
+use crate::{error::Result, msg::TypeSupport, rcl};
 
 /// A message loaned by a publisher.
 ///
@@ -17,7 +13,7 @@ pub enum PublisherLoanedMessage<T: TypeSupport> {
 unsafe impl<T: Send + TypeSupport> Send for PublisherLoanedMessage<T> {}
 
 impl<T: TypeSupport> PublisherLoanedMessage<T> {
-    pub(crate) fn new(publisher: Arc<rcl::rcl_publisher_t>) -> OResult<Self> {
+    pub(crate) fn new(publisher: Arc<rcl::rcl_publisher_t>) -> Result<Self> {
         if rcl::MTSafeFn::rcl_publisher_can_loan_messages(publisher.as_ref() as *const _) {
             Ok(Self::Loaned(Loaned::new(publisher)?))
         } else {
@@ -29,23 +25,18 @@ impl<T: TypeSupport> PublisherLoanedMessage<T> {
     pub(crate) fn send(self) -> Result<()> {
         match self {
             PublisherLoanedMessage::Copied(msg) => {
-                if let Err(e) = rcl::MTSafeFn::rcl_publish(
+                rcl::MTSafeFn::rcl_publish(
                     msg.publisher.as_ref(),
                     &msg.value as *const T as _,
                     null_mut(),
-                ) {
-                    return Err(e.into());
-                }
+                )?;
             }
             PublisherLoanedMessage::Loaned(mut msg) => {
-                if let Err(e) = rcl::MTSafeFn::rcl_publish_loaned_message(
+                rcl::MTSafeFn::rcl_publish_loaned_message(
                     msg.publisher.as_ref(),
                     msg.as_mut_ptr() as *const _ as *mut _,
                     null_mut(),
-                ) {
-                    return Err(e.into());
-                }
-
+                )?;
                 // rcl_publish_loaned_message returns the loaned chunk to the middleware.
                 msg.returned = true;
             }
@@ -94,7 +85,7 @@ pub struct Loaned<T: TypeSupport> {
 }
 
 impl<T: TypeSupport> Loaned<T> {
-    pub(crate) fn new(publisher: Arc<rcl::rcl_publisher_t>) -> OResult<Self> {
+    pub(crate) fn new(publisher: Arc<rcl::rcl_publisher_t>) -> Result<Self> {
         let mut chunk = null_mut();
         let guard = rcl::MT_UNSAFE_FN.lock();
         guard.rcl_borrow_loaned_message(

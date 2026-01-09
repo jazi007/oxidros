@@ -1,12 +1,12 @@
 //! Goal handle representing each action goal.
 
-use oxidros_core::TryClone;
+use oxidros_core::{RclError, TryClone};
 use parking_lot::Mutex;
 use std::{collections::BTreeMap, rc::Rc, sync::Arc};
 
 use super::{GoalEvent, GoalStatus, server::ServerData};
 use crate::{
-    error::{OError, RCLActionResult, Result},
+    error::Result,
     logger::{Logger, pr_error_in},
     msg::ActionMsg,
     rcl,
@@ -108,13 +108,13 @@ where
         &self,
         goal_id: [u8; 16],
         result: T::ResultContent,
-    ) -> RCLActionResult<()> {
+    ) -> Result<()> {
         let mut requests = self.data.pending_result_requests.lock();
         let guard = rcl::MT_UNSAFE_FN.lock();
 
         if let Some(reqs) = requests.remove(&goal_id) {
             for mut request_id in reqs {
-                let result = result.try_clone().ok_or(OError::BadAlloc)?;
+                let result = result.try_clone().ok_or(RclError::BadAlloc)?;
                 let response = T::new_result_response(GoalStatus::Succeeded as u8, result);
 
                 match guard.rcl_action_send_result_response(
@@ -142,7 +142,7 @@ where
     fn update_result(&self, result: T::ResultContent) -> Result<()> {
         let mut results = self.results.lock();
         if results
-            .insert(self.goal_id, result.try_clone().ok_or(OError::BadAlloc)?)
+            .insert(self.goal_id, result.try_clone().ok_or(RclError::BadAlloc)?)
             .is_some()
         {
             return Err(format!(

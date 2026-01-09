@@ -3,7 +3,8 @@
 use futures_util::try_join;
 use oxidros_core::selector::CallbackResult;
 use oxidros_core::{
-    DurabilityPolicy, HistoryPolicy, LivelinessPolicy, ReliabilityPolicy, TryClone,
+    ActionError, DurabilityPolicy, Error, HistoryPolicy, LivelinessPolicy, ReliabilityPolicy,
+    TryClone,
 };
 use oxidros_msg::interfaces::action_msgs::srv::CancelGoal_Response;
 use oxidros_msg::interfaces::unique_identifier_msgs::msg::UUID;
@@ -18,7 +19,7 @@ use crate::msg::GetUUID;
 use crate::{
     RecvResult,
     clock::Clock,
-    error::{RCLActionError, RCLActionResult, Result},
+    error::Result,
     get_allocator, is_halt,
     msg::{
         ActionGoal, ActionMsg, GoalResponse, builtin_interfaces::UnsafeTime,
@@ -98,7 +99,7 @@ impl ServerData {
         &self.server as *const _ as *mut _
     }
 
-    pub(crate) fn publish_goal_status(&self) -> RCLActionResult<()> {
+    pub(crate) fn publish_goal_status(&self) -> Result<()> {
         let guard = rcl::MT_UNSAFE_FN.lock();
 
         let mut statuses = rcl::MTSafeFn::rcl_action_get_zero_initialized_goal_status_array();
@@ -144,11 +145,7 @@ where
     T: ActionMsg,
 {
     /// Create a server.
-    pub fn new(
-        node: Arc<Node>,
-        action_name: &str,
-        qos: Option<ServerQosOption>,
-    ) -> RCLActionResult<Self> {
+    pub fn new(node: Arc<Node>, action_name: &str, qos: Option<ServerQosOption>) -> Result<Self> {
         let mut server = rcl::MTSafeFn::rcl_action_get_zero_initialized_server();
         let options = qos
             .map(rcl::rcl_action_server_options_t::from)
@@ -195,8 +192,8 @@ where
                 };
                 RecvResult::Ok((sender, request))
             }
-            Err(RCLActionError::ServerTakeFailed) => RecvResult::RetryLater,
-            Err(e) => RecvResult::Err(e.into()),
+            Err(Error::Action(ActionError::ServerTakeFailed)) => RecvResult::RetryLater,
+            Err(e) => RecvResult::Err(e),
         }
     }
 
@@ -217,8 +214,8 @@ where
                 };
                 RecvResult::Ok((sender, request, goals))
             }
-            Err(RCLActionError::ServerTakeFailed) => RecvResult::RetryLater,
-            Err(e) => RecvResult::Err(e.into()),
+            Err(Error::Action(ActionError::ServerTakeFailed)) => RecvResult::RetryLater,
+            Err(e) => RecvResult::Err(e),
         }
     }
 
@@ -234,8 +231,8 @@ where
                 };
                 RecvResult::Ok((sender, request))
             }
-            Err(RCLActionError::ServerTakeFailed) => RecvResult::RetryLater,
-            Err(e) => RecvResult::Err(e.into()),
+            Err(Error::Action(ActionError::ServerTakeFailed)) => RecvResult::RetryLater,
+            Err(e) => RecvResult::Err(e),
         }
     }
 
@@ -584,7 +581,7 @@ impl<T: ActionMsg> ServerResultSend<T> {
                         "failed to send result response from action server: {}",
                         e
                     );
-                    return Err(e.into());
+                    return Err(e);
                 }
             }
             None => {
@@ -815,7 +812,7 @@ fn rcl_action_accept_new_goal(
 
 fn rcl_action_take_goal_request<T: ActionMsg>(
     server: &rcl_action_server_t,
-) -> RCLActionResult<(rcl::rmw_request_id_t, SendGoalServiceRequest<T>)> {
+) -> Result<(rcl::rmw_request_id_t, SendGoalServiceRequest<T>)> {
     let mut header: rcl::rmw_request_id_t = unsafe { std::mem::zeroed() };
     let mut request: SendGoalServiceRequest<T> = unsafe { std::mem::zeroed() };
     let guard = rcl::MT_UNSAFE_FN.lock();
@@ -825,7 +822,7 @@ fn rcl_action_take_goal_request<T: ActionMsg>(
 
 fn rcl_recv_cancel_request(
     server: &rcl_action_server_t,
-) -> RCLActionResult<(
+) -> Result<(
     rcl::rmw_request_id_t,
     rcl_action_cancel_request_t,
     Vec<GoalInfo>,
@@ -875,7 +872,7 @@ fn rcl_recv_cancel_request(
 
 fn rcl_action_take_result_request<T: ActionMsg>(
     server: &rcl_action_server_t,
-) -> RCLActionResult<(rcl::rmw_request_id_t, GetResultServiceRequest<T>)> {
+) -> Result<(rcl::rmw_request_id_t, GetResultServiceRequest<T>)> {
     let mut header: rcl::rmw_request_id_t = unsafe { std::mem::zeroed() };
     let mut request: GetResultServiceRequest<T> = unsafe { std::mem::zeroed() };
     let guard = rcl::MT_UNSAFE_FN.lock();

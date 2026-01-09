@@ -48,12 +48,7 @@
 //! `None` of the 2nd argument of `create_publisher` is equivalent to `Some(Profile::default())`.
 
 use crate::{
-    error::{OResult, Result},
-    get_allocator,
-    msg::TypeSupport,
-    node::Node,
-    qos, rcl,
-    signal_handler::Signaled,
+    error::Result, get_allocator, msg::TypeSupport, node::Node, qos, rcl, signal_handler::Signaled,
     topic::publisher_loaned_message::PublisherLoanedMessage,
 };
 use std::{ffi::CString, marker::PhantomData, ptr::null_mut, sync::Arc};
@@ -103,7 +98,7 @@ impl<T: TypeSupport> Publisher<T> {
         node: Arc<Node>,
         topic_name: &str,
         qos: Option<qos::Profile>,
-    ) -> OResult<Self> {
+    ) -> Result<Self> {
         let mut publisher = rcl::MTSafeFn::rcl_get_zero_initialized_publisher();
 
         let topic_name_c = CString::new(topic_name).unwrap_or_default();
@@ -138,7 +133,7 @@ impl<T: TypeSupport> Publisher<T> {
         node: Arc<Node>,
         topic_name: &str,
         qos: Option<qos::Profile>,
-    ) -> OResult<Self> {
+    ) -> Result<Self> {
         let mut publisher = rcl::MTSafeFn::rcl_get_zero_initialized_publisher();
 
         let topic_name_c = CString::new(topic_name).unwrap_or_default();
@@ -178,7 +173,7 @@ impl<T: TypeSupport> Publisher<T> {
     }
 
     /// Borrows a memory chunk from the shared memory.
-    pub fn borrow_loaned_message(&self) -> OResult<PublisherLoanedMessage<T>> {
+    pub fn borrow_loaned_message(&self) -> Result<PublisherLoanedMessage<T>> {
         PublisherLoanedMessage::new(self.publisher.clone())
     }
 
@@ -215,11 +210,7 @@ impl<T: TypeSupport> Publisher<T> {
         #[cfg(feature = "rcl_stat")]
         let start = std::time::SystemTime::now();
 
-        if let Err(e) =
-            rcl::MTSafeFn::rcl_publish(self.publisher.as_ref(), msg as *const T as _, null_mut())
-        {
-            return Err(e.into());
-        }
+        rcl::MTSafeFn::rcl_publish(self.publisher.as_ref(), msg as *const T as _, null_mut())?;
 
         #[cfg(feature = "rcl_stat")]
         {
@@ -269,11 +260,7 @@ impl<T: TypeSupport> Publisher<T> {
         #[cfg(feature = "rcl_stat")]
         let start = std::time::SystemTime::now();
 
-        if let Err(e) =
-            rcl::MTSafeFn::rcl_publish_serialized_message(self.publisher.as_ref(), msg, null_mut())
-        {
-            return Err(e.into());
-        }
+        rcl::MTSafeFn::rcl_publish_serialized_message(self.publisher.as_ref(), msg, null_mut())?;
 
         #[cfg(feature = "rcl_stat")]
         {

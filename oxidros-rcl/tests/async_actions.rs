@@ -32,12 +32,12 @@ fn create_server(
 ) -> Result<Server<Fibonacci>> {
     let node_server = ctx.create_node(node, None, Default::default()).unwrap();
 
-    Server::new(node_server, action, qos).map_err(|e| e.into())
+    Server::new(node_server, action, qos)
 }
 
 fn create_client(ctx: &Arc<Context>, node: &str, action: &str) -> Result<Client<Fibonacci>> {
     let node_client = ctx.create_node(node, None, Default::default())?;
-    Client::new(node_client, action, None).map_err(|e| e.into())
+    Client::new(node_client, action, None)
 }
 
 async fn assert_status(client: &mut Client<Fibonacci>, expected: GoalStatus) {

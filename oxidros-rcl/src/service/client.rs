@@ -56,7 +56,7 @@
 use super::Header;
 use crate::{
     RecvResult,
-    error::{OError, OResult, Result},
+    error::Result,
     get_allocator, is_halt,
     msg::ServiceMsg,
     node::Node,
@@ -68,7 +68,7 @@ use crate::{
     },
     signal_handler::Signaled,
 };
-use oxidros_core::selector::CallbackResult;
+use oxidros_core::{Error, RclError, selector::CallbackResult};
 use std::{
     ffi::CString, future::Future, marker::PhantomData, os::raw::c_void, sync::Arc, task::Poll,
     time::Duration,
@@ -97,7 +97,7 @@ pub struct Client<T: ServiceMsg> {
 }
 
 impl<T: ServiceMsg> Client<T> {
-    pub(crate) fn new(node: Arc<Node>, service_name: &str, qos: Option<Profile>) -> OResult<Self> {
+    pub(crate) fn new(node: Arc<Node>, service_name: &str, qos: Option<Profile>) -> Result<Self> {
         let mut client = rcl::MTSafeFn::rcl_get_zero_initialized_client();
         let service_name_c = CString::new(service_name).unwrap_or_default();
         let profile = qos.unwrap_or_else(Profile::services_default);
@@ -128,7 +128,7 @@ impl<T: ServiceMsg> Client<T> {
     /// - `RCLError::NodeInvalid`  if the node is invalid, or
     /// - `RCLError::InvalidArgument` if any arguments are invalid, or
     /// - `RCLError::Error` if an unspecified error occurs.
-    pub fn is_service_available(&self) -> OResult<bool> {
+    pub fn is_service_available(&self) -> Result<bool> {
         let guard = rcl::MT_UNSAFE_FN.lock();
         guard.rcl_service_server_is_available(self.data.node.as_ptr(), &self.data.client)
     }
@@ -170,7 +170,7 @@ impl<T: ServiceMsg> Client<T> {
     /// - `RCLError::InvalidArgument` if any arguments are invalid, or
     /// - `RCLError::ClientInvalid` if the client is invalid, or
     /// - `RCLError::Error` if an unspecified error occurs.
-    pub fn send(&mut self, data: &<T as ServiceMsg>::Request) -> OResult<ClientRecv<'_, T>> {
+    pub fn send(&mut self, data: &<T as ServiceMsg>::Request) -> Result<ClientRecv<'_, T>> {
         let (s, _) = self.send_ret_seq(data)?;
         Ok(s)
     }
@@ -218,7 +218,7 @@ impl<T: ServiceMsg> Client<T> {
     pub fn send_ret_seq(
         &mut self,
         data: &<T as ServiceMsg>::Request,
-    ) -> OResult<(ClientRecv<'_, T>, i64)> {
+    ) -> Result<(ClientRecv<'_, T>, i64)> {
         let mut seq: i64 = 0;
         rcl::MTSafeFn::rcl_send_request(
             &self.data.client,
@@ -253,8 +253,8 @@ impl<'a, T: ServiceMsg> ClientRecv<'a, T> {
             self.seq,
         ) {
             Ok(data) => data,
-            Err(OError::ClientTakeFailed) => return RecvResult::RetryLater,
-            Err(e) => return RecvResult::Err(e.into()),
+            Err(Error::Rcl(RclError::ClientTakeFailed)) => return RecvResult::RetryLater,
+            Err(e) => return RecvResult::Err(e),
         };
 
         if header.request_id.sequence_number != self.seq {
@@ -396,7 +396,7 @@ impl<'a, T: ServiceMsg> ClientRecv<'a, T> {
 fn rcl_take_response_with_info<T>(
     client: &rcl::rcl_client_t,
     seq: i64,
-) -> OResult<(T, rcl::rmw_service_info_t)> {
+) -> Result<(T, rcl::rmw_service_info_t)> {
     let mut header: rcl::rmw_service_info_t = unsafe { std::mem::zeroed() };
     let mut ros_response: T = unsafe { std::mem::zeroed() };
 

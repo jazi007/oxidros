@@ -26,10 +26,10 @@ pub trait Communicate: Send + Sync {
 
 impl Communicate for Arc<Node> {
     fn new_publisher<T: TypeSupport>(&self, attributes: &Attributes) -> Result<Publisher<T>> {
-        Ok(self.create_publisher::<T>(attributes.name, attributes.qos.clone())?)
+        self.create_publisher::<T>(attributes.name, attributes.qos.clone())
     }
     fn new_subscriber<T: TypeSupport>(&self, attributes: &Attributes) -> Result<Subscriber<T>> {
-        Ok(self.create_subscriber(attributes.name, attributes.qos.clone())?)
+        self.create_subscriber(attributes.name, attributes.qos.clone())
     }
     fn new_server<T: ServiceMsg>(&self, attributes: &Attributes) -> Result<Server<T>> {
         let server = self.create_server(attributes.name, attributes.qos.clone())?;

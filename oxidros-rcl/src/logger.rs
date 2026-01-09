@@ -63,14 +63,13 @@
 //! th2.join().unwrap();
 //! ```
 
-use crate::{
-    error::{OResult, Result},
-    rcl,
-};
+use crate::{error::Result, rcl};
 use num_derive::{FromPrimitive, ToPrimitive};
+use oxidros_core::{Error, RclError};
 use std::ffi::CString;
 
-static INITIALIZER: std::sync::OnceLock<OResult<()>> = std::sync::OnceLock::new();
+static INITIALIZER: std::sync::OnceLock<std::result::Result<(), RclError>> =
+    std::sync::OnceLock::new();
 
 /// Get the function name called this macro.
 #[macro_export]
@@ -310,11 +309,15 @@ impl Logger {
     }
 }
 
-fn init_once() -> OResult<()> {
+fn init_once() -> std::result::Result<(), RclError> {
     *INITIALIZER.get_or_init(|| {
         // initialize
         let guard = rcl::MT_UNSAFE_LOG_FN.lock();
-        guard.rcutils_logging_initialize()
+        match guard.rcutils_logging_initialize() {
+            Ok(v) => Ok(v),
+            Err(Error::Rcl(e)) => Err(e),
+            _ => Err(RclError::InvalidRetVal),
+        }
     })
 }
 

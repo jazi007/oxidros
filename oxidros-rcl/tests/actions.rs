@@ -31,13 +31,13 @@ fn create_server(
 ) -> Result<Server<Fibonacci>> {
     let node_server = ctx.create_node(node, None, Default::default()).unwrap();
 
-    Server::new(node_server, action, qos).map_err(|e| e.into())
+    Server::new(node_server, action, qos)
 }
 
 fn create_client(ctx: &Arc<Context>, node: &str, action: &str) -> Result<Client<Fibonacci>> {
     let options = oxidros_rcl::node::NodeOptions::default();
     let node_client = ctx.create_node(node, None, options)?;
-    Client::new(node_client, action, None).map_err(|e| e.into())
+    Client::new(node_client, action, None)
 }
 
 fn accept_handler(handle: GoalHandle<Fibonacci>) {

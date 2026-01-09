@@ -6,7 +6,7 @@ use std::fmt;
 use std::slice::from_raw_parts;
 use std::time::Duration;
 
-use crate::error::{ActionError, RCLActionError};
+use crate::error::ActionError;
 
 use super::RclRetErr;
 
@@ -256,7 +256,7 @@ impl From<&super::rcl_variant_t> for oxidros_core::parameter::Value {
     }
 }
 
-impl From<RclRetErr> for crate::error::OError {
+impl From<RclRetErr> for crate::error::RclError {
     fn from(value: RclRetErr) -> Self {
         let value = value.0 as u32;
         match value {
@@ -349,8 +349,8 @@ impl From<oxidros_core::RclError> for RclRetErr {
     }
 }
 
-impl From<RCLActionError> for RclRetErr {
-    fn from(val: RCLActionError) -> Self {
+impl From<ActionError> for RclRetErr {
+    fn from(val: ActionError) -> Self {
         match val {
             ActionError::NameInvalid => super::RCL_RET_ACTION_NAME_INVALID.into(),
             ActionError::GoalAccepted => super::RCL_RET_ACTION_GOAL_ACCEPTED.into(),

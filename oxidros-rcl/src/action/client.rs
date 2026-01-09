@@ -1,6 +1,7 @@
 //! Action client.
 
 use oxidros_core::selector::CallbackResult;
+use oxidros_core::{ActionError, Error, RclError};
 use std::future::Future;
 use std::pin::Pin;
 use std::{ffi::CString, marker::PhantomData, sync::Arc, task::Poll, time::Duration};
@@ -8,7 +9,7 @@ use std::{ffi::CString, marker::PhantomData, sync::Arc, task::Poll, time::Durati
 use crate::helper::is_unpin;
 use crate::{
     RecvResult,
-    error::{OError, RCLActionError, RCLActionResult, Result},
+    error::Result,
     get_allocator, is_halt,
     msg::{
         ActionMsg,
@@ -82,11 +83,7 @@ where
     T: ActionMsg,
 {
     // Create a client.
-    pub fn new(
-        node: Arc<Node>,
-        action_name: &str,
-        qos: Option<ClientQosOption>,
-    ) -> RCLActionResult<Self> {
+    pub fn new(node: Arc<Node>, action_name: &str, qos: Option<ClientQosOption>) -> Result<Self> {
         let mut client = rcl::MTSafeFn::rcl_action_get_zero_initialized_client();
         let options = qos
             .map(rcl::rcl_action_client_options_t::from)
@@ -116,7 +113,7 @@ where
     }
 
     /// Returns true if the corresponding action server is available.
-    pub fn is_server_available(&self) -> RCLActionResult<bool> {
+    pub fn is_server_available(&self) -> Result<bool> {
         let guard = rcl::MT_UNSAFE_FN.lock();
         let mut is_available = false;
         match guard.rcl_action_server_is_available(
@@ -125,7 +122,7 @@ where
             &mut is_available as *mut _,
         ) {
             Ok(()) => Ok(is_available),
-            Err(RCLActionError::Rcl(OError::NodeInvalid)) => {
+            Err(Error::Action(ActionError::Rcl(RclError::NodeInvalid))) => {
                 // TODO: soft failure in case of shutdown context
                 eprintln!("Invalid node (the shutdown has started?)");
                 Ok(false)
@@ -209,8 +206,8 @@ where
     pub fn try_recv_feedback(&mut self) -> RecvResult<<T as ActionMsg>::Feedback> {
         match rcl_action_take_feedback::<T>(&self.data.client) {
             Ok(feedback) => RecvResult::Ok(feedback),
-            Err(RCLActionError::ClientTakeFailed) => RecvResult::RetryLater,
-            Err(e) => RecvResult::Err(e.into()),
+            Err(Error::Action(ActionError::ClientTakeFailed)) => RecvResult::RetryLater,
+            Err(e) => RecvResult::Err(e),
         }
     }
 
@@ -242,8 +239,8 @@ where
     pub fn try_recv_status(&mut self) -> RecvResult<GoalStatusArray> {
         match rcl_action_take_status(&self.data.client) {
             Ok(status_array) => RecvResult::Ok(status_array),
-            Err(RCLActionError::ClientTakeFailed) => RecvResult::RetryLater,
-            Err(e) => RecvResult::Err(e.into()),
+            Err(Error::Action(ActionError::ClientTakeFailed)) => RecvResult::RetryLater,
+            Err(e) => RecvResult::Err(e),
         }
     }
 
@@ -305,8 +302,8 @@ impl<'a, T: ActionMsg> ClientGoalRecv<'a, T> {
                     RecvResult::RetryLater
                 }
             }
-            Err(RCLActionError::ClientTakeFailed) => RecvResult::RetryLater,
-            Err(e) => RecvResult::Err(e.into()),
+            Err(Error::Action(ActionError::ClientTakeFailed)) => RecvResult::RetryLater,
+            Err(e) => RecvResult::Err(e),
         }
     }
 
@@ -418,8 +415,8 @@ impl<'a, T: ActionMsg> ClientCancelRecv<'a, T> {
                     RecvResult::RetryLater
                 }
             }
-            Err(RCLActionError::ClientTakeFailed) => RecvResult::RetryLater,
-            Err(e) => RecvResult::Err(e.into()),
+            Err(Error::Action(ActionError::ClientTakeFailed)) => RecvResult::RetryLater,
+            Err(e) => RecvResult::Err(e),
         }
     }
 
@@ -530,8 +527,8 @@ impl<'a, T: ActionMsg> ClientResultRecv<'a, T> {
                     RecvResult::RetryLater
                 }
             }
-            Err(RCLActionError::ClientTakeFailed) => RecvResult::RetryLater,
-            Err(e) => RecvResult::Err(e.into()),
+            Err(Error::Action(ActionError::ClientTakeFailed)) => RecvResult::RetryLater,
+            Err(e) => RecvResult::Err(e),
         }
     }
 
@@ -771,7 +768,7 @@ impl<'a, T: ActionMsg> Future for AsyncStatusReceiver<'a, T> {
 
 fn rcl_action_take_goal_response<T>(
     client: &rcl::rcl_action_client_t,
-) -> RCLActionResult<(SendGoalServiceResponse<T>, rcl::rmw_request_id_t)>
+) -> Result<(SendGoalServiceResponse<T>, rcl::rmw_request_id_t)>
 where
     T: ActionMsg,
 {
@@ -790,7 +787,7 @@ where
 
 fn rcl_action_take_cancel_response(
     client: &rcl::rcl_action_client_t,
-) -> RCLActionResult<(CancelGoal_Response, rcl::rmw_request_id_t)> {
+) -> Result<(CancelGoal_Response, rcl::rmw_request_id_t)> {
     let guard = rcl::MT_UNSAFE_FN.lock();
 
     let mut header: rcl::rmw_request_id_t = unsafe { std::mem::zeroed() };
@@ -806,7 +803,7 @@ fn rcl_action_take_cancel_response(
 
 fn rcl_action_take_result_response<T>(
     client: &rcl::rcl_action_client_t,
-) -> RCLActionResult<(GetResultServiceResponse<T>, rcl::rmw_request_id_t)>
+) -> Result<(GetResultServiceResponse<T>, rcl::rmw_request_id_t)>
 where
     T: ActionMsg,
 {
@@ -823,7 +820,7 @@ where
     Ok((response, header))
 }
 
-fn rcl_action_take_feedback<T>(client: &rcl::rcl_action_client_t) -> RCLActionResult<T::Feedback>
+fn rcl_action_take_feedback<T>(client: &rcl::rcl_action_client_t) -> Result<T::Feedback>
 where
     T: ActionMsg,
 {
@@ -835,7 +832,7 @@ where
     Ok(feedback)
 }
 
-fn rcl_action_take_status(client: &rcl::rcl_action_client_t) -> RCLActionResult<GoalStatusArray> {
+fn rcl_action_take_status(client: &rcl::rcl_action_client_t) -> Result<GoalStatusArray> {
     let guard = rcl::MT_UNSAFE_FN.lock();
     let mut status_array = GoalStatusArray::new().unwrap();
     guard.rcl_action_take_status(client, &mut status_array as *const _ as *mut _)?;

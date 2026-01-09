@@ -19,7 +19,7 @@ use libc::atexit;
 
 use crate::{
     context::{Context, remove_context},
-    error::{OResult, Result},
+    error::Result,
     msg::{ServiceMsg, TypeSupport},
     parameter::ParameterServer,
     qos, rcl,
@@ -44,7 +44,7 @@ impl Node {
         name: &str,
         namespace: Option<&str>,
         options: NodeOptions,
-    ) -> OResult<Arc<Self>> {
+    ) -> Result<Arc<Self>> {
         let mut node = rcl::MTSafeFn::rcl_get_zero_initialized_node();
 
         let name_c = CString::new(name).unwrap();
@@ -83,15 +83,15 @@ impl Node {
         &self.node as *const _ as *mut _
     }
 
-    pub fn get_name(&self) -> OResult<String> {
+    pub fn get_name(&self) -> Result<String> {
         rcl::MTSafeFn::rcl_node_get_name(&self.node)
     }
 
-    pub fn get_fully_qualified_name(&self) -> OResult<String> {
+    pub fn get_fully_qualified_name(&self) -> Result<String> {
         rcl::MTSafeFn::rcl_node_get_fully_qualified_name(&self.node)
     }
 
-    pub fn get_namespace(&self) -> OResult<String> {
+    pub fn get_namespace(&self) -> Result<String> {
         rcl::MTSafeFn::rcl_node_get_namespace(&self.node)
     }
 
@@ -122,7 +122,7 @@ impl Node {
         self: &Arc<Self>,
         topic_name: &str,
         qos: Option<qos::Profile>,
-    ) -> OResult<Publisher<T>> {
+    ) -> Result<Publisher<T>> {
         Publisher::new(self.clone(), topic_name, qos)
     }
 
@@ -148,7 +148,7 @@ impl Node {
         self: &Arc<Self>,
         topic_name: &str,
         qos: Option<qos::Profile>,
-    ) -> OResult<Publisher<T>> {
+    ) -> Result<Publisher<T>> {
         Publisher::new_disable_loaned_message(self.clone(), topic_name, qos)
     }
 
@@ -172,7 +172,7 @@ impl Node {
         self: &Arc<Self>,
         topic_name: &str,
         qos: Option<qos::Profile>,
-    ) -> OResult<Subscriber<T>> {
+    ) -> Result<Subscriber<T>> {
         Subscriber::new(self.clone(), topic_name, qos)
     }
 
@@ -196,7 +196,7 @@ impl Node {
         self: &Arc<Self>,
         topic_name: &str,
         qos: Option<qos::Profile>,
-    ) -> OResult<Subscriber<T>> {
+    ) -> Result<Subscriber<T>> {
         Subscriber::new_disable_loaned_message(self.clone(), topic_name, qos)
     }
 
@@ -220,7 +220,7 @@ impl Node {
         self: &Arc<Self>,
         service_name: &str,
         qos: Option<qos::Profile>,
-    ) -> OResult<Server<T>> {
+    ) -> Result<Server<T>> {
         Server::new(self.clone(), service_name, qos)
     }
 
@@ -244,7 +244,7 @@ impl Node {
         self: &Arc<Self>,
         service_name: &str,
         qos: Option<qos::Profile>,
-    ) -> OResult<Client<T>> {
+    ) -> Result<Client<T>> {
         Client::new(self.clone(), service_name, qos)
     }
 }
@@ -318,7 +318,6 @@ impl oxidros_core::api::RosNode for Node {
         qos: Option<qos::Profile>,
     ) -> oxidros_core::Result<Self::Publisher<T>> {
         self.create_publisher(topic_name, qos)
-            .map_err(oxidros_core::Error::Rcl)
     }
 
     fn new_subscriber<T: TypeSupport>(
@@ -327,7 +326,6 @@ impl oxidros_core::api::RosNode for Node {
         qos: Option<qos::Profile>,
     ) -> oxidros_core::Result<Self::Subscriber<T>> {
         self.create_subscriber(topic_name, qos)
-            .map_err(oxidros_core::Error::Rcl)
     }
 
     fn new_client<T: ServiceMsg>(
@@ -336,7 +334,6 @@ impl oxidros_core::api::RosNode for Node {
         qos: Option<qos::Profile>,
     ) -> oxidros_core::Result<Self::Client<T>> {
         self.create_client(service_name, qos)
-            .map_err(oxidros_core::Error::Rcl)
     }
 
     fn new_server<T: ServiceMsg>(
@@ -345,6 +342,5 @@ impl oxidros_core::api::RosNode for Node {
         qos: Option<qos::Profile>,
     ) -> oxidros_core::Result<Self::Server<T>> {
         self.create_server(service_name, qos)
-            .map_err(oxidros_core::Error::Rcl)
     }
 }

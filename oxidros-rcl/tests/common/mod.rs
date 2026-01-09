@@ -15,7 +15,7 @@ use oxidros_rcl::msg::common_interfaces::example_interfaces::{
 
 use oxidros_rcl::{
     self,
-    error::{OResult, Result},
+    error::Result,
     msg::{ServiceMsg, TypeSupport},
     node::Node,
     rcl,
@@ -29,7 +29,7 @@ pub fn create_publisher(
     node: Arc<Node>,
     topic_name: &str,
     disable_loaned_message: bool,
-) -> OResult<Publisher<Int64>> {
+) -> Result<Publisher<Int64>> {
     let _ = disable_loaned_message;
     node.create_publisher(topic_name, Default::default())
 }
@@ -38,15 +38,15 @@ pub fn create_subscriber(
     node: Arc<Node>,
     topic_name: &str,
     disable_loaned_message: bool,
-) -> OResult<Subscriber<Int64>> {
+) -> Result<Subscriber<Int64>> {
     let _ = disable_loaned_message;
     node.create_subscriber(topic_name, Default::default())
 }
 
-pub fn create_server(node: Arc<Node>, service_name: &str) -> OResult<Server<AddTwoInts>> {
+pub fn create_server(node: Arc<Node>, service_name: &str) -> Result<Server<AddTwoInts>> {
     node.create_server(service_name, None)
 }
 
-pub fn create_client(node: Arc<Node>, service_name: &str) -> OResult<Client<AddTwoInts>> {
+pub fn create_client(node: Arc<Node>, service_name: &str) -> Result<Client<AddTwoInts>> {
     node.create_client(service_name, None)
 }

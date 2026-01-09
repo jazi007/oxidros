@@ -94,7 +94,7 @@ use super::Header;
 use crate::msg::interfaces::rosgraph_msgs::msg::Clock;
 use crate::{
     PhantomUnsync, RecvResult,
-    error::{OError, OResult, Result},
+    error::Result,
     get_allocator,
     helper::is_unpin,
     is_halt,
@@ -105,7 +105,7 @@ use crate::{
     selector::async_selector::{self, SELECTOR},
     signal_handler::Signaled,
 };
-use oxidros_core::selector::CallbackResult;
+use oxidros_core::{Error, RclError, selector::CallbackResult};
 use parking_lot::Mutex;
 use std::{
     ffi::CString, future::Future, marker::PhantomData, os::raw::c_void, sync::Arc, task::Poll,
@@ -167,7 +167,7 @@ pub struct Server<T> {
 }
 
 impl<T: ServiceMsg> Server<T> {
-    pub(crate) fn new(node: Arc<Node>, service_name: &str, qos: Option<Profile>) -> OResult<Self> {
+    pub(crate) fn new(node: Arc<Node>, service_name: &str, qos: Option<Profile>) -> Result<Self> {
         let mut service = rcl::MTSafeFn::rcl_get_zero_initialized_service();
         let service_name_c = CString::new(service_name).unwrap_or_default();
         let profile = qos.unwrap_or_else(Profile::services_default);
@@ -201,7 +201,7 @@ impl<T: ServiceMsg> Server<T> {
         clock: &mut Clock,
         qos: Profile,
         introspection_state: RCLServiceIntrospection,
-    ) -> OResult<()> {
+    ) -> Result<()> {
         let mut pub_opts = unsafe { rcl::rcl_publisher_get_default_options() };
         pub_opts.qos = (&qos).into();
 
@@ -272,11 +272,11 @@ impl<T: ServiceMsg> Server<T> {
         let (request, header) =
             match rcl_take_request_with_info::<<T as ServiceMsg>::Request>(&data.service) {
                 Ok(data) => data,
-                Err(OError::ServiceTakeFailed) => {
+                Err(Error::Rcl(RclError::ServiceTakeFailed)) => {
                     drop(data);
                     return RecvResult::RetryLater;
                 }
-                Err(e) => return RecvResult::Err(e.into()),
+                Err(e) => return RecvResult::Err(e),
             };
 
         drop(data);
@@ -397,7 +397,7 @@ impl<T: ServiceMsg> ServerSend<T> {
     /// `data` should be immutable, but `rcl_send_response` provided
     /// by ROS2 takes normal pointers instead of `const` pointers.
     /// So, currently, `send` takes `data` as mutable.
-    pub fn send(mut self, data: &<T as ServiceMsg>::Response) -> OResult<()> {
+    pub fn send(mut self, data: &<T as ServiceMsg>::Response) -> Result<()> {
         let server_data = self.data.lock();
         rcl::MTSafeFn::rcl_send_response(
             &server_data.service,
@@ -409,7 +409,7 @@ impl<T: ServiceMsg> ServerSend<T> {
 
 fn rcl_take_request_with_info<T>(
     service: &rcl::rcl_service_t,
-) -> OResult<(T, rcl::rmw_service_info_t)> {
+) -> Result<(T, rcl::rmw_service_info_t)> {
     let mut header: rcl::rmw_service_info_t = unsafe { std::mem::zeroed() };
     let mut ros_request: T = unsafe { std::mem::zeroed() };
 
@@ -511,10 +511,8 @@ impl<T: ServiceMsg> oxidros_core::api::ServiceRequest<T> for RclServiceRequest<T
     }
 
     fn respond(self, response: T::Response) -> oxidros_core::Result<()> {
-        // ServerSend::send returns OResult which uses RclError
-        self.sender
-            .send(&response)
-            .map_err(oxidros_core::Error::Rcl)
+        // ServerSend::send returns Result which uses RclError
+        self.sender.send(&response)
     }
 }
 

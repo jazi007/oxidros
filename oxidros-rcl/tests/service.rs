@@ -38,7 +38,7 @@ fn test_service() -> Result<()> {
             c
         }
         Err(e) => {
-            return Err(e.into());
+            return Err(e);
         }
     };
 

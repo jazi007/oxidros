@@ -152,7 +152,7 @@
 
 use crate::{
     PhantomUnsync, RecvResult,
-    error::{OError, OResult, Result},
+    error::Result,
     get_allocator,
     helper::is_unpin,
     is_halt,
@@ -164,7 +164,7 @@ use crate::{
     topic::subscriber_loaned_message::SubscriberLoanedMessage,
 };
 pub use oxidros_core::message::TakenMsg;
-use oxidros_core::selector::CallbackResult;
+use oxidros_core::{Error, RclError, selector::CallbackResult};
 use std::{
     ffi::CString,
     future::Future,
@@ -223,7 +223,7 @@ impl<T: TypeSupport> Subscriber<T> {
         node: Arc<Node>,
         topic_name: &str,
         qos: Option<qos::Profile>,
-    ) -> OResult<Self> {
+    ) -> Result<Self> {
         let mut subscription = Box::new(rcl::MTSafeFn::rcl_get_zero_initialized_subscription());
 
         let topic_name_c = CString::new(topic_name).unwrap_or_default();
@@ -260,7 +260,7 @@ impl<T: TypeSupport> Subscriber<T> {
         node: Arc<Node>,
         topic_name: &str,
         qos: Option<qos::Profile>,
-    ) -> OResult<Self> {
+    ) -> Result<Self> {
         let mut subscription = Box::new(rcl::MTSafeFn::rcl_get_zero_initialized_subscription());
         let topic_name_c = CString::new(topic_name).unwrap_or_default();
         let mut options = Options::new(&qos.unwrap_or_default());
@@ -337,13 +337,13 @@ impl<T: TypeSupport> Subscriber<T> {
 
                 RecvResult::Ok(n)
             }
-            Err(OError::SubscriptionTakeFailed) => {
+            Err(Error::Rcl(RclError::SubscriptionTakeFailed)) => {
                 #[cfg(feature = "rcl_stat")]
                 self.subscription.measure_latency(start);
 
                 RecvResult::RetryLater
             }
-            Err(e) => RecvResult::Err(e.into()),
+            Err(e) => RecvResult::Err(e),
         }
     }
     /// Blocking receive.
@@ -519,7 +519,7 @@ impl Options {
     }
 }
 
-fn take<T: 'static>(subscription: &Arc<RCLSubscription>) -> OResult<TakenMsg<T>> {
+fn take<T: 'static>(subscription: &Arc<RCLSubscription>) -> Result<TakenMsg<T>> {
     if rcl::MTSafeFn::rcl_subscription_can_loan_messages(subscription.subscription.as_ref()) {
         take_loaned_message(subscription.clone()).map(move |x| TakenMsg::Loaned(Box::new(x)))
     } else {
@@ -529,7 +529,7 @@ fn take<T: 'static>(subscription: &Arc<RCLSubscription>) -> OResult<TakenMsg<T>>
 
 fn take_loaned_message<T>(
     subscription: Arc<RCLSubscription>,
-) -> OResult<SubscriberLoanedMessage<T>> {
+) -> Result<SubscriberLoanedMessage<T>> {
     let guard = rcl::MT_UNSAFE_FN.lock();
     let message: *mut T = null_mut();
     guard
@@ -542,7 +542,7 @@ fn take_loaned_message<T>(
         .map(|_| SubscriberLoanedMessage::new(subscription, message))
 }
 
-fn rcl_take<T>(subscription: &rcl::rcl_subscription_t) -> OResult<T> {
+fn rcl_take<T>(subscription: &rcl::rcl_subscription_t) -> Result<T> {
     let guard = rcl::MT_UNSAFE_FN.lock();
     let mut ros_message: T = unsafe { std::mem::zeroed() };
     match guard.rcl_take(

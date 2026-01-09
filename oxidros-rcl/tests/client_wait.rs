@@ -36,7 +36,7 @@ fn test_client_wait() -> Result<()> {
             c
         }
         Err(e) => {
-            return Err(e.into());
+            return Err(e);
         }
     };
 
