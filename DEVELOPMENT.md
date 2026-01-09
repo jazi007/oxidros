@@ -33,23 +33,36 @@ This document tracks the progress of aligning `oxidros-rcl` and `oxidros-zenoh` 
 
 ## Phase 2: Trait Consolidation (2-3 days)
 
-### 2.1 Move ros2-types traits to oxidros-core
-- [ ] Move `TypeSupport` trait to `oxidros-core/src/msg.rs`
-- [ ] Move `TryClone` trait to `oxidros-core/src/msg.rs`
-- [ ] Move `ServiceMsg` trait to `oxidros-core/src/msg.rs`
-- [ ] Move `ActionMsg`, `ActionGoal`, `ActionResult` traits to `oxidros-core/src/msg.rs`
-- [ ] Move `GetUUID`, `GoalResponse`, `ResultResponse` traits to `oxidros-core/src/msg.rs`
-- [ ] Move `UnsafeTime`, `UnsafeDuration` to `oxidros-core/src/time.rs`
+## Phase 2: Trait Consolidation (2-3 days) ✅ COMPLETE
 
-### 2.2 Update ros2-types to re-export from oxidros-core
-- [ ] Update `ros2-types/src/traits.rs` to re-export from oxidros-core
-- [ ] Update `ros2-types/src/lib.rs` exports
-- [ ] Ensure derive macros still work with re-exported traits
+**Note**: The original plan to move traits from `ros2-types` to `oxidros-core` was revised.
+Moving traits would create a circular dependency since `ros2-types` has derive macros that 
+other crates depend on. Instead, the approach is:
+- Keep traits defined in `ros2-types` (standalone, low-level crate)
+- `oxidros-core` re-exports all traits via `pub use ros2_types::*`
+- Downstream crates import from `oxidros_core` instead of `ros2_types`
 
-### 2.3 Update downstream crates
-- [ ] Update `oxidros-rcl` imports
-- [ ] Update `oxidros-zenoh` imports
-- [ ] Update `oxidros-msg` imports
+### 2.1 Verify oxidros-core re-exports ✅
+- [x] `oxidros-core/src/lib.rs` has `pub use ros2_types::*` (re-exports all traits)
+- [x] `oxidros-core/src/msg.rs` re-exports: `TypeSupport`, `TryClone`, `ServiceMsg`, `ActionMsg`, `ActionGoal`, `ActionResult`, `GetUUID`, `GoalResponse`, `ResultResponse`
+- [x] `oxidros-core/src/time.rs` re-exports: `UnsafeTime`, `UnsafeDuration`
+
+### 2.2 Trait source structure verified ✅
+- [x] `ros2-types/src/traits.rs` is the source of truth for message traits
+- [x] `ros2-types` provides derive macros (`Ros2Msg`, `TypeDescription`, `ros2_service`, `ros2_action`)
+- [x] Derive macros reference `ros2_types::` for generated code
+
+### 2.3 Update downstream crates ✅
+- [x] `oxidros-rcl` - already imports from `oxidros_core` (no changes needed)
+- [x] `oxidros-zenoh` - updated all imports from `ros2_types` to `oxidros_core`
+  - `node.rs`: `TypeDescription`, `TypeSupport`
+  - `topic/publisher.rs`: `TypeDescription`, `TypeSupport`
+  - `topic/subscriber.rs`: `TypeDescription`, `TypeSupport`
+  - `service/client.rs`: `TypeDescription`, `TypeSupport`
+  - `service/server.rs`: `TypeDescription`, `TypeSupport`
+- [x] Removed direct `ros2-types` dependency from `oxidros-zenoh/Cargo.toml`
+- [x] `oxidros-msg` - keeps `ros2-types` dependency for derive macros (required)
+- [x] All crates build successfully
 
 ---
 

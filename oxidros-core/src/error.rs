@@ -342,7 +342,7 @@ impl From<&str> for Error {
 
 impl From<Box<dyn std::error::Error + Send + Sync + 'static>> for Error {
     fn from(err: Box<dyn std::error::Error + Send + Sync + 'static>) -> Self {
-        Error::Zenoh(err.to_string())
+        Error::Other(err.to_string())
     }
 }
 

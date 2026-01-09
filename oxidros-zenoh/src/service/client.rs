@@ -10,9 +10,8 @@ use crate::{
     keyexpr::{EntityKind, liveliness_entity_keyexpr, topic_keyexpr},
     node::Node,
 };
-use oxidros_core::qos::Profile;
+use oxidros_core::{TypeDescription, TypeSupport, qos::Profile};
 use parking_lot::Mutex;
-use ros2_types::{TypeDescription, TypeSupport};
 use std::{marker::PhantomData, sync::Arc, time::Duration};
 use zenoh::query::QueryTarget;
 use zenoh::{Wait, bytes::ZBytes};

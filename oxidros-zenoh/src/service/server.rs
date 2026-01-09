@@ -10,8 +10,7 @@ use crate::{
     keyexpr::{EntityKind, liveliness_entity_keyexpr, topic_keyexpr},
     node::Node,
 };
-use oxidros_core::qos::Profile;
-use ros2_types::{TypeDescription, TypeSupport};
+use oxidros_core::{TypeDescription, TypeSupport, qos::Profile};
 use std::{marker::PhantomData, sync::Arc};
 use zenoh::{Wait, bytes::ZBytes, query::Query};
 

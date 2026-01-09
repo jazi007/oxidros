@@ -11,9 +11,8 @@ use crate::{
     service::{client::Client, server::Server},
     topic::{publisher::Publisher, subscriber::Subscriber},
 };
-use oxidros_core::qos::Profile;
+use oxidros_core::{TypeDescription, TypeSupport, qos::Profile};
 use parking_lot::Mutex;
-use ros2_types::{TypeDescription, TypeSupport};
 use ros2args::names::NameKind;
 use std::sync::{
     Arc,

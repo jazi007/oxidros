@@ -1769,7 +1769,6 @@ dependencies = [
  "oxidros-core",
  "oxidros-msg",
  "parking_lot",
- "ros2-types",
  "ros2args",
  "serde",
  "thiserror 2.0.17",

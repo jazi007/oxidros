@@ -11,9 +11,8 @@ use crate::{
     node::Node,
     qos::QosMapping,
 };
-use oxidros_core::qos::Profile;
+use oxidros_core::{TypeDescription, TypeSupport, qos::Profile};
 use parking_lot::Mutex;
-use ros2_types::{TypeDescription, TypeSupport};
 use std::{marker::PhantomData, sync::Arc};
 use zenoh::{Wait, bytes::ZBytes};
 
