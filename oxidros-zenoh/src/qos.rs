@@ -70,7 +70,11 @@ impl QosMapping {
     /// Returns `DEFAULT_DEPTH` (42) if the profile depth is 0,
     /// otherwise returns the specified depth.
     pub fn effective_depth(profile: &Profile) -> usize {
-        if profile.depth == 0 {
+        let depth = match profile.history {
+            HistoryPolicy::KeepAll => usize::MAX,
+            _ => profile.depth,
+        };
+        if depth == 0 {
             DEFAULT_DEPTH
         } else {
             profile.depth

@@ -15,6 +15,7 @@ use oxidros_core::{TypeSupport, qos::Profile};
 use parking_lot::Mutex;
 use std::{marker::PhantomData, sync::Arc};
 use zenoh::{Wait, bytes::ZBytes};
+use zenoh_ext::AdvancedPublisherBuilderExt;
 
 /// Topic publisher.
 ///
@@ -35,8 +36,8 @@ pub struct Publisher<T> {
     topic_name: String,
     /// Fully qualified topic name.
     fq_topic_name: String,
-    /// Zenoh publisher.
-    zenoh_publisher: zenoh::pubsub::Publisher<'static>,
+    /// Zenoh advanced publisher (supports cache for TRANSIENT_LOCAL durability).
+    zenoh_publisher: zenoh_ext::AdvancedPublisher<'static>,
     /// Publisher GID.
     gid: [u8; GID_SIZE],
     /// Sequence number counter.
@@ -84,12 +85,27 @@ impl<T: TypeSupport> Publisher<T> {
 
         // Create an owned key expression
         let key_expr = zenoh::key_expr::KeyExpr::try_from(key_expr_str)?;
-        let mut builder = session.declare_publisher(key_expr);
 
-        // Apply QoS settings
-        builder = builder.congestion_control(QosMapping::congestion_control(&qos));
+        // Build AdvancedPublisher with cache config based on durability QoS
+        // For TRANSIENT_LOCAL: cache messages for late-joining subscribers
+        // For VOLATILE: no cache (max_samples = 0)
+        let cache_depth = if QosMapping::is_transient_local(&qos) {
+            let depth = QosMapping::effective_depth(&qos);
+            log::debug!(
+                "Creating publisher for '{}' with cache depth {}",
+                fq_topic_name,
+                depth
+            );
+            depth
+        } else {
+            0
+        };
 
-        let zenoh_publisher = builder.wait()?;
+        let zenoh_publisher = session
+            .declare_publisher(key_expr)
+            .congestion_control(QosMapping::congestion_control(&qos))
+            .cache(zenoh_ext::CacheConfig::default().max_samples(cache_depth))
+            .wait()?;
 
         // Generate publisher GID
         let gid = generate_gid();

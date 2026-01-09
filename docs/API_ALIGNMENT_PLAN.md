@@ -1,0 +1,626 @@
+# API Alignment Plan: oxidros-rcl vs oxidros-zenoh
+
+This document details the public API differences between `oxidros-rcl` and `oxidros-zenoh`, and provides a phased plan to align them for a unified developer experience.
+
+---
+
+## Table of Contents
+
+1. [API Differences](#api-differences)
+   - [Context](#1-context)
+   - [Node](#2-node)
+   - [Publisher](#3-publisher)
+   - [Subscriber](#4-subscriber)
+   - [Client (Service)](#5-client-service)
+   - [Server (Service)](#6-server-service)
+   - [Selector](#7-selector)
+   - [Action (Client/Server)](#8-action-clientserver)
+   - [Parameter Server](#9-parameter-server)
+   - [Logger](#10-logger)
+   - [Additional Types](#11-additional-types--re-exports)
+   - [Error Types](#12-error-types)
+   - [zenoh-ext Usage](#13-zenoh-ext-crate-not-used)
+2. [Alignment Plan](#alignment-plan)
+
+---
+
+## API Differences
+
+### 1. Context
+
+| API | `oxidros-rcl` | `oxidros-zenoh` | Status |
+|-----|---------------|-----------------|--------|
+| `new()` | `fn new() -> Result<Arc<Self>>` | `fn new() -> Result<Arc<Self>>` | ✅ Aligned |
+| `create_node()` | `fn create_node(&Arc<Self>, name: &str, namespace: Option<&str>, options: NodeOptions) -> OResult<Arc<Node>>` | `fn create_node(&Arc<Self>, name: &str, namespace: Option<&str>) -> Result<Arc<Node>>` | ⚠️ Different (NodeOptions param) |
+| `create_selector()` | `fn create_selector(&Arc<Self>) -> OResult<Selector>` | ❌ Missing | ❌ Missing in zenoh |
+| `with_args()` | ❌ Missing | `fn with_args(ros2_args: Ros2Args) -> Result<Arc<Self>>` | ❌ Missing in rcl |
+| `with_domain_id()` | ❌ Missing | `fn with_domain_id(domain_id: u32) -> Result<Arc<Self>>` | ❌ Missing in rcl |
+| `with_config()` | ❌ Missing | `fn with_config(domain_id: u32, config: zenoh::Config) -> Result<Arc<Self>>` | 🔧 Backend-specific |
+| `with_args_and_domain_id()` | ❌ Missing | `fn with_args_and_domain_id(ros2_args, domain_id) -> Result<Arc<Self>>` | ❌ Missing in rcl |
+| `with_full_config()` | ❌ Missing | `fn with_full_config(ros2_args, domain_id, config) -> Result<Arc<Self>>` | 🔧 Backend-specific |
+| `domain_id()` | ❌ Missing | `fn domain_id(&self) -> u32` | ❌ Missing in rcl |
+| `session_id()` | ❌ Missing | `fn session_id(&self) -> &str` | 🔧 Zenoh-specific |
+| `session()` | ❌ Missing | `fn session(&self) -> &Session` | 🔧 Zenoh-specific |
+| `ros2_args()` | ❌ Missing | `fn ros2_args(&self) -> &Ros2Args` | ❌ Missing in rcl |
+| `enclave()` | ❌ Missing | `fn enclave(&self) -> Option<&str>` | ❌ Missing in rcl |
+| `graph_cache()` | ❌ Missing | `fn graph_cache(&self) -> GraphCache` | 🔧 Zenoh-specific |
+
+**Summary:**
+- `create_node()` has different signatures (NodeOptions in rcl)
+- zenoh has more flexible constructors
+- rcl is missing domain_id, ros2_args, enclave accessors
+- zenoh is missing `create_selector()` on Context
+
+---
+
+### 2. Node
+
+| API | `oxidros-rcl` | `oxidros-zenoh` | Status |
+|-----|---------------|-----------------|--------|
+| `get_name()` | `fn get_name(&self) -> OResult<String>` | `fn get_name(&self) -> &str` | ⚠️ Different return type |
+| `get_namespace()` | `fn get_namespace(&self) -> OResult<String>` | `fn get_namespace(&self) -> &str` | ⚠️ Different return type |
+| `get_fully_qualified_name()` | `fn get_fully_qualified_name(&self) -> OResult<String>` | `fn get_fully_qualified_name(&self) -> String` | ⚠️ Different return type |
+| `name()` | ❌ Missing | `fn name(&self) -> &str` | ❌ Missing in rcl |
+| `namespace()` | ❌ Missing | `fn namespace(&self) -> &str` | ❌ Missing in rcl |
+| `fully_qualified_name()` | ❌ Missing | `fn fully_qualified_name(&self) -> String` | ❌ Missing in rcl |
+| `create_publisher()` | `fn create_publisher<T>(..., qos: Option<Profile>) -> OResult<Publisher<T>>` | `fn create_publisher<T>(..., qos: Option<Profile>) -> Result<Publisher<T>>` | ✅ Aligned |
+| `create_publisher_disable_loaned_message()` | `fn create_publisher_disable_loaned_message<T>(...) -> OResult<Publisher<T>>` | ❌ Missing | 🔧 RCL-specific |
+| `create_subscriber()` | `fn create_subscriber<T>(..., qos: Option<Profile>) -> OResult<Subscriber<T>>` | `fn create_subscriber<T>(..., qos: Option<Profile>) -> Result<Subscriber<T>>` | ✅ Aligned |
+| `create_subscriber_disable_loaned_message()` | `fn create_subscriber_disable_loaned_message<T>(...) -> OResult<Subscriber<T>>` | ❌ Missing | 🔧 RCL-specific |
+| `create_server()` | `fn create_server<T>(..., qos: Option<Profile>) -> OResult<Server<T>>` | `fn create_server<T>(..., qos: Option<Profile>) -> Result<Server<T>>` | ✅ Aligned |
+| `create_client()` | `fn create_client<T>(..., qos: Option<Profile>) -> OResult<Client<T>>` | `fn create_client<T>(..., qos: Option<Profile>) -> Result<Client<T>>` | ✅ Aligned |
+| `create_parameter_server()` | `fn create_parameter_server(&Arc<Self>) -> Result<ParameterServer>` | `fn create_parameter_server(&Arc<Self>) -> Result<ParameterServer>` | ✅ Aligned |
+| `gid()` | ❌ Missing | `fn gid(&self) -> &[u8; 16]` | ❌ Missing in rcl |
+| `node_id()` | ❌ Missing | `fn node_id(&self) -> u32` | 🔧 Zenoh-specific |
+| `enclave()` | ❌ Missing | `fn enclave(&self) -> &str` | ❌ Missing in rcl |
+| `context()` | ❌ Missing | `fn context(&self) -> &Arc<Context>` | ❌ Missing in rcl |
+| `expand_and_remap_name()` | ❌ Missing | `fn expand_and_remap_name(&self, name, kind) -> Result<String>` | ❌ Missing in rcl |
+
+**Summary:**
+- `get_*` methods return `OResult<String>` in rcl but `&str`/`String` in zenoh
+- rcl is missing short-form accessors (`name()`, `namespace()`, `fully_qualified_name()`)
+- Loaned message APIs are rcl-specific (shared memory)
+- rcl is missing `gid()`, `context()`, `enclave()`, `expand_and_remap_name()`
+
+---
+
+### 3. Publisher
+
+| API | `oxidros-rcl` | `oxidros-zenoh` | Status |
+|-----|---------------|-----------------|--------|
+| `get_topic_name()` | `fn get_topic_name(&self) -> &str` | ❌ Missing | ⚠️ Naming difference |
+| `topic_name()` | ❌ Missing | `fn topic_name(&self) -> &str` | ⚠️ Naming difference |
+| `fq_topic_name()` | ❌ Missing | `fn fq_topic_name(&self) -> &str` | ❌ Missing in rcl |
+| `send()` | `fn send(&self, msg: &T) -> Result<()>` | `fn send(&self, msg: &T) -> Result<()>` | ✅ Aligned |
+| `send_loaned()` | `fn send_loaned(&self, msg: PublisherLoanedMessage<T>) -> Result<()>` | ❌ Missing | 🔧 RCL-specific |
+| `send_raw()` | `unsafe fn send_raw(&self, msg: &[u8]) -> Result<()>` | ❌ Missing | 🔧 RCL-specific |
+| `can_loan_messages()` | `fn can_loan_messages(&self) -> bool` | ❌ Missing | 🔧 RCL-specific |
+| `borrow_loaned_message()` | `fn borrow_loaned_message(&self) -> OResult<PublisherLoanedMessage<T>>` | ❌ Missing | 🔧 RCL-specific |
+| `gid()` | ❌ Missing | `fn gid(&self) -> &[u8; GID_SIZE]` | ❌ Missing in rcl |
+| `node()` | ❌ Missing | `fn node(&self) -> &Arc<Node>` | ❌ Missing in rcl |
+| `statistics()` | `fn statistics(&self) -> SerializableTimeStat` (feature-gated) | ❌ Missing | 🔧 RCL-specific |
+
+**Summary:**
+- Different naming: `get_topic_name()` vs `topic_name()`
+- Loaned message APIs are rcl-specific
+- rcl is missing `gid()`, `node()`, `fq_topic_name()`
+
+---
+
+### 4. Subscriber
+
+| API | `oxidros-rcl` | `oxidros-zenoh` | Status |
+|-----|---------------|-----------------|--------|
+| `get_topic_name()` | `fn get_topic_name(&self) -> &str` | ❌ Missing | ⚠️ Naming difference |
+| `topic_name()` | ❌ Missing | `fn topic_name(&self) -> &str` | ⚠️ Naming difference |
+| `fq_topic_name()` | ❌ Missing | `fn fq_topic_name(&self) -> &str` | ❌ Missing in rcl |
+| `try_recv()` | `fn try_recv(&self) -> RecvResult<TakenMsg<T>>` | `fn try_recv(&mut self) -> Result<Option<ReceivedMessage<T>>>` | ⚠️ Different signature & return |
+| `recv()` | `async fn recv(&mut self) -> Result<TakenMsg<T>>` | `async fn recv(&mut self) -> Result<ReceivedMessage<T>>` | ⚠️ Different return type |
+| `recv_blocking()` | `fn recv_blocking(&self) -> Result<TakenMsg<T>>` | ❌ Missing | ❌ Missing in zenoh |
+| `gid()` | ❌ Missing | `fn gid(&self) -> &[u8; GID_SIZE]` | ❌ Missing in rcl |
+| `node()` | ❌ Missing | `fn node(&self) -> &Arc<Node>` | ❌ Missing in rcl |
+| `statistics()` | `fn statistics(&self) -> SerializableTimeStat` (feature-gated) | ❌ Missing | 🔧 RCL-specific |
+
+**Summary:**
+- `try_recv()` has different signature: `RecvResult<TakenMsg<T>>` vs `Result<Option<ReceivedMessage<T>>>`
+- Return types differ: `TakenMsg<T>` (can be Loaned) vs `ReceivedMessage<T>` (includes attachment)
+- rcl has `recv_blocking()`, zenoh does not
+- Different naming conventions
+
+---
+
+### 5. Client (Service)
+
+| API | `oxidros-rcl` | `oxidros-zenoh` | Status |
+|-----|---------------|-----------------|--------|
+| `is_service_available()` | `fn is_service_available(&self) -> OResult<bool>` | `fn is_service_available(&self) -> bool` | ⚠️ Different return type |
+| `send()` | `fn send(&mut self, data: &Request) -> OResult<ClientRecv<T>>` | ❌ Missing | ⚠️ Different pattern |
+| `send_ret_seq()` | `fn send_ret_seq(&mut self, data: &Request) -> OResult<(ClientRecv<T>, i64)>` | ❌ Missing | 🔧 RCL-specific |
+| `call()` | ❌ Missing | `async fn call(&self, request: &Request) -> Result<ClientResponse<Response>>` | ⚠️ Different pattern |
+| `call_with_timeout()` | ❌ Missing | `async fn call_with_timeout(&self, request, timeout) -> Result<ClientResponse<Response>>` | ❌ Missing in rcl |
+| `service_name()` | ❌ Missing (private field) | `fn service_name(&self) -> &str` | ❌ Missing in rcl |
+| `fq_service_name()` | ❌ Missing | `fn fq_service_name(&self) -> &str` | ❌ Missing in rcl |
+| `gid()` | ❌ Missing | `fn gid(&self) -> &[u8; GID_SIZE]` | ❌ Missing in rcl |
+| `node()` | ❌ Missing | `fn node(&self) -> &Arc<Node>` | ❌ Missing in rcl |
+
+**Key Pattern Difference:**
+- **rcl**: Two-step pattern → `send()` returns `ClientRecv` → call `recv()` or `try_recv()` on it
+- **zenoh**: Single-step async pattern → `call()` or `call_with_timeout()`
+
+---
+
+### 6. Server (Service)
+
+| API | `oxidros-rcl` | `oxidros-zenoh` | Status |
+|-----|---------------|-----------------|--------|
+| `try_recv()` | `fn try_recv(&mut self) -> RecvResult<(ServerSend<T>, Request, Header)>` | `fn try_recv(&mut self) -> Result<Option<ServiceRequest<T>>>` | ⚠️ Different return type |
+| `recv()` | `async fn recv(&mut self) -> Result<(ServerSend<T>, Request, Header)>` | `async fn recv(&mut self) -> Result<ServiceRequest<T>>` | ⚠️ Different return type |
+| `configure_introspection()` | `fn configure_introspection(&self, clock, qos, state) -> OResult<()>` (jazzy) | ❌ Missing | 🔧 RCL-specific |
+| `service_name()` | ❌ Missing (private field) | `fn service_name(&self) -> &str` | ❌ Missing in rcl |
+| `fq_service_name()` | ❌ Missing | `fn fq_service_name(&self) -> &str` | ❌ Missing in rcl |
+| `gid()` | ❌ Missing | `fn gid(&self) -> &[u8; GID_SIZE]` | ❌ Missing in rcl |
+| `node()` | ❌ Missing | `fn node(&self) -> &Arc<Node>` | ❌ Missing in rcl |
+
+**Response Sending Pattern:**
+- **rcl**: `recv()` returns `(ServerSend<T>, Request, Header)` → call `server_send.send(&response)`
+- **zenoh**: `recv()` returns `ServiceRequest<T>` → call `request.send(response)`
+
+---
+
+### 7. Selector
+
+| API | `oxidros-rcl` | `oxidros-zenoh` | Status |
+|-----|---------------|-----------------|--------|
+| `new()` | `pub(crate) fn new(context: Arc<Context>) -> OResult<Self>` | `pub fn new() -> Self` | ⚠️ Different (context param) |
+| `add_subscriber()` | `fn add_subscriber<T>(&mut self, subscriber, handler) -> bool` | `fn add_subscriber<T>(&mut self, subscriber, handler) -> bool` | ✅ Aligned |
+| `add_server()` | `fn add_server<T>(&mut self, server, handler) -> bool` | ❌ Stub only | ❌ Missing in zenoh |
+| `add_parameter_server()` | `fn add_parameter_server(&mut self, param_server, handler)` | ❌ Stub only | ❌ Missing in zenoh |
+| `add_timer()` | ❌ Missing | `fn add_timer(&mut self, period, handler) -> u64` | ❌ Missing in rcl |
+| `add_wall_timer()` | `fn add_wall_timer(&mut self, name, period, handler) -> u64` | `fn add_wall_timer(&mut self, name, period, handler) -> u64` | ✅ Aligned |
+| `remove_timer()` | ❌ Missing | `fn remove_timer(&mut self, id: u64)` | ⚠️ Naming difference |
+| `delete_wall_timer()` | `fn delete_wall_timer(&mut self, id: u64)` | ❌ Missing | ⚠️ Naming difference |
+| `wait()` | `fn wait(&mut self) -> Result<()>` | `fn wait(&mut self) -> Result<()>` | ✅ Aligned |
+| `wait_timeout()` | `fn wait_timeout(&mut self, timeout) -> Result<bool>` | `fn wait_timeout(&mut self, timeout) -> Result<bool>` | ✅ Aligned |
+| `add_action_server()` | `fn add_action_server<T, GR, A, CR>(...) -> bool` | ❌ Returns error | ❌ Not supported in zenoh |
+| `add_action_client()` | `fn add_action_client(&mut self, client) -> bool` | ❌ Returns error | ❌ Not supported in zenoh |
+| `add_guard_condition()` | `fn add_guard_condition(&mut self, cond, handler, is_once)` | ❌ Missing | 🔧 RCL-specific |
+| `add_oneshot_timer()` | `fn add_oneshot_timer(&mut self, delay, handler) -> u64` | ❌ Missing | ❌ Missing in zenoh |
+| `statistics()` | `fn statistics(&self) -> Statistics` (feature-gated) | ❌ Missing | 🔧 RCL-specific |
+
+**Summary:**
+- rcl Selector requires Context, zenoh is standalone
+- Different timer naming: `delete_wall_timer()` vs `remove_timer()`
+- zenoh is missing server/parameter server/action handlers
+
+---
+
+### 8. Action (Client/Server)
+
+| Module | `oxidros-rcl` | `oxidros-zenoh` | Status |
+|--------|---------------|-----------------|--------|
+| `action::client::Client` | ✅ Full implementation | ❌ Stub only | ❌ Not supported |
+| `action::server::Server` | ✅ Full implementation | ❌ Stub only | ❌ Not supported |
+| `action::handle::GoalHandle` | ✅ Full implementation | ❌ Stub only | ❌ Not supported |
+
+**Note:** Actions are not yet supported in the Zenoh backend.
+
+---
+
+### 9. Parameter Server
+
+| API | `oxidros-rcl` | `oxidros-zenoh` | Status |
+|-----|---------------|-----------------|--------|
+| `new()` | `fn new(node: Arc<Node>) -> Result<Self>` | `fn new(node: Arc<Node>) -> Result<Self>` | ✅ Aligned |
+| `wait()` | `async fn wait(&mut self) -> Result<BTreeSet<String>>` | ❌ Missing | ⚠️ Different pattern |
+| `spin()` | ❌ Missing | `async fn spin(&mut self) -> Result<()>` | ⚠️ Different pattern |
+| `params` field | `pub params: Arc<RwLock<Parameters>>` | Private | ⚠️ Different visibility |
+| `params()` | ❌ Missing (field is public) | `fn params(&self) -> &Arc<RwLock<Parameters>>` | ⚠️ Different access pattern |
+| `cond_callback` | `pub cond_callback: GuardCondition` | ❌ Missing | 🔧 RCL-specific |
+
+---
+
+### 10. Logger
+
+| Module | `oxidros-rcl` | `oxidros-zenoh` | Status |
+|--------|---------------|-----------------|--------|
+| `Logger` struct | ✅ Full implementation | ❌ Missing entirely | ❌ Missing in zenoh |
+| `pr_debug!` macro | ✅ Available | ❌ Missing | ❌ Missing in zenoh |
+| `pr_info!` macro | ✅ Available | ❌ Missing | ❌ Missing in zenoh |
+| `pr_warn!` macro | ✅ Available | ❌ Missing | ❌ Missing in zenoh |
+| `pr_error!` macro | ✅ Available | ❌ Missing | ❌ Missing in zenoh |
+| `pr_fatal!` macro | ✅ Available | ❌ Missing | ❌ Missing in zenoh |
+
+---
+
+### 11. Additional Types & Re-exports
+
+| Type | `oxidros-rcl` | `oxidros-zenoh` | Status |
+|------|---------------|-----------------|--------|
+| `RecvResult<T>` | `enum { Ok(T), RetryLater, Err(Error) }` | ❌ Missing | ⚠️ Different pattern |
+| `TakenMsg<T>` | Re-exported (Copied/Loaned variants) | Internal only | ⚠️ Different |
+| `ReceivedMessage<T>` | ❌ Missing | `struct { data: T, attachment: Option<Attachment> }` | ⚠️ Different |
+| `Header` (service) | ✅ Includes timestamps, sequence, guid | ❌ Missing | ❌ Missing in zenoh |
+| `Attachment` | ❌ Missing | ✅ Includes seq, timestamp, gid | ❌ Missing in rcl |
+| `NodeOptions` | ✅ Full struct | ❌ Missing | ❌ Missing in zenoh |
+| `GraphCache` | ❌ Missing | ✅ Full implementation | 🔧 Zenoh-specific |
+| `QosMapping` | ❌ Missing | ✅ Full implementation | 🔧 Zenoh-specific |
+| `ST<T>` | ✅ Single-threaded container | ❌ Missing | 🔧 RCL-specific |
+| `is_halt()` | ✅ Signal handler | ❌ Missing | ❌ Missing in zenoh |
+| `PublisherLoanedMessage` | ✅ Available | ❌ Missing | 🔧 RCL-specific |
+| `SubscriberLoanedMessage` | ✅ Available | ❌ Missing | 🔧 RCL-specific |
+| `ServiceRequest` (zenoh) | ❌ Missing | ✅ Unified request+sender | ⚠️ Different |
+
+---
+
+### 12. Error Types
+
+| Type | `oxidros-rcl` | `oxidros-zenoh` | Status |
+|------|---------------|-----------------|--------|
+| Result alias | `OResult<T>` = `Result<T, RclError>` | `Result<T>` = `Result<T, Error>` | ⚠️ Different |
+| Re-exports | `RclError`, `ActionError`, `Error`, `Result` | `Error`, `Result` | ⚠️ Different |
+
+---
+
+### 13. zenoh-ext Crate (Not Used!)
+
+**Critical Issue:** The `zenoh-ext` crate is declared as a dependency in `oxidros-zenoh/Cargo.toml` but is **never actually used** in the code.
+
+```toml
+# In Cargo.toml - declared but unused:
+zenoh-ext = { version = "1.0", features = ["unstable"] }
+```
+
+#### What zenoh-ext Provides (and we're missing):
+
+| Feature | Purpose | ROS2 QoS Support |
+|---------|---------|------------------|
+| `AdvancedPublisher` | Publisher with message caching | Required for `TRANSIENT_LOCAL` durability |
+| `AdvancedSubscriber` | Subscriber with history query | Required for late-joining subscribers |
+| `CacheConfig` | Configure publisher cache size | Maps to `KeepLast(n)` history depth |
+| `HistoryConfig` | Query historical samples | Late-joiner receives cached messages |
+| `RecoveryConfig` | Message retransmission | Required for `RELIABLE` reliability |
+| `MissDetectionConfig` | Detect missed samples | Sequence number gap detection |
+| `SampleMissListener` | Callback on missed samples | Reliability monitoring |
+| `z_serialize`/`z_deserialize` | Zenoh serialization format | Potential alternative to CDR |
+
+#### Current Consequences:
+
+| QoS Policy | Expected Behavior | Actual Behavior |
+|------------|-------------------|-----------------|
+| `TRANSIENT_LOCAL` | Late joiners receive cached messages | ❌ Late joiners miss messages |
+| `RELIABLE` + `KeepAll` | No message loss, blocking on congestion | ⚠️ Partial (congestion control only) |
+| `KeepLast(n)` with durability | Publisher caches n samples | ❌ No caching implemented |
+| Message loss detection | Gaps in sequence numbers detected | ❌ Not implemented |
+
+**Status:** 🔴 Critical - Must implement to be compatible with ROS2 QoS semantics.
+
+---
+
+## Alignment Plan
+
+The goal is to create a unified API that allows users to write backend-agnostic code while still providing access to backend-specific features when needed.
+
+### Phase 1: Foundation - Unified Traits & Error Types
+
+**Goal:** Establish common traits in `oxidros-core` that both backends implement.
+
+#### Step 1.1: Unify Error Types
+- [ ] Ensure both backends use `oxidros_core::Error` as the primary error type
+- [ ] Rename rcl's `OResult<T>` to `Result<T>` for consistency
+- [ ] Keep backend-specific error variants (RclError, ZenohError) as enum variants in unified Error
+
+#### Step 1.2: Unify RecvResult Pattern
+- [ ] Decide on unified pattern: Either `RecvResult<T>` enum or `Result<Option<T>>`
+- [ ] Recommendation: Use `Result<Option<T>>` as it's more idiomatic Rust
+- [ ] Update rcl's `try_recv()` to return `Result<Option<T>>` instead of `RecvResult<T>`
+- [ ] Deprecate `RecvResult` enum
+
+#### Step 1.3: Review & Extend Core Traits
+- [ ] Audit `oxidros_core::api` traits (RosContext, RosNode, RosPublisher, etc.)
+- [ ] Ensure all common methods are defined in traits
+- [ ] Add missing trait methods identified in this document
+
+---
+
+### Phase 2: Context & Node Alignment
+
+**Goal:** Align Context and Node APIs for consistent creation and access patterns.
+
+#### Step 2.1: Context Creation
+- [ ] Add `with_domain_id()` to rcl Context
+- [ ] Add `domain_id()` accessor to rcl Context
+- [ ] Add `ros2_args()` accessor to rcl Context (parse from env)
+- [ ] Add `enclave()` accessor to rcl Context
+- [ ] Keep backend-specific constructors (zenoh's `with_config()`, `with_full_config()`)
+- [ ] Add `create_selector()` to zenoh Context (wraps `Selector::new()`)
+
+#### Step 2.2: Node Creation
+- [ ] Make `NodeOptions` optional in rcl's `create_node()` with default
+- [ ] Update trait signature: `create_node(name, namespace, options: Option<NodeOptions>)`
+- [ ] Add `NodeOptions` stub to zenoh (ignored but accepted for API compatibility)
+
+#### Step 2.3: Node Accessors
+- [ ] Add `name()`, `namespace()`, `fully_qualified_name()` to rcl Node (non-Result versions)
+- [ ] Change rcl's `get_name()` etc. to return `&str` or `String` (not Result)
+- [ ] Add `gid()` to rcl Node
+- [ ] Add `context()` to rcl Node
+- [ ] Add `enclave()` to rcl Node
+- [ ] Add `expand_and_remap_name()` to rcl Node (use ros2args crate)
+
+---
+
+### Phase 3: Topic API Alignment (Publisher/Subscriber)
+
+**Goal:** Unify naming conventions and return types.
+
+#### Step 3.1: Naming Convention
+- [ ] Add `topic_name()` alias to rcl Publisher/Subscriber (calls `get_topic_name()`)
+- [ ] Deprecate `get_topic_name()` in rcl (keep for backward compatibility)
+- [ ] Add `fq_topic_name()` to rcl Publisher/Subscriber
+
+#### Step 3.2: Publisher Accessors
+- [ ] Add `gid()` to rcl Publisher
+- [ ] Add `node()` to rcl Publisher
+
+#### Step 3.3: Subscriber Alignment
+- [ ] Change rcl `try_recv()` to return `Result<Option<TakenMsg<T>>>` instead of `RecvResult`
+- [ ] Add `recv_blocking()` to zenoh Subscriber
+- [ ] Add `gid()` to rcl Subscriber
+- [ ] Add `node()` to rcl Subscriber
+
+#### Step 3.4: Message Types
+- [ ] Unify message wrapper: Create `ReceivedMessage<T>` in core with optional attachment
+- [ ] Have both backends return `ReceivedMessage<T>` from `recv()`
+- [ ] Keep `TakenMsg<T>` for loaned message support (rcl-specific feature)
+
+---
+
+### Phase 4: Service API Alignment (Client/Server)
+
+**Goal:** Create a unified service pattern that works across both backends.
+
+#### Step 4.1: Client API
+- [ ] Add `call()` and `call_with_timeout()` async methods to rcl Client
+- [ ] These would internally use `send()` + `recv()` pattern
+- [ ] Add `service_name()` accessor to rcl Client
+- [ ] Add `fq_service_name()` accessor to rcl Client
+- [ ] Add `gid()` to rcl Client
+- [ ] Add `node()` to rcl Client
+- [ ] Change rcl `is_service_available()` to return `bool` (not Result)
+- [ ] Keep two-step pattern available for advanced use cases
+
+#### Step 4.2: Server API
+- [ ] Create unified `ServiceRequest<T>` type in core
+- [ ] Change rcl `recv()` to return `ServiceRequest<T>` wrapper
+- [ ] `ServiceRequest<T>` contains request, header/attachment, and response sender
+- [ ] Add `service_name()` accessor to rcl Server
+- [ ] Add `fq_service_name()` accessor to rcl Server
+- [ ] Add `gid()` to rcl Server
+- [ ] Add `node()` to rcl Server
+
+#### Step 4.3: Header/Attachment Unification
+- [ ] Create unified `ServiceHeader` in core
+- [ ] Include: sequence number, timestamp, writer/client GID
+- [ ] Map rcl's `Header` to `ServiceHeader`
+- [ ] Map zenoh's `Attachment` to `ServiceHeader`
+
+---
+
+### Phase 5: Selector Alignment
+
+**Goal:** Make Selector creation and timer APIs consistent.
+
+#### Step 5.1: Selector Creation
+- [ ] Add `create_selector()` to zenoh Context
+- [ ] Keep `Selector::new()` available in both for flexibility
+
+#### Step 5.2: Timer APIs
+- [ ] Add `add_timer()` to rcl Selector (alias for `add_wall_timer()` without name)
+- [ ] Add `remove_timer()` to rcl Selector (alias for `delete_wall_timer()`)
+- [ ] Add `delete_wall_timer()` to zenoh Selector (alias for `remove_timer()`)
+- [ ] Add `add_oneshot_timer()` to zenoh Selector
+
+#### Step 5.3: Server Handler
+- [ ] Implement `add_server()` properly in zenoh Selector
+- [ ] Use polling pattern similar to subscriber handling
+
+#### Step 5.4: Parameter Server Handler
+- [ ] Implement `add_parameter_server()` properly in zenoh Selector
+
+---
+
+### Phase 6: Parameter Server Alignment
+
+**Goal:** Unify parameter server access patterns.
+
+#### Step 6.1: Access Pattern
+- [ ] Add `params()` accessor method to rcl ParameterServer
+- [ ] Make rcl's `params` field private
+- [ ] Add `wait()` to zenoh ParameterServer (returns updated param names)
+- [ ] Add `spin()` to rcl ParameterServer (alias for internal loop)
+
+#### Step 6.2: Selector Integration
+- [ ] Ensure both parameter servers work with their respective Selectors
+
+---
+
+### Phase 7: Logger Support for Zenoh
+
+**Goal:** Add ROS2 logging capability to zenoh backend.
+
+#### Step 7.1: Logger Implementation
+- [ ] Create `Logger` struct in zenoh crate
+- [ ] Use `tracing` crate or custom implementation
+- [ ] Match log levels with rcl: debug, info, warn, error, fatal
+
+#### Step 7.2: Logging Macros
+- [ ] Add `pr_debug!`, `pr_info!`, `pr_warn!`, `pr_error!`, `pr_fatal!` macros
+
+#### Step 7.3: Alternative
+- [ ] Or: Move Logger to `oxidros-core` as a shared component
+- [ ] Backends provide platform-specific sinks
+
+---
+
+### Phase 8: Signal Handling for Zenoh
+
+**Goal:** Add graceful shutdown support to zenoh backend.
+
+#### Step 8.1: Signal Handler
+- [ ] Add `is_halt()` function to zenoh
+- [ ] Register SIGINT/SIGTERM handlers
+
+#### Step 8.2: Integration
+- [ ] Ensure async operations check halt flag
+- [ ] Selector should exit on signal
+
+---
+
+### Phase 9: Documentation & Deprecation
+
+**Goal:** Document the unified API and deprecation timeline.
+
+#### Step 9.1: API Documentation
+- [ ] Document unified traits in `oxidros-core`
+- [ ] Create migration guide for existing users
+- [ ] Add examples showing backend-agnostic code
+
+#### Step 9.2: Deprecation Notices
+- [ ] Mark old method names as `#[deprecated]`
+- [ ] Provide deprecation timeline (e.g., remove in next major version)
+
+#### Step 9.3: Feature Flags
+- [ ] Document backend-specific features (loaned messages, actions, etc.)
+- [ ] Create feature flags for optional capabilities
+
+---
+
+### Phase 10: Use zenoh-ext for Advanced Pub/Sub ✅ COMPLETED
+
+**Goal:** Leverage `zenoh-ext` crate for proper ROS2 QoS support.
+
+**Status:** ✅ Completed on 2026-01-09
+
+**Implementation Summary:**
+- Publisher uses `AdvancedPublisher` with `.cache(depth)` - 0 for volatile, actual depth for transient local
+- Subscriber uses `AdvancedSubscriber` with `.history(depth)` - 0 for volatile, actual depth for transient local
+- No enum variants needed - advanced pub/sub works for all cases
+
+**Background:** The `zenoh-ext` crate was declared as a dependency in `oxidros-zenoh/Cargo.toml` but was **not actually used** anywhere in the code. This has been fixed. `zenoh-ext` provides critical features required for proper ROS2 QoS compatibility:
+
+#### What zenoh-ext Provides:
+
+| Feature | Description | ROS2 QoS Mapping |
+|---------|-------------|------------------|
+| `AdvancedPublisher` | Publisher with caching support | `TRANSIENT_LOCAL` durability |
+| `AdvancedSubscriber` | Subscriber with history query | `TRANSIENT_LOCAL` durability |
+| `CacheConfig` | Configure publisher cache size | `KeepLast(n)` history depth |
+| `HistoryConfig` | Configure historical data query | Late-joining subscriber support |
+| `RecoveryConfig` | Configure retransmission | `RELIABLE` reliability |
+| `MissDetectionConfig` | Detect missed samples | Sequence number tracking |
+| `SampleMissListener` | Listen for missed samples | Reliability monitoring |
+
+#### Current Problem:
+
+The current implementation uses basic `zenoh::Publisher` and `zenoh::Subscriber`, which means:
+- ❌ `TRANSIENT_LOCAL` durability is not properly implemented
+- ❌ Late-joining subscribers don't receive cached messages
+- ❌ No sample miss detection for reliable delivery
+- ❌ No message recovery for unreliable networks
+
+#### Step 10.1: AdvancedPublisher for TRANSIENT_LOCAL ✅
+- [x] Use `AdvancedPublisher` when QoS durability is `TransientLocal`
+- [x] Configure cache size from QoS history depth
+- [x] Use `CacheConfig` to set `max_samples` based on `KeepLast(n)`
+
+#### Step 10.2: AdvancedSubscriber for Late Joiners ✅
+- [x] Use `AdvancedSubscriber` when QoS durability is `TransientLocal`
+- [x] Configure `HistoryConfig` to query historical samples on subscription
+- [x] Match history depth with publisher's cache
+
+#### Step 10.3: Sample Miss Detection (Future Enhancement)
+- [ ] Enable `MissDetectionConfig` for `RELIABLE` reliability
+- [ ] Use `SampleMissListener` to detect and log missed samples
+- [ ] Optionally configure `RecoveryConfig` for retransmission
+
+#### Step 10.4: Update Publisher Implementation ✅
+```rust
+// Before (current):
+let zenoh_publisher = session.declare_publisher(key_expr).wait()?;
+
+// After (with zenoh-ext):
+use zenoh_ext::AdvancedPublisherBuilderExt;
+
+let builder = session.declare_publisher(key_expr);
+let zenoh_publisher = if QosMapping::is_transient_local(&qos) {
+    builder
+        .cache(CacheConfig::default().max_samples(QosMapping::effective_depth(&qos)))
+        .wait()?
+} else {
+    builder.wait()?
+};
+```
+
+#### Step 10.5: Update Subscriber Implementation ✅
+```rust
+// Before (current):
+let zenoh_subscriber = session.declare_subscriber(key_expr).wait()?;
+
+// After (with zenoh-ext):
+use zenoh_ext::AdvancedSubscriberBuilderExt;
+
+let builder = session.declare_subscriber(key_expr);
+let zenoh_subscriber = if QosMapping::is_transient_local(&qos) {
+    builder
+        .history(HistoryConfig::default().max_samples(QosMapping::effective_depth(&qos)))
+        .wait()?
+} else {
+    builder.wait()?
+};
+```
+
+---
+
+### Phase 11: Action Support for Zenoh (Future)
+
+**Goal:** Implement ROS2 action support in zenoh backend.
+
+#### Step 11.1: Research
+- [ ] Study rmw_zenoh action implementation (if available)
+- [ ] Design action protocol over Zenoh
+
+#### Step 11.2: Implementation
+- [ ] Implement action client
+- [ ] Implement action server
+- [ ] Implement goal handle
+
+#### Step 11.3: Selector Integration
+- [ ] Add action handlers to zenoh Selector
+
+---
+
+## Priority Matrix
+
+| Phase | Priority | Effort | Impact |
+|-------|----------|--------|--------|
+| Phase 1: Foundation | 🔴 Critical | Medium | High |
+| Phase 2: Context & Node | 🔴 Critical | Medium | High |
+| Phase 3: Topic API | 🟡 High | Low | Medium |
+| Phase 4: Service API | 🟡 High | Medium | High |
+| Phase 5: Selector | 🟡 High | Medium | Medium |
+| Phase 6: Parameter Server | 🟢 Medium | Low | Low |
+| Phase 7: Logger | 🟢 Medium | Low | Medium |
+| Phase 8: Signal Handling | 🟢 Medium | Low | Medium |
+| Phase 9: Documentation | 🟡 High | Medium | High |
+| **Phase 10: zenoh-ext** | **✅ Done** | **Medium** | **High** |
+| Phase 11: Actions | 🔵 Low | High | Medium |
+
+---
+
+## Success Criteria
+
+1. **API Compatibility**: User code written against `oxidros-core` traits works with both backends
+2. **Feature Parity**: Common features work identically across backends
+3. **Clear Documentation**: Backend-specific features are clearly documented
+4. **Backward Compatibility**: Existing code continues to work with deprecation warnings
+5. **Type Safety**: Compile-time errors for incompatible backend usage

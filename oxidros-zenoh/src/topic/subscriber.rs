@@ -14,6 +14,7 @@ use crate::{
 use oxidros_core::{TypeSupport, qos::Profile};
 use std::{marker::PhantomData, sync::Arc};
 use zenoh::Wait;
+use zenoh_ext::AdvancedSubscriberBuilderExt;
 
 /// Received message with metadata.
 #[derive(Debug)]
@@ -52,11 +53,11 @@ pub struct Subscriber<T> {
     /// Subscriber GID.
     gid: [u8; GID_SIZE],
     /// Message receiver channel.
-    receiver: flume::Receiver<(Vec<u8>, Option<Vec<u8>>)>,
+    receiver: flume::Receiver<zenoh::sample::Sample>,
     /// Liveliness token.
     _liveliness_token: zenoh::liveliness::LivelinessToken,
-    /// Zenoh subscriber (kept alive).
-    _zenoh_subscriber: zenoh::pubsub::Subscriber<()>,
+    /// Zenoh advanced subscriber (supports history query for TRANSIENT_LOCAL durability).
+    _zenoh_subscriber: zenoh_ext::AdvancedSubscriber<()>,
     /// Phantom data for type.
     _phantom: PhantomData<T>,
 }
@@ -98,22 +99,33 @@ impl<T: TypeSupport> Subscriber<T> {
         let depth = QosMapping::effective_depth(&qos);
         let (sender, receiver) = flume::bounded(depth);
 
+        // Clone receiver for use in callback (to implement KeepLast drop-oldest semantics)
+        let drain_receiver = receiver.clone();
+
         // Create Zenoh subscriber
         let session = node.context().session();
+
+        // Build AdvancedSubscriber with history config based on durability QoS
+        // For TRANSIENT_LOCAL: query history from publishers with cache
+        // For VOLATILE: no history query (max_samples = 0)
+        let history_depth = if QosMapping::is_transient_local(&qos) {
+            QosMapping::effective_depth(&qos)
+        } else {
+            0
+        };
         let zenoh_subscriber = session
             .declare_subscriber(&key_expr)
-            .callback(move |sample| {
-                // Extract payload
-                let payload: Vec<u8> = sample.payload().to_bytes().to_vec();
-
-                // Extract attachment if present
-                let attachment = sample.attachment().map(|a| a.to_bytes().to_vec());
-
-                // Send to channel (drop if full - KeepLast behavior)
-                let _ = sender.try_send((payload, attachment));
+            .callback(move |sample: zenoh::sample::Sample| {
+                // KeepLast(n) semantics: if channel is full, drop oldest message first
+                if sender.is_full() {
+                    // Drain one message to make room (drop oldest)
+                    let _ = drain_receiver.try_recv();
+                }
+                // Now there's room - this should always succeed
+                let _ = sender.try_send(sample);
             })
+            .history(zenoh_ext::HistoryConfig::default().max_samples(history_depth))
             .wait()?;
-
         // Generate subscriber GID
         let gid = generate_gid();
         let entity_id = node.allocate_entity_id();
@@ -171,15 +183,15 @@ impl<T: TypeSupport> Subscriber<T> {
     ///
     /// Returns an error if deserialization fails or the channel is closed.
     pub async fn recv(&mut self) -> Result<ReceivedMessage<T>> {
-        let (payload, attachment_bytes) = self
+        let sample = self
             .receiver
             .recv_async()
             .await
             .map_err(|_| Error::ChannelClosed)?;
-
-        let data = T::from_bytes(&payload)?;
-        let attachment = attachment_bytes.and_then(|bytes| Attachment::from_bytes(&bytes));
-
+        let data = T::from_bytes(&sample.payload().to_bytes())?;
+        let attachment = sample
+            .attachment()
+            .and_then(|bytes| Attachment::from_bytes(&bytes.to_bytes()));
         Ok(ReceivedMessage { data, attachment })
     }
 
@@ -192,9 +204,11 @@ impl<T: TypeSupport> Subscriber<T> {
     /// Returns an error if deserialization fails.
     pub fn try_recv(&mut self) -> Result<Option<ReceivedMessage<T>>> {
         match self.receiver.try_recv() {
-            Ok((payload, attachment_bytes)) => {
-                let data = T::from_bytes(&payload)?;
-                let attachment = attachment_bytes.and_then(|bytes| Attachment::from_bytes(&bytes));
+            Ok(sample) => {
+                let data = T::from_bytes(&sample.payload().to_bytes())?;
+                let attachment = sample
+                    .attachment()
+                    .and_then(|bytes| Attachment::from_bytes(&bytes.to_bytes()));
                 Ok(Some(ReceivedMessage { data, attachment }))
             }
             Err(flume::TryRecvError::Empty) => Ok(None),
