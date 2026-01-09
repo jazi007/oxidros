@@ -5,6 +5,7 @@
 //! for multiple implementations (real RCL, mock, alternative DDS, etc.).
 
 pub mod action;
+pub mod api;
 pub mod delta_list;
 pub mod error;
 pub mod helper;
@@ -17,6 +18,12 @@ pub mod time;
 
 // Re-export commonly used error types
 pub use error::{ActionError, Error, RclError, Result};
+
+// Re-export API traits
+pub use api::{
+    ReceivedMessage, RosClient, RosContext, RosNode, RosPublisher, RosServer, RosSubscriber,
+    ServiceRequest,
+};
 
 // Re-export message traits
 pub use msg::{

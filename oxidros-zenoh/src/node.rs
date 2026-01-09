@@ -11,7 +11,7 @@ use crate::{
     service::{client::Client, server::Server},
     topic::{publisher::Publisher, subscriber::Subscriber},
 };
-use oxidros_core::{TypeDescription, TypeSupport, qos::Profile};
+use oxidros_core::{TypeSupport, qos::Profile};
 use parking_lot::Mutex;
 use ros2args::names::NameKind;
 use std::sync::{
@@ -268,7 +268,7 @@ impl Node {
     /// - Relative names are prefixed with the node's namespace
     /// - Private names (starting with `~`) are prefixed with the node's FQN
     /// - Remapping rules from command-line arguments are applied
-    pub fn create_publisher<T: TypeSupport + TypeDescription>(
+    pub fn create_publisher<T: TypeSupport>(
         self: &Arc<Self>,
         topic_name: &str,
         qos: Option<Profile>,
@@ -299,7 +299,7 @@ impl Node {
     /// # Name Resolution
     ///
     /// The topic name is expanded and remapped (see `create_publisher`).
-    pub fn create_subscriber<T: TypeSupport + TypeDescription>(
+    pub fn create_subscriber<T: TypeSupport>(
         self: &Arc<Self>,
         topic_name: &str,
         qos: Option<Profile>,
@@ -336,8 +336,8 @@ impl Node {
         qos: Option<Profile>,
     ) -> Result<Client<T>>
     where
-        T::Request: TypeSupport + TypeDescription,
-        T::Response: TypeSupport + TypeDescription,
+        T::Request: TypeSupport,
+        T::Response: TypeSupport,
     {
         // Expand and remap the service name (services use Topic naming rules)
         let fq_service_name = self.expand_and_remap_name(service_name, NameKind::Topic)?;
@@ -370,8 +370,8 @@ impl Node {
         qos: Option<Profile>,
     ) -> Result<Server<T>>
     where
-        T::Request: TypeSupport + TypeDescription,
-        T::Response: TypeSupport + TypeDescription,
+        T::Request: TypeSupport,
+        T::Response: TypeSupport,
     {
         // Expand and remap the service name (services use Topic naming rules)
         let fq_service_name = self.expand_and_remap_name(service_name, NameKind::Topic)?;
@@ -402,5 +402,60 @@ impl Node {
     ///
     pub fn create_parameter_server(self: &Arc<Self>) -> Result<crate::parameter::ParameterServer> {
         crate::parameter::ParameterServer::new(self.clone())
+    }
+}
+
+// ============================================================================
+// RosNode trait implementation
+// ============================================================================
+
+impl oxidros_core::api::RosNode for Node {
+    type Publisher<T: TypeSupport> = Publisher<T>;
+    type Subscriber<T: TypeSupport> = Subscriber<T>;
+    type Client<T: oxidros_core::ServiceMsg> = Client<T>;
+    type Server<T: oxidros_core::ServiceMsg> = Server<T>;
+
+    fn name(&self) -> &str {
+        Node::name(self)
+    }
+
+    fn namespace(&self) -> &str {
+        Node::namespace(self)
+    }
+
+    fn fully_qualified_name(&self) -> String {
+        Node::fully_qualified_name(self)
+    }
+
+    fn create_publisher<T: TypeSupport>(
+        self: &Arc<Self>,
+        topic_name: &str,
+        qos: Option<Profile>,
+    ) -> Result<Self::Publisher<T>> {
+        Node::create_publisher(self, topic_name, qos)
+    }
+
+    fn create_subscriber<T: TypeSupport>(
+        self: &Arc<Self>,
+        topic_name: &str,
+        qos: Option<Profile>,
+    ) -> Result<Self::Subscriber<T>> {
+        Node::create_subscriber(self, topic_name, qos)
+    }
+
+    fn create_client<T: oxidros_core::ServiceMsg>(
+        self: &Arc<Self>,
+        service_name: &str,
+        qos: Option<Profile>,
+    ) -> Result<Self::Client<T>> {
+        Node::create_client(self, service_name, qos)
+    }
+
+    fn create_server<T: oxidros_core::ServiceMsg>(
+        self: &Arc<Self>,
+        service_name: &str,
+        qos: Option<Profile>,
+    ) -> Result<Self::Server<T>> {
+        Node::create_server(self, service_name, qos)
     }
 }

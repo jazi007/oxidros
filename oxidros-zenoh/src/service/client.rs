@@ -10,7 +10,7 @@ use crate::{
     keyexpr::{EntityKind, liveliness_entity_keyexpr, topic_keyexpr},
     node::Node,
 };
-use oxidros_core::{TypeDescription, TypeSupport, qos::Profile};
+use oxidros_core::{TypeSupport, qos::Profile};
 use parking_lot::Mutex;
 use std::{marker::PhantomData, sync::Arc, time::Duration};
 use zenoh::query::QueryTarget;
@@ -57,8 +57,8 @@ pub struct Client<T: oxidros_core::ServiceMsg> {
 
 impl<T: oxidros_core::ServiceMsg> Client<T>
 where
-    T::Request: TypeSupport + TypeDescription,
-    T::Response: TypeSupport + TypeDescription,
+    T::Request: TypeSupport,
+    T::Response: TypeSupport,
 {
     /// Create a new service client.
     ///
@@ -76,7 +76,7 @@ where
     ) -> Result<Self> {
         // Get type info - use request type for service key
         let type_name = T::Request::type_name();
-        let type_hash = T::Request::compute_hash()?;
+        let type_hash = T::Request::type_hash()?;
 
         // Build key expression
         let key_expr = topic_keyexpr(
@@ -234,5 +234,37 @@ where
     /// Get the parent node.
     pub fn node(&self) -> &Arc<Node> {
         &self.node
+    }
+}
+
+// ============================================================================
+// RosClient trait implementation
+// ============================================================================
+
+impl<T: oxidros_core::ServiceMsg> oxidros_core::api::RosClient<T> for Client<T>
+where
+    T::Request: TypeSupport,
+    T::Response: TypeSupport,
+{
+    fn service_name(&self) -> &str {
+        Client::service_name(self)
+    }
+
+    fn is_service_available(&self) -> bool {
+        Client::is_service_available(self)
+    }
+
+    async fn call(&self, request: &T::Request) -> crate::error::Result<T::Response> {
+        let response = Client::call(self, request).await?;
+        Ok(response.response)
+    }
+
+    async fn call_with_timeout(
+        &self,
+        request: &T::Request,
+        timeout: Duration,
+    ) -> crate::error::Result<T::Response> {
+        let response = Client::call_with_timeout(self, request, timeout).await?;
+        Ok(response.response)
     }
 }

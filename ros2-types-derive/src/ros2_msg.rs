@@ -655,6 +655,42 @@ fn generate_native_type_support_impl(
             fn type_name() -> &'static str {
                 #dds_type_name
             }
+
+            fn type_hash() -> ros2_types::Result<::std::string::String> {
+                <Self as ros2_types::TypeDescription>::compute_hash()
+            }
+        }
+    }
+}
+
+/// Generate native type support impl for action wrapper types that don't have TypeDescription.
+/// These types use the default type_hash() implementation (returns empty string).
+fn generate_native_type_support_impl_no_hash(
+    name: &syn::Ident,
+    package: &str,
+    interface_type: &str,
+) -> TokenStream {
+    // DDS type name format: "pkg_name::interface_type::dds_::TypeName_"
+    let dds_type_name = format!("{}::{}::dds_::{}_", package, interface_type, name);
+
+    quote! {
+        // TypeSupport implementation (without type_hash override)
+        impl ros2_types::TypeSupport for #name {
+            fn to_bytes(&self) -> ros2_types::Result<Vec<u8>> {
+                ros2_types::cdr_encoding::to_vec::<Self, ros2_types::byteorder::LittleEndian>(self)
+                    .map_err(|e| ros2_types::Error::CdrError(e.to_string()))
+            }
+
+            fn from_bytes(bytes: &[u8]) -> ros2_types::Result<Self> {
+                ros2_types::cdr_encoding::from_bytes::<Self, ros2_types::byteorder::LittleEndian>(bytes)
+                    .map(|(msg, _bytes_consumed)| msg)
+                    .map_err(|e| ros2_types::Error::CdrError(e.to_string()))
+            }
+
+            fn type_name() -> &'static str {
+                #dds_type_name
+            }
+            // Uses default type_hash() implementation
         }
     }
 }
@@ -879,15 +915,15 @@ pub fn generate_action_wrapper(
         generate_rcl_type_support_impl(&feedback_message_ident, package, "action");
 
     let ts_send_goal_req_impl_native =
-        generate_native_type_support_impl(&send_goal_request_ident, package, "action");
+        generate_native_type_support_impl_no_hash(&send_goal_request_ident, package, "action");
     let ts_send_goal_resp_impl_native =
-        generate_native_type_support_impl(&send_goal_response_ident, package, "action");
+        generate_native_type_support_impl_no_hash(&send_goal_response_ident, package, "action");
     let ts_get_result_req_impl_native =
-        generate_native_type_support_impl(&get_result_request_ident, package, "action");
+        generate_native_type_support_impl_no_hash(&get_result_request_ident, package, "action");
     let ts_get_result_resp_impl_native =
-        generate_native_type_support_impl(&get_result_response_ident, package, "action");
+        generate_native_type_support_impl_no_hash(&get_result_response_ident, package, "action");
     let ts_feedback_message_impl_native =
-        generate_native_type_support_impl(&feedback_message_ident, package, "action");
+        generate_native_type_support_impl_no_hash(&feedback_message_ident, package, "action");
 
     let serialization_ffi = generate_serialization_ffi_decls();
     let serialized_msg_struct = generate_serialized_message_struct();

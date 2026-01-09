@@ -11,7 +11,7 @@ use crate::{
     node::Node,
     qos::QosMapping,
 };
-use oxidros_core::{TypeDescription, TypeSupport, qos::Profile};
+use oxidros_core::{TypeSupport, qos::Profile};
 use std::{marker::PhantomData, sync::Arc};
 use zenoh::Wait;
 
@@ -61,7 +61,7 @@ pub struct Subscriber<T> {
     _phantom: PhantomData<T>,
 }
 
-impl<T: TypeSupport + TypeDescription> Subscriber<T> {
+impl<T: TypeSupport> Subscriber<T> {
     /// Create a new subscriber.
     ///
     /// # Arguments
@@ -83,7 +83,7 @@ impl<T: TypeSupport + TypeDescription> Subscriber<T> {
 
         // Get type info
         let type_name = T::type_name();
-        let type_hash = T::compute_hash()?;
+        let type_hash = T::type_hash()?;
 
         // Build key expression with wildcard for type hash
         // This allows receiving from publishers with different (compatible) type hashes
@@ -205,5 +205,37 @@ impl<T: TypeSupport> Subscriber<T> {
     /// Get the parent node.
     pub fn node(&self) -> &Arc<Node> {
         &self.node
+    }
+}
+
+// ============================================================================
+// RosSubscriber trait implementation
+// ============================================================================
+
+impl<T: TypeSupport> oxidros_core::api::RosSubscriber<T, Option<Attachment>> for Subscriber<T> {
+    fn topic_name(&self) -> &str {
+        Subscriber::topic_name(self)
+    }
+
+    async fn recv(
+        &mut self,
+    ) -> crate::error::Result<oxidros_core::ReceivedMessage<T, Option<Attachment>>> {
+        let msg = Subscriber::recv(self).await?;
+        Ok(oxidros_core::ReceivedMessage::new(
+            msg.data,
+            Some(msg.attachment),
+        ))
+    }
+
+    fn try_recv(
+        &mut self,
+    ) -> crate::error::Result<Option<oxidros_core::ReceivedMessage<T, Option<Attachment>>>> {
+        match Subscriber::try_recv(self)? {
+            Some(msg) => Ok(Some(oxidros_core::ReceivedMessage::new(
+                msg.data,
+                Some(msg.attachment),
+            ))),
+            None => Ok(None),
+        }
     }
 }

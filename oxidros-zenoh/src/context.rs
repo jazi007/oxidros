@@ -269,3 +269,23 @@ impl Context {
         Ok(())
     }
 }
+
+// ============================================================================
+// RosContext trait implementation
+// ============================================================================
+
+impl oxidros_core::api::RosContext for Context {
+    type Node = Node;
+
+    fn create_node(
+        self: &Arc<Self>,
+        name: &str,
+        namespace: Option<&str>,
+    ) -> crate::error::Result<Arc<Self::Node>> {
+        Context::create_node(self, name, namespace)
+    }
+
+    fn domain_id(&self) -> u32 {
+        Context::domain_id(self)
+    }
+}

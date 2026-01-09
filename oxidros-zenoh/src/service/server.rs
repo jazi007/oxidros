@@ -10,7 +10,7 @@ use crate::{
     keyexpr::{EntityKind, liveliness_entity_keyexpr, topic_keyexpr},
     node::Node,
 };
-use oxidros_core::{TypeDescription, TypeSupport, qos::Profile};
+use oxidros_core::{TypeSupport, qos::Profile};
 use std::{marker::PhantomData, sync::Arc};
 use zenoh::{Wait, bytes::ZBytes, query::Query};
 
@@ -101,8 +101,8 @@ pub struct Server<T: oxidros_core::ServiceMsg> {
 
 impl<T: oxidros_core::ServiceMsg> Server<T>
 where
-    T::Request: TypeSupport + TypeDescription,
-    T::Response: TypeSupport + TypeDescription,
+    T::Request: TypeSupport,
+    T::Response: TypeSupport,
 {
     /// Create a new service server.
     ///
@@ -120,7 +120,7 @@ where
     ) -> Result<Self> {
         // Get type info
         let type_name = T::Request::type_name();
-        let type_hash = T::Request::compute_hash()?;
+        let type_hash = T::Request::type_hash()?;
 
         // Build key expression
         let key_expr = topic_keyexpr(
@@ -255,5 +255,87 @@ where
     /// Get the parent node.
     pub fn node(&self) -> &Arc<Node> {
         &self.node
+    }
+
+    /// Try to receive a request without blocking.
+    ///
+    /// Returns `Ok(None)` if no request is currently available.
+    pub fn try_recv(&mut self) -> Result<Option<ServiceRequest<T>>>
+    where
+        T::Request: TypeSupport,
+    {
+        match self.receiver.try_recv() {
+            Ok((query, payload, attachment_bytes)) => {
+                // Deserialize request
+                let request = T::Request::from_bytes(&payload)?;
+
+                // Parse attachment
+                let attachment = attachment_bytes
+                    .as_ref()
+                    .and_then(|bytes| Attachment::from_bytes(bytes));
+
+                // Extract client info for response
+                let (sequence_number, client_gid) = attachment
+                    .as_ref()
+                    .map(|a| (a.sequence_number, a.gid))
+                    .unwrap_or((0, [0u8; GID_SIZE]));
+
+                let sender = RequestSender {
+                    query,
+                    client_gid,
+                    sequence_number,
+                    _phantom: PhantomData,
+                };
+
+                Ok(Some(ServiceRequest {
+                    request,
+                    attachment,
+                    sender,
+                }))
+            }
+            Err(flume::TryRecvError::Empty) => Ok(None),
+            Err(flume::TryRecvError::Disconnected) => Err(Error::ChannelClosed),
+        }
+    }
+}
+
+// ============================================================================
+// ServiceRequest trait implementation
+// ============================================================================
+
+impl<T: oxidros_core::ServiceMsg> oxidros_core::api::ServiceRequest<T> for ServiceRequest<T>
+where
+    T::Response: TypeSupport,
+{
+    fn request(&self) -> &T::Request {
+        &self.request
+    }
+
+    fn respond(self, response: T::Response) -> Result<()> {
+        ServiceRequest::respond(self, response)
+    }
+}
+
+// ============================================================================
+// RosServer trait implementation
+// ============================================================================
+
+impl<T: oxidros_core::ServiceMsg> oxidros_core::api::RosServer<T> for Server<T>
+where
+    T::Request: TypeSupport,
+    T::Response: TypeSupport,
+{
+    type Request = ServiceRequest<T>;
+
+    fn service_name(&self) -> &str {
+        Server::service_name(self)
+    }
+
+    async fn recv(&mut self) -> Result<Self::Request> {
+        Server::recv(self).await
+    }
+
+    fn try_recv(&mut self) -> Result<Option<Self::Request>> {
+        Server::try_recv(self)
     }
 }

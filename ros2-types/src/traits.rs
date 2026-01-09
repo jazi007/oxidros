@@ -16,7 +16,7 @@ use std::ffi::c_void;
 /// The `to_bytes` and `from_bytes` methods provide CDR serialization:
 /// - For RCL (DDS-based): Uses `rmw_serialize`/`rmw_deserialize` internally
 /// - For native Zenoh: Uses serde with `cdr-encoding` crate
-pub trait TypeSupport: 'static {
+pub trait TypeSupport: 'static + Send + Sync {
     /// Returns an opaque pointer to the type support structure.
     ///
     /// The actual type of this pointer depends on the implementation
@@ -53,6 +53,17 @@ pub trait TypeSupport: 'static {
     ///
     /// This is used for Zenoh key expressions and type matching.
     fn type_name() -> &'static str;
+
+    /// Returns the RIHS01 type hash for this message type.
+    ///
+    /// # Implementation
+    /// - For RCL: Returns empty string (hash is handled by rosidl typesupport)
+    /// - For Zenoh: Computes hash from TypeDescription
+    ///
+    /// The hash format is: `RIHS01_<64_character_hex_sha256>`
+    fn type_hash() -> Result<::std::string::String> {
+        Ok(::std::string::String::new())
+    }
 }
 
 /// Trait for type that can fail cloning
@@ -66,7 +77,7 @@ pub trait TryClone: Sized {
 /// Trait for ROS2 service message types.
 ///
 /// Services consist of a request and response message pair.
-pub trait ServiceMsg {
+pub trait ServiceMsg: 'static + Send + Sync {
     /// The request message type.
     type Request: TypeSupport;
 
@@ -83,7 +94,7 @@ pub trait ServiceMsg {
 ///
 /// Actions are more complex than services and include goals, results,
 /// and feedback messages.
-pub trait ActionMsg {
+pub trait ActionMsg: 'static + Send + Sync {
     /// The goal service type.
     type Goal: ActionGoal;
 
@@ -124,7 +135,7 @@ pub trait ActionMsg {
 }
 
 /// Trait for action goal types.
-pub trait ActionGoal {
+pub trait ActionGoal: 'static + Send + Sync {
     /// The request message type for sending a goal.
     type Request: TypeSupport + GetUUID;
 
@@ -140,13 +151,13 @@ pub trait ActionGoal {
 /// Trait for types that contain a UUID.
 ///
 /// Used for tracking goals and feedback in actions.
-pub trait GetUUID {
+pub trait GetUUID: 'static + Send + Sync {
     /// Returns a reference to the UUID.
     fn get_uuid(&self) -> &[u8; 16];
 }
 
 /// Trait for action goal response types.
-pub trait GoalResponse {
+pub trait GoalResponse: 'static + Send + Sync {
     /// Returns whether the goal was accepted.
     fn is_accepted(&self) -> bool;
 
@@ -158,7 +169,7 @@ pub trait GoalResponse {
 }
 
 /// Trait for action result types.
-pub trait ActionResult {
+pub trait ActionResult: 'static + Send + Sync {
     /// The request message type for getting a result.
     type Request: TypeSupport + GetUUID;
 
@@ -172,7 +183,7 @@ pub trait ActionResult {
 }
 
 /// Trait for action result response types.
-pub trait ResultResponse {
+pub trait ResultResponse: 'static + Send + Sync {
     /// Returns the status code of the result.
     fn get_status(&self) -> u8;
 }

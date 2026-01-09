@@ -11,7 +11,7 @@ use crate::{
     node::Node,
     qos::QosMapping,
 };
-use oxidros_core::{TypeDescription, TypeSupport, qos::Profile};
+use oxidros_core::{TypeSupport, qos::Profile};
 use parking_lot::Mutex;
 use std::{marker::PhantomData, sync::Arc};
 use zenoh::{Wait, bytes::ZBytes};
@@ -47,7 +47,7 @@ pub struct Publisher<T> {
     _phantom: PhantomData<T>,
 }
 
-impl<T: TypeSupport + TypeDescription> Publisher<T> {
+impl<T: TypeSupport> Publisher<T> {
     /// Create a new publisher.
     ///
     /// # Arguments
@@ -69,7 +69,7 @@ impl<T: TypeSupport + TypeDescription> Publisher<T> {
 
         // Get type info
         let type_name = T::type_name();
-        let type_hash = T::compute_hash()?;
+        let type_hash = T::type_hash()?;
 
         // Build key expression
         let key_expr_str = topic_keyexpr(
@@ -175,5 +175,19 @@ impl<T: TypeSupport> Publisher<T> {
     /// Get the parent node.
     pub fn node(&self) -> &Arc<Node> {
         &self.node
+    }
+}
+
+// ============================================================================
+// RosPublisher trait implementation
+// ============================================================================
+
+impl<T: TypeSupport> oxidros_core::api::RosPublisher<T> for Publisher<T> {
+    fn topic_name(&self) -> &str {
+        Publisher::topic_name(self)
+    }
+
+    fn send(&self, msg: &T) -> crate::error::Result<()> {
+        Publisher::send(self, msg)
     }
 }

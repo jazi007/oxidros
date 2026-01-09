@@ -66,52 +66,65 @@ other crates depend on. Instead, the approach is:
 
 ---
 
-## Phase 3: API Traits Definition in oxidros-core (3-4 days)
+## Phase 3: API Traits Definition in oxidros-core (3-4 days) ✅ COMPLETE
 
-### 3.1 Create Context trait
-- [ ] Create `oxidros-core/src/api/mod.rs`
-- [ ] Define `trait Context` with:
-  - `fn new() -> Result<Arc<Self>>`
-  - `fn create_node(&self, name: &str, namespace: Option<&str>) -> Result<Arc<Node>>`
+Created `oxidros-core/src/api/mod.rs` with unified API traits that both `oxidros-rcl` and `oxidros-zenoh` can implement.
+
+### 3.1 Create Context trait ✅
+- [x] Created `oxidros-core/src/api/mod.rs`
+- [x] Defined `trait RosContext` with:
+  - `type Node: RosNode` - Associated type for node
+  - `fn create_node(&Arc<Self>, name: &str, namespace: Option<&str>) -> Result<Arc<Self::Node>>`
   - `fn domain_id(&self) -> u32`
 
-### 3.2 Create Node trait
-- [ ] Define `trait Node` with:
+### 3.2 Create Node trait ✅
+- [x] Defined `trait RosNode` with:
+  - `type Publisher<T>`, `type Subscriber<T>`, `type Client<T>`, `type Server<T>` - Associated types
   - `fn name(&self) -> &str`
   - `fn namespace(&self) -> &str`
   - `fn fully_qualified_name(&self) -> String`
-  - `fn create_publisher<T>(...) -> Result<Publisher<T>>`
-  - `fn create_subscriber<T>(...) -> Result<Subscriber<T>>`
-  - `fn create_client<T>(...) -> Result<Client<T>>`
-  - `fn create_server<T>(...) -> Result<Server<T>>`
-  - `fn create_parameter_server(&self) -> Result<ParameterServer>`
+  - `fn create_publisher<T>(&Arc<Self>, ...) -> Result<Self::Publisher<T>>`
+  - `fn create_subscriber<T>(&Arc<Self>, ...) -> Result<Self::Subscriber<T>>`
+  - `fn create_client<T>(&Arc<Self>, ...) -> Result<Self::Client<T>>`
+  - `fn create_server<T>(&Arc<Self>, ...) -> Result<Self::Server<T>>`
 
-### 3.3 Create Publisher trait
-- [ ] Define `trait Publisher<T>` with:
+**Note**: `create_parameter_server` deferred - not part of unified API yet
+
+### 3.3 Create Publisher trait ✅
+- [x] Defined `trait RosPublisher<T: TypeSupport>` with:
   - `fn topic_name(&self) -> &str`
   - `fn send(&self, msg: &T) -> Result<()>`
 
-### 3.4 Create Subscriber trait
-- [ ] Define `trait Subscriber<T>` with:
+### 3.4 Create Subscriber trait ✅
+- [x] Defined `trait RosSubscriber<T: TypeSupport, M = ()>` with:
   - `fn topic_name(&self) -> &str`
-  - `async fn recv(&mut self) -> Result<ReceivedMessage<T>>`
-  - `fn try_recv(&mut self) -> Result<Option<ReceivedMessage<T>>>`
+  - `async fn recv(&mut self) -> Result<ReceivedMessage<T, M>>`
+  - `fn try_recv(&mut self) -> Result<Option<ReceivedMessage<T, M>>>`
 
-### 3.5 Create Service traits
-- [ ] Define `trait Client<T: ServiceMsg>` with:
+**Note**: `recv_blocking` deferred - implementations differ too much
+
+### 3.5 Create Service traits ✅
+- [x] Defined `trait RosClient<T: ServiceMsg>` with:
   - `fn service_name(&self) -> &str`
+  - `fn is_service_available(&self) -> bool`
   - `async fn call(&self, request: &T::Request) -> Result<T::Response>`
   - `async fn call_with_timeout(&self, request: &T::Request, timeout: Duration) -> Result<T::Response>`
 
-- [ ] Define `trait Server<T: ServiceMsg>` with:
+- [x] Defined `trait RosServer<T: ServiceMsg>` with:
+  - `type Request: ServiceRequest<T>` - Associated type for request handler
   - `fn service_name(&self) -> &str`
-  - `async fn recv(&mut self) -> Result<ServiceRequest<T>>`
-  - `fn try_recv(&mut self) -> Result<Option<ServiceRequest<T>>>`
+  - `async fn recv(&mut self) -> Result<Self::Request>`
+  - `fn try_recv(&mut self) -> Result<Option<Self::Request>>`
 
-### 3.6 Create common types
-- [ ] Define `ReceivedMessage<T>` struct in oxidros-core
-- [ ] Define `ServiceRequest<T>` struct in oxidros-core
-- [ ] Move/unify `CallbackResult` enum
+### 3.6 Create common types ✅
+- [x] Defined `ReceivedMessage<T, M>` struct with `data` and optional `metadata`
+- [x] Defined `trait ServiceRequest<T: ServiceMsg>` with `request()` and `respond()`
+
+**Note**: `CallbackResult` already exists in `oxidros_core::selector`
+
+### 3.7 Re-export from lib.rs ✅
+- [x] Added `pub mod api` to lib.rs
+- [x] Re-exported: `ReceivedMessage`, `RosClient`, `RosContext`, `RosNode`, `RosPublisher`, `RosServer`, `RosSubscriber`, `ServiceRequest`
 
 ---
 
