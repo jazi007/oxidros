@@ -48,7 +48,9 @@ pub use traits::{
     ActionGoal, ActionMsg, ActionResult, GetUUID, GoalResponse, ResultResponse, SequenceRaw,
     ServiceMsg, TryClone, TypeSupport, UnsafeDuration, UnsafeTime,
 };
-pub use type_description::{MessageTypeName, TypeDescription};
+pub use type_description::{
+    ActionTypeDescription, MessageTypeName, ServiceTypeDescription, TypeDescription,
+};
 pub use types::{
     FIELD_TYPE_BOOLEAN, FIELD_TYPE_BOUNDED_STRING, FIELD_TYPE_BOUNDED_WSTRING, FIELD_TYPE_BYTE,
     FIELD_TYPE_CHAR, FIELD_TYPE_DOUBLE, FIELD_TYPE_FIXED_STRING, FIELD_TYPE_FIXED_WSTRING,
@@ -63,7 +65,10 @@ pub use types::{
 // Access them via ros2_types::types::{Field, FieldType, ...} if needed.
 
 #[cfg(feature = "derive")]
-pub use ros2_types_derive::{Ros2Msg, TypeDescription, ros2_action, ros2_service};
+pub use ros2_types_derive::{
+    ActionTypeDescription, Ros2Msg, ServiceTypeDescription, TypeDescription, ros2_action,
+    ros2_service,
+};
 
 // Re-export cdr-encoding dependencies for generated code
 pub use byteorder;

@@ -93,6 +93,7 @@
 
 mod attrs;
 mod ros2_msg;
+mod service_action_type_description;
 mod type_description;
 mod type_mapping;
 
@@ -304,4 +305,84 @@ pub fn ros2_action(input: TokenStream) -> TokenStream {
     let uuid_path_prefix = parts.get(2).copied();
 
     ros2_msg::generate_action_wrapper(package, action_name, uuid_path_prefix).into()
+}
+
+/// Derive macro for ServiceTypeDescription trait
+///
+/// This macro generates the `ServiceTypeDescription` trait implementation for a marker struct.
+/// It computes the service type hash using the Request and Response types' TypeDescription.
+///
+/// # Requirements
+///
+/// - The Request and Response types must already have `TypeDescription` implemented
+/// - Types must follow naming convention: `{ServiceName}_Request` and `{ServiceName}_Response`
+///
+/// # Example
+///
+/// ```ignore
+/// use ros2_types_derive::{TypeDescription, ServiceTypeDescription};
+///
+/// #[derive(TypeDescription)]
+/// #[ros2(package = "example_interfaces", interface_type = "srv")]
+/// pub struct AddTwoInts_Request { pub a: i64, pub b: i64 }
+///
+/// #[derive(TypeDescription)]
+/// #[ros2(package = "example_interfaces", interface_type = "srv")]
+/// pub struct AddTwoInts_Response { pub sum: i64 }
+///
+/// // Generate ServiceTypeDescription for the service
+/// #[derive(ServiceTypeDescription)]
+/// #[ros2(package = "example_interfaces")]
+/// pub struct AddTwoInts;
+/// ```
+#[proc_macro_derive(ServiceTypeDescription, attributes(ros2))]
+pub fn derive_service_type_description(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+
+    match service_action_type_description::derive_service_type_description_impl(input) {
+        Ok(tokens) => tokens.into(),
+        Err(e) => e.to_compile_error().into(),
+    }
+}
+
+/// Derive macro for ActionTypeDescription trait
+///
+/// This macro generates the `ActionTypeDescription` trait implementation for a marker struct.
+/// It computes the action type hash using the Goal, Result, and Feedback types' TypeDescription.
+///
+/// # Requirements
+///
+/// - Goal, Result, and Feedback types must already have `TypeDescription` implemented
+/// - Types must follow naming convention: `{ActionName}_Goal`, `{ActionName}_Result`, `{ActionName}_Feedback`
+///
+/// # Example
+///
+/// ```ignore
+/// use ros2_types_derive::{TypeDescription, ActionTypeDescription};
+///
+/// #[derive(TypeDescription)]
+/// #[ros2(package = "example_interfaces", interface_type = "action")]
+/// pub struct Fibonacci_Goal { pub order: i32 }
+///
+/// #[derive(TypeDescription)]
+/// #[ros2(package = "example_interfaces", interface_type = "action")]
+/// pub struct Fibonacci_Result { pub sequence: Vec<i32> }
+///
+/// #[derive(TypeDescription)]
+/// #[ros2(package = "example_interfaces", interface_type = "action")]
+/// pub struct Fibonacci_Feedback { pub partial_sequence: Vec<i32> }
+///
+/// // Generate ActionTypeDescription for the action
+/// #[derive(ActionTypeDescription)]
+/// #[ros2(package = "example_interfaces")]
+/// pub struct Fibonacci;
+/// ```
+#[proc_macro_derive(ActionTypeDescription, attributes(ros2))]
+pub fn derive_action_type_description(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+
+    match service_action_type_description::derive_action_type_description_impl(input) {
+        Ok(tokens) => tokens.into(),
+        Err(e) => e.to_compile_error().into(),
+    }
 }

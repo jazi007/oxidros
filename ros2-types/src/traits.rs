@@ -88,6 +88,24 @@ pub trait ServiceMsg: 'static + Send + Sync {
     fn type_support() -> *const c_void {
         std::ptr::null()
     }
+
+    /// Returns the type name in DDS format.
+    ///
+    /// Example: `"example_interfaces::srv::dds_::AddTwoInts_"`
+    ///
+    /// This is used for Zenoh key expressions and type matching.
+    fn type_name() -> &'static str;
+
+    /// Returns the RIHS01 type hash for this message type.
+    ///
+    /// # Implementation
+    /// - For RCL: Returns empty string (hash is handled by rosidl typesupport)
+    /// - For Zenoh: Computes hash from TypeDescription
+    ///
+    /// The hash format is: `RIHS01_<64_character_hex_sha256>`
+    fn type_hash() -> Result<::std::string::String> {
+        Ok(::std::string::String::new())
+    }
 }
 
 /// Trait for ROS2 action message types.
@@ -108,6 +126,13 @@ pub trait ActionMsg: 'static + Send + Sync {
     fn type_support() -> *const c_void {
         std::ptr::null()
     }
+
+    /// Returns the type name in DDS format.
+    ///
+    /// Example: `"example_interfaces::srv::dds_::AddTwoInts_"`
+    ///
+    /// This is used for Zenoh key expressions and type matching.
+    fn type_name() -> &'static str;
 
     /// The goal content type (the actual goal data).
     type GoalContent: TypeSupport;
@@ -132,6 +157,17 @@ pub trait ActionMsg: 'static + Send + Sync {
 
     /// Create a new feedback message with the given feedback and UUID.
     fn new_feedback_message(feedback: Self::FeedbackContent, uuid: [u8; 16]) -> Self::Feedback;
+
+    /// Returns the RIHS01 type hash for this message type.
+    ///
+    /// # Implementation
+    /// - For RCL: Returns empty string (hash is handled by rosidl typesupport)
+    /// - For Zenoh: Computes hash from TypeDescription
+    ///
+    /// The hash format is: `RIHS01_<64_character_hex_sha256>`
+    fn type_hash() -> Result<::std::string::String> {
+        Ok(::std::string::String::new())
+    }
 }
 
 /// Trait for action goal types.

@@ -58,3 +58,52 @@ pub trait TypeDescription {
         calculate_type_hash(&description)
     }
 }
+
+/// Trait for ROS2 service types that can provide a type description for hash computation
+///
+/// This trait is separate from `ServiceMsg` (which is for runtime FFI) and only
+/// requires `TypeDescription` on Request/Response types.
+pub trait ServiceTypeDescription {
+    /// Get the type description for this service
+    ///
+    /// The service type description has fields:
+    /// - `request_message`: Reference to the Request message type
+    /// - `response_message`: Reference to the Response message type  
+    /// - `event_message`: Reference to the Event message type
+    fn type_description() -> crate::types::TypeDescriptionMsg;
+
+    /// Get the service type name information
+    fn service_type_name() -> MessageTypeName;
+
+    /// Compute the RIHS01 type hash for this service
+    fn compute_hash() -> Result<String> {
+        let description = Self::type_description();
+        calculate_type_hash(&description)
+    }
+}
+
+/// Trait for ROS2 action types that can provide a type description for hash computation
+///
+/// This trait is separate from `ActionMsg` (which is for runtime FFI) and only
+/// requires `TypeDescription` on Goal/Result/Feedback types.
+pub trait ActionTypeDescription {
+    /// Get the type description for this action
+    ///
+    /// The action type description has fields:
+    /// - `goal`: Reference to the Goal message type
+    /// - `result`: Reference to the Result message type
+    /// - `feedback`: Reference to the Feedback message type
+    /// - `send_goal_service`: Reference to the SendGoal service
+    /// - `get_result_service`: Reference to the GetResult service
+    /// - `feedback_message`: Reference to the FeedbackMessage type
+    fn type_description() -> crate::types::TypeDescriptionMsg;
+
+    /// Get the action type name information
+    fn action_type_name() -> MessageTypeName;
+
+    /// Compute the RIHS01 type hash for this action
+    fn compute_hash() -> Result<String> {
+        let description = Self::type_description();
+        calculate_type_hash(&description)
+    }
+}

@@ -364,7 +364,108 @@ fn generate_test_registry(
 
     writeln!(file, "#[allow(unused_imports)]")?;
     writeln!(file, "use crate::generated;")?;
-    writeln!(file, "use crate::{{TestResult, test_type_impl}};\n")?;
+    writeln!(
+        file,
+        "use crate::{{TestResult, test_type_impl, test_service_type_impl, test_action_type_impl}};\n"
+    )?;
+
+    // Generate service marker structs with ServiceTypeDescription derive
+    let services: Vec<_> = discovered
+        .iter()
+        .filter(|d| d.interface_type == "srv")
+        .collect();
+
+    if !services.is_empty() {
+        writeln!(file, "// Service marker structs for type hash computation")?;
+        writeln!(file, "#[allow(dead_code)]")?;
+        writeln!(file, "pub mod service_types {{")?;
+
+        // Group services by package to avoid module name collisions
+        let mut services_by_package: std::collections::HashMap<&str, Vec<&&DiscoveredType>> =
+            std::collections::HashMap::new();
+        for srv in &services {
+            services_by_package
+                .entry(srv.package.as_str())
+                .or_default()
+                .push(srv);
+        }
+
+        for (package, pkg_services) in &services_by_package {
+            writeln!(file, "    pub mod {} {{", package)?;
+            for srv in pkg_services {
+                let module_name = srv.name.to_snake_case();
+                // Each service gets its own submodule with the Request/Response types imported
+                writeln!(file, "        pub mod {} {{", module_name)?;
+                writeln!(file, "            #[allow(unused_imports)]")?;
+                writeln!(
+                    file,
+                    "            use crate::generated::{}::srv::{}::*;",
+                    srv.package, module_name
+                )?;
+                writeln!(file)?;
+                writeln!(
+                    file,
+                    "            #[derive(ros2_types::ServiceTypeDescription)]"
+                )?;
+                writeln!(file, "            #[ros2(package = \"{}\")]", srv.package)?;
+                writeln!(file, "            pub struct {};", srv.name)?;
+                writeln!(file, "        }}")?;
+            }
+            writeln!(file, "    }}")?;
+        }
+        writeln!(file, "}}\n")?;
+    }
+
+    // Generate action marker structs with ActionTypeDescription derive
+    let actions: Vec<_> = discovered
+        .iter()
+        .filter(|d| d.interface_type == "action")
+        .collect();
+
+    if !actions.is_empty() {
+        writeln!(file, "// Action marker structs for type hash computation")?;
+        writeln!(file, "#[allow(dead_code)]")?;
+        writeln!(file, "pub mod action_types {{")?;
+
+        // Group actions by package to avoid module name collisions
+        let mut actions_by_package: std::collections::HashMap<&str, Vec<&&DiscoveredType>> =
+            std::collections::HashMap::new();
+        for action in &actions {
+            actions_by_package
+                .entry(action.package.as_str())
+                .or_default()
+                .push(action);
+        }
+
+        for (package, pkg_actions) in &actions_by_package {
+            writeln!(file, "    pub mod {} {{", package)?;
+            for action in pkg_actions {
+                let module_name = action.name.to_snake_case();
+                // Each action gets its own submodule with the Goal/Result/Feedback types imported
+                writeln!(file, "        pub mod {} {{", module_name)?;
+                writeln!(file, "            #[allow(unused_imports)]")?;
+                writeln!(
+                    file,
+                    "            use crate::generated::{}::action::{}::*;",
+                    action.package, module_name
+                )?;
+                writeln!(file)?;
+                writeln!(
+                    file,
+                    "            #[derive(ros2_types::ActionTypeDescription)]"
+                )?;
+                writeln!(
+                    file,
+                    "            #[ros2(package = \"{}\")]",
+                    action.package
+                )?;
+                writeln!(file, "            pub struct {};", action.name)?;
+                writeln!(file, "        }}")?;
+            }
+            writeln!(file, "    }}")?;
+        }
+        writeln!(file, "}}\n")?;
+    }
 
     writeln!(file, "pub struct TypeEntry {{")?;
     writeln!(
@@ -420,6 +521,28 @@ fn generate_test_registry(
         }
     }
 
+    writeln!(file, "];\n")?;
+
+    // Generate list of service types (for testing service type hashes)
+    writeln!(file, "pub const ALL_SERVICE_TYPES: &[TypeEntry] = &[")?;
+    for d in discovered.iter().filter(|d| d.interface_type == "srv") {
+        writeln!(
+            file,
+            "    TypeEntry {{ ros2_name: \"{}/srv/{}\", package: \"{}\", interface_type: \"srv\", name: \"{}\" }},",
+            d.package, d.name, d.package, d.name
+        )?;
+    }
+    writeln!(file, "];\n")?;
+
+    // Generate list of action types (for testing action type hashes)
+    writeln!(file, "pub const ALL_ACTION_TYPES: &[TypeEntry] = &[")?;
+    for d in discovered.iter().filter(|d| d.interface_type == "action") {
+        writeln!(
+            file,
+            "    TypeEntry {{ ros2_name: \"{}/action/{}\", package: \"{}\", interface_type: \"action\", name: \"{}\" }},",
+            d.package, d.name, d.package, d.name
+        )?;
+    }
     writeln!(file, "];\n")?;
 
     // Build a map of actual module names from the generated code
@@ -569,6 +692,80 @@ fn generate_test_registry(
     writeln!(
         file,
         "            println!(\"⊘ Skipped (not in generated code)\");"
+    )?;
+    writeln!(file, "            TestResult::Skipped")?;
+    writeln!(file, "        }}")?;
+    writeln!(file, "    }}")?;
+    writeln!(file, "}}\n")?;
+
+    // Generate test_service_type_by_name dispatch function
+    writeln!(
+        file,
+        "pub fn test_service_type_by_name(ros2_name: &str) -> TestResult {{"
+    )?;
+    writeln!(file, "    let mut total = 0;")?;
+    writeln!(file, "    let mut matches = 0;")?;
+    writeln!(file, "    let mut mismatches = 0;")?;
+    writeln!(file, "    let mut errors = 0;\n")?;
+    writeln!(file, "    match ros2_name {{")?;
+
+    for d in discovered.iter().filter(|d| d.interface_type == "srv") {
+        let key = format!("{}/srv/{}", d.package, d.name);
+        let module_name = module_names
+            .get(&key)
+            .map(|s| s.as_str())
+            .unwrap_or_else(|| d.name.to_snake_case().leak());
+
+        if !module_name.is_empty() {
+            writeln!(
+                file,
+                "        \"{}/srv/{}\" => test_service_type_impl::<service_types::{}::{}::{}>(ros2_name, &mut total, &mut matches, &mut mismatches, &mut errors),",
+                d.package, d.name, d.package, module_name, d.name
+            )?;
+        }
+    }
+
+    writeln!(file, "        _ => {{")?;
+    writeln!(
+        file,
+        "            println!(\"⊘ Skipped (service not in generated code)\");"
+    )?;
+    writeln!(file, "            TestResult::Skipped")?;
+    writeln!(file, "        }}")?;
+    writeln!(file, "    }}")?;
+    writeln!(file, "}}\n")?;
+
+    // Generate test_action_type_by_name dispatch function
+    writeln!(
+        file,
+        "pub fn test_action_type_by_name(ros2_name: &str) -> TestResult {{"
+    )?;
+    writeln!(file, "    let mut total = 0;")?;
+    writeln!(file, "    let mut matches = 0;")?;
+    writeln!(file, "    let mut mismatches = 0;")?;
+    writeln!(file, "    let mut errors = 0;\n")?;
+    writeln!(file, "    match ros2_name {{")?;
+
+    for d in discovered.iter().filter(|d| d.interface_type == "action") {
+        let key = format!("{}/action/{}", d.package, d.name);
+        let module_name = module_names
+            .get(&key)
+            .map(|s| s.as_str())
+            .unwrap_or_else(|| d.name.to_snake_case().leak());
+
+        if !module_name.is_empty() {
+            writeln!(
+                file,
+                "        \"{}/action/{}\" => test_action_type_impl::<action_types::{}::{}::{}>(ros2_name, &mut total, &mut matches, &mut mismatches, &mut errors),",
+                d.package, d.name, d.package, module_name, d.name
+            )?;
+        }
+    }
+
+    writeln!(file, "        _ => {{")?;
+    writeln!(
+        file,
+        "            println!(\"⊘ Skipped (action not in generated code)\");"
     )?;
     writeln!(file, "            TestResult::Skipped")?;
     writeln!(file, "        }}")?;

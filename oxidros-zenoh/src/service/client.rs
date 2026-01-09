@@ -75,8 +75,8 @@ where
         qos: Profile,
     ) -> Result<Self> {
         // Get type info - use request type for service key
-        let type_name = T::Request::type_name();
-        let type_hash = T::Request::type_hash()?;
+        let type_name = T::type_name();
+        let type_hash = T::type_hash()?;
 
         // Build key expression
         let key_expr = topic_keyexpr(

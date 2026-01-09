@@ -2,7 +2,7 @@
 //!
 //! This example:
 //! 1. Uses generated message structs (via build.rs)
-//! 2. Automatically discovers ALL ROS2 messages/services in the installation
+//! 2. Automatically discovers ALL ROS2 messages/services/actions in the installation
 //! 3. Calls compute_hash() from the derived TypeDescription trait
 //! 4. Validates against ROS2 jazzy using ros2 CLI
 
@@ -23,8 +23,10 @@ mod test_registry {
 fn main() {
     println!("=== ROS2 Type Hash Validation (Fully Automated) ===\n");
     println!(
-        "Discovered {} types to test\n",
-        test_registry::ALL_TYPES.len()
+        "Discovered {} message types, {} service types, {} action types to test\n",
+        test_registry::ALL_TYPES.len(),
+        test_registry::ALL_SERVICE_TYPES.len(),
+        test_registry::ALL_ACTION_TYPES.len()
     );
 
     let mut total = 0;
@@ -36,6 +38,8 @@ fn main() {
     // Group by package for organized output
     let mut current_package = "";
 
+    // Test individual message types (msg, srv Request/Response, action Goal/Result/Feedback)
+    println!("\n=== Testing Message Types ===\n");
     for entry in test_registry::ALL_TYPES {
         // Print package header when we encounter a new package
         if entry.package != current_package {
@@ -62,6 +66,74 @@ fn main() {
             }
             TestResult::Skipped => {
                 skipped += 1;
+            }
+        }
+    }
+
+    // Test service type hashes
+    if !test_registry::ALL_SERVICE_TYPES.is_empty() {
+        println!("\n=== Testing Service Type Hashes ===\n");
+        current_package = "";
+
+        for entry in test_registry::ALL_SERVICE_TYPES {
+            if entry.package != current_package {
+                if !current_package.is_empty() {
+                    println!();
+                }
+                println!("--- Testing {} services ---", entry.package);
+                current_package = entry.package;
+            }
+
+            match test_registry::test_service_type_by_name(entry.ros2_name) {
+                TestResult::Match => {
+                    total += 1;
+                    matches += 1;
+                }
+                TestResult::Mismatch => {
+                    total += 1;
+                    mismatches += 1;
+                }
+                TestResult::Error => {
+                    total += 1;
+                    errors += 1;
+                }
+                TestResult::Skipped => {
+                    skipped += 1;
+                }
+            }
+        }
+    }
+
+    // Test action type hashes
+    if !test_registry::ALL_ACTION_TYPES.is_empty() {
+        println!("\n=== Testing Action Type Hashes ===\n");
+        current_package = "";
+
+        for entry in test_registry::ALL_ACTION_TYPES {
+            if entry.package != current_package {
+                if !current_package.is_empty() {
+                    println!();
+                }
+                println!("--- Testing {} actions ---", entry.package);
+                current_package = entry.package;
+            }
+
+            match test_registry::test_action_type_by_name(entry.ros2_name) {
+                TestResult::Match => {
+                    total += 1;
+                    matches += 1;
+                }
+                TestResult::Mismatch => {
+                    total += 1;
+                    mismatches += 1;
+                }
+                TestResult::Error => {
+                    total += 1;
+                    errors += 1;
+                }
+                TestResult::Skipped => {
+                    skipped += 1;
+                }
             }
         }
     }
@@ -146,6 +218,112 @@ pub fn test_type_impl<T: ros2_types::TypeDescription>(
                             println!("=================\n");
                         }
 
+                        *mismatches += 1;
+                        TestResult::Mismatch
+                    }
+                }
+                Err(e) => {
+                    println!(" ⚠ Cannot verify ({})", e);
+                    *errors += 1;
+                    TestResult::Error
+                }
+            }
+        }
+        Err(e) => {
+            println!("{}: ✗ Hash computation failed: {}", type_name, e);
+            *errors += 1;
+            TestResult::Error
+        }
+    }
+}
+
+pub fn test_service_type_impl<T: ros2_types::ServiceTypeDescription>(
+    type_name: &str,
+    total: &mut i32,
+    matches: &mut i32,
+    mismatches: &mut i32,
+    errors: &mut i32,
+) -> TestResult {
+    *total += 1;
+
+    let debug = std::env::var("DEBUG_HASH").is_ok();
+
+    match T::compute_hash() {
+        Ok(computed_hash) => {
+            print!("{}: {}", type_name, computed_hash);
+
+            if debug {
+                let desc = T::type_description();
+                println!(
+                    "\n  Service Type: {}, Fields: {}, Refs: {}",
+                    desc.type_description.type_name,
+                    desc.type_description.fields.len(),
+                    desc.referenced_type_descriptions.len()
+                );
+            }
+
+            match get_ros2_service_hash(type_name) {
+                Ok(expected_hash) => {
+                    if computed_hash == expected_hash {
+                        println!(" ✓ MATCH");
+                        *matches += 1;
+                        TestResult::Match
+                    } else {
+                        println!(" ✗ MISMATCH");
+                        println!("  Expected: {}", expected_hash);
+                        *mismatches += 1;
+                        TestResult::Mismatch
+                    }
+                }
+                Err(e) => {
+                    println!(" ⚠ Cannot verify ({})", e);
+                    *errors += 1;
+                    TestResult::Error
+                }
+            }
+        }
+        Err(e) => {
+            println!("{}: ✗ Hash computation failed: {}", type_name, e);
+            *errors += 1;
+            TestResult::Error
+        }
+    }
+}
+
+pub fn test_action_type_impl<T: ros2_types::ActionTypeDescription>(
+    type_name: &str,
+    total: &mut i32,
+    matches: &mut i32,
+    mismatches: &mut i32,
+    errors: &mut i32,
+) -> TestResult {
+    *total += 1;
+
+    let debug = std::env::var("DEBUG_HASH").is_ok();
+
+    match T::compute_hash() {
+        Ok(computed_hash) => {
+            print!("{}: {}", type_name, computed_hash);
+
+            if debug {
+                let desc = T::type_description();
+                println!(
+                    "\n  Action Type: {}, Fields: {}, Refs: {}",
+                    desc.type_description.type_name,
+                    desc.type_description.fields.len(),
+                    desc.referenced_type_descriptions.len()
+                );
+            }
+
+            match get_ros2_action_hash(type_name) {
+                Ok(expected_hash) => {
+                    if computed_hash == expected_hash {
+                        println!(" ✓ MATCH");
+                        *matches += 1;
+                        TestResult::Match
+                    } else {
+                        println!(" ✗ MISMATCH");
+                        println!("  Expected: {}", expected_hash);
                         *mismatches += 1;
                         TestResult::Mismatch
                     }
@@ -275,4 +453,76 @@ fn get_ros2_hash(type_name: &str) -> Result<(String, String), Box<dyn std::error
     };
 
     Ok((hash, serde_json::to_string_pretty(&json)?))
+}
+
+fn get_ros2_service_hash(type_name: &str) -> Result<String, Box<dyn std::error::Error>> {
+    // Parse type name: pkg/srv/ServiceName
+    let parts: Vec<&str> = type_name.split('/').collect();
+    if parts.len() != 3 {
+        return Err(format!("Invalid service type name format: {}", type_name).into());
+    }
+    let (package, _interface_type, service_name) = (parts[0], parts[1], parts[2]);
+
+    let ros_path = std::env::var("ROS_PATH").unwrap_or_else(|_| "/opt/ros/jazzy".to_string());
+
+    // Read the JSON file for this service
+    let json_path = std::path::PathBuf::from(format!(
+        "{}/share/{}/srv/{}.json",
+        ros_path, package, service_name
+    ));
+
+    let json_content = std::fs::read_to_string(&json_path)
+        .map_err(|e| format!("Cannot read {}: {}", json_path.display(), e))?;
+
+    let json: serde_json::Value = serde_json::from_str(&json_content)?;
+
+    // Look for the service type hash (e.g., "example_interfaces/srv/AddTwoInts")
+    let target_type = format!("{}/srv/{}", package, service_name);
+    let hash = json["type_hashes"]
+        .as_array()
+        .and_then(|arr| {
+            arr.iter()
+                .find(|h| h["type_name"].as_str() == Some(&target_type))
+        })
+        .and_then(|h| h["hash_string"].as_str())
+        .ok_or(format!("Service hash not found for {}", target_type))?
+        .to_string();
+
+    Ok(hash)
+}
+
+fn get_ros2_action_hash(type_name: &str) -> Result<String, Box<dyn std::error::Error>> {
+    // Parse type name: pkg/action/ActionName
+    let parts: Vec<&str> = type_name.split('/').collect();
+    if parts.len() != 3 {
+        return Err(format!("Invalid action type name format: {}", type_name).into());
+    }
+    let (package, _interface_type, action_name) = (parts[0], parts[1], parts[2]);
+
+    let ros_path = std::env::var("ROS_PATH").unwrap_or_else(|_| "/opt/ros/jazzy".to_string());
+
+    // Read the JSON file for this action
+    let json_path = std::path::PathBuf::from(format!(
+        "{}/share/{}/action/{}.json",
+        ros_path, package, action_name
+    ));
+
+    let json_content = std::fs::read_to_string(&json_path)
+        .map_err(|e| format!("Cannot read {}: {}", json_path.display(), e))?;
+
+    let json: serde_json::Value = serde_json::from_str(&json_content)?;
+
+    // Look for the action type hash (e.g., "example_interfaces/action/Fibonacci")
+    let target_type = format!("{}/action/{}", package, action_name);
+    let hash = json["type_hashes"]
+        .as_array()
+        .and_then(|arr| {
+            arr.iter()
+                .find(|h| h["type_name"].as_str() == Some(&target_type))
+        })
+        .and_then(|h| h["hash_string"].as_str())
+        .ok_or(format!("Action hash not found for {}", target_type))?
+        .to_string();
+
+    Ok(hash)
 }

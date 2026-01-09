@@ -119,8 +119,8 @@ where
         qos: Profile,
     ) -> Result<Self> {
         // Get type info
-        let type_name = T::Request::type_name();
-        let type_hash = T::Request::type_hash()?;
+        let type_name = T::type_name();
+        let type_hash = T::type_hash()?;
 
         // Build key expression
         let key_expr = topic_keyexpr(

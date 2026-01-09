@@ -788,9 +788,11 @@ pub fn generate_service_wrapper(package: &str, service_name: &str) -> TokenStrea
     );
 
     let service_doc = format!("Service wrapper for {}", service_name);
+    let dds_type_name = format!("{}::src::dds_::{}_", package, service_name);
     quote! {
         #[doc = #service_doc]
-        #[derive(Debug)]
+        #[derive(Debug, ros2_types::ServiceTypeDescription)]
+        #[ros2(package = #package)]
         pub struct #service_ident;
 
         #[cfg(feature = "rcl")]
@@ -801,10 +803,16 @@ pub fn generate_service_wrapper(package: &str, service_name: &str) -> TokenStrea
         impl ros2_types::ServiceMsg for #service_ident {
             type Request = #request_ident;
             type Response = #response_ident;
-
             #[cfg(feature = "rcl")]
             fn type_support() -> *const std::ffi::c_void {
                 unsafe { #type_support_fn() }
+            }
+            #[cfg(not(feature = "rcl"))]
+            fn type_hash() -> ros2_types::Result<::std::string::String> {
+                <Self as ros2_types::ServiceTypeDescription>::compute_hash()
+            }
+            fn type_name() -> &'static str {
+                #dds_type_name
             }
         }
     }
@@ -832,6 +840,8 @@ pub fn generate_action_wrapper(
     action_name: &str,
     uuid_path_prefix: Option<&str>,
 ) -> TokenStream {
+    // DDS type name format: "pkg_name::interface_type::dds_::TypeName_"
+    let dds_type_name = format!("{}::action::dds_::{}_", package, action_name);
     let action_ident = format_ident!("{}", action_name);
     let goal_ident = format_ident!("{}_Goal", action_name);
     let result_ident = format_ident!("{}_Result", action_name);
@@ -1109,13 +1119,18 @@ pub fn generate_action_wrapper(
         // =============================================================================
 
         #[doc = #action_doc]
-        #[derive(Debug)]
+        #[derive(Debug, ros2_types::ActionTypeDescription)]
+        #[ros2(package = #package)]
         pub struct #action_ident;
 
         impl ros2_types::ActionMsg for #action_ident {
             type Goal = #send_goal_ident;
             type Result = #get_result_ident;
             type Feedback = #feedback_message_ident;
+
+            fn type_name() -> &'static str {
+                #dds_type_name
+            }
 
             #[cfg(feature = "rcl")]
             fn type_support() -> *const std::ffi::c_void {
@@ -1153,6 +1168,10 @@ pub fn generate_action_wrapper(
                     feedback,
                     goal_id: #uuid_type { uuid },
                 }
+            }
+            #[cfg(not(feature = "rcl"))]
+            fn type_hash() -> ros2_types::Result<::std::string::String> {
+                <Self as ros2_types::ActionTypeDescription>::compute_hash()
             }
         }
     }
