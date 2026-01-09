@@ -165,24 +165,41 @@ Created `oxidros-core/src/api/mod.rs` with unified API traits that both `oxidros
 
 ---
 
-## Phase 5: Selector Implementation for oxidros-zenoh (2-3 days)
+## Phase 5: Selector Implementation (2-3 days) ✅ COMPLETE
 
-### 5.1 Create Selector using flume
-- [ ] Create `oxidros-zenoh/src/selector.rs`
-- [ ] Implement `Selector` struct using `flume::Selector`
-- [ ] Implement `add_subscriber()` method
-- [ ] Implement `add_server()` method
-- [ ] Implement `add_wall_timer()` method
-- [ ] Implement `add_parameter_server()` method
-- [ ] Implement `wait()` method
+### 5.1 Define RosSelector trait in oxidros-core ✅
+- [x] Created `RosSelector` trait in `oxidros-core/src/api/mod.rs`
+- [x] Associated types: `Subscriber<T>`, `Server<T>`, `ActionServer<T>`, `ActionClient<T>`, `ActionGoalHandle<T>`, `ParameterServer`
+- [x] Methods: `add_subscriber()`, `add_server()`, `add_parameter_server()`, `add_timer()`, `add_wall_timer()`, `remove_timer()`
+- [x] Action methods: `add_action_server()`, `add_action_client()` (return `Result<bool>` for backend support detection)
+- [x] Wait methods: `wait()`, `wait_timeout()`
+- [x] Added `NotImplemented` error variant to `oxidros_core::Error` for unsupported features
 
-### 5.2 Add Selector to Context
-- [ ] Add `create_selector()` method to zenoh Context
-- [ ] Update lib.rs exports
+### 5.2 Add Selector to RosContext trait ✅
+- [x] Added `type Selector: RosSelector` associated type to `RosContext`
+- [x] Added `fn create_selector(&Arc<Self>) -> Result<Self::Selector>` method
+- [x] Updated lib.rs re-exports
 
-### 5.3 Define Selector trait in oxidros-core
-- [ ] Define `trait Selector` with common API
-- [ ] Implement trait for both rcl and zenoh Selectors
+### 5.3 Implement RosSelector for oxidros-rcl ✅
+- [x] Implemented `RosSelector` trait for `selector::Selector`
+- [x] Delegates to existing Selector methods
+- [x] Wraps handlers to match RCL signatures (e.g., `ServerCallback` includes `Header`)
+- [x] Action server wraps goal_handler for `SendGoalServiceRequest<T>`, cancel_handler for `GoalInfo`
+- [x] Added `inner_data()` accessor to `action::client::Client` for selector registration
+
+### 5.4 Create Selector for oxidros-zenoh ✅
+- [x] Created `oxidros-zenoh/src/selector.rs`
+- [x] Implemented `Selector` struct with poll-based message handling
+- [x] Timer implementation using `HashMap<u64, Timer>` with absolute `Instant` fire times
+  - **Note**: Did not use `DeltaList` because its linked-list API (`insert`, `pop`, `filter`) differs from the HashMap approach; DeltaList uses relative time deltas optimized for RCL's wait semantics
+- [x] Subscriber handlers use `try_recv()` polling in wait loop
+- [x] Action methods return `Err(NotImplemented)` - Zenoh doesn't support actions yet
+- [x] Implemented `RosSelector` trait for `Selector`
+- [x] Updated lib.rs to export `Selector`
+
+### 5.5 Implement RosContext::create_selector for both backends ✅
+- [x] oxidros-rcl: delegates to `Context::create_selector()`
+- [x] oxidros-zenoh: returns `Ok(Selector::new())`
 
 ---
 
@@ -259,13 +276,13 @@ Created `oxidros-core/src/api/mod.rs` with unified API traits that both `oxidros
 | 2 | Trait Consolidation | 2-3 days | ✅ Complete |
 | 3 | API Traits Definition | 3-4 days | ✅ Complete |
 | 4 | Implement API Traits | 3-4 days | ✅ Complete |
-| 5 | Selector for Zenoh | 2-3 days | ⬜ Not Started |
+| 5 | Selector Implementation | 2-3 days | ✅ Complete |
 | 6 | Update oxidros Crate | 1 day | ⬜ Not Started |
 | 7 | Testing & Documentation | 1-2 days | ⬜ Not Started |
 | 8 | Action System (Future) | 1-2 weeks | ⬜ Deferred |
 
 **Total (Phases 1-7): ~2-3 weeks**
-**Completed: Phases 1-4**
+**Completed: Phases 1-5**
 
 ---
 

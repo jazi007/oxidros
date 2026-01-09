@@ -63,6 +63,15 @@ pub enum Error {
     #[error("Operation interrupted by signal")]
     Interrupted,
 
+    /// Feature not implemented in this backend.
+    #[error("{feature} not implemented: {reason}")]
+    NotImplemented {
+        /// The feature that is not implemented.
+        feature: String,
+        /// Reason or additional context.
+        reason: String,
+    },
+
     /// Null byte not found
     #[error("Nul byte not found {0}")]
     NullError(#[from] std::ffi::NulError),

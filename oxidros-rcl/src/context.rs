@@ -221,6 +221,7 @@ unsafe impl Send for Context {}
 
 impl oxidros_core::api::RosContext for Context {
     type Node = Node;
+    type Selector = Selector;
 
     fn create_node(
         self: &Arc<Self>,
@@ -229,6 +230,10 @@ impl oxidros_core::api::RosContext for Context {
     ) -> oxidros_core::Result<Arc<Self::Node>> {
         Context::create_node(self, name, namespace, Default::default())
             .map_err(oxidros_core::Error::Rcl)
+    }
+
+    fn create_selector(self: &Arc<Self>) -> oxidros_core::Result<Self::Selector> {
+        Context::create_selector(self).map_err(oxidros_core::Error::Rcl)
     }
 
     fn domain_id(&self) -> u32 {

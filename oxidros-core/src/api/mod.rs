@@ -25,8 +25,8 @@
 //! }
 //! ```
 
-use crate::{Result, ServiceMsg, TypeSupport, message::TakenMsg, qos::Profile};
-use std::{borrow::Cow, sync::Arc};
+use crate::{ActionMsg, Result, ServiceMsg, TypeSupport, message::TakenMsg, qos::Profile};
+use std::{borrow::Cow, sync::Arc, time::Duration};
 
 // ============================================================================
 // Common Types
@@ -57,6 +57,9 @@ pub trait RosContext: Send + Sync + Sized {
     /// The node type created by this context.
     type Node: RosNode;
 
+    /// The selector type created by this context.
+    type Selector: RosSelector;
+
     /// Create a new node.
     ///
     /// # Arguments
@@ -72,6 +75,9 @@ pub trait RosContext: Send + Sync + Sized {
         name: &str,
         namespace: Option<&str>,
     ) -> Result<Arc<Self::Node>>;
+
+    /// Create a new selector for event-driven execution.
+    fn create_selector(self: &Arc<Self>) -> Result<Self::Selector>;
 
     /// Get the domain ID.
     fn domain_id(&self) -> u32;
@@ -247,4 +253,158 @@ pub trait RosServer<T: ServiceMsg>: Send {
     ///
     /// Returns `Ok(None)` if no request is currently available.
     fn try_recv(&mut self) -> Result<Option<Self::Request>>;
+}
+
+// ============================================================================
+// Selector Trait
+// ============================================================================
+
+type ParameterHandler =
+    Box<dyn FnMut(&mut crate::parameter::Parameters, std::collections::BTreeSet<String>)>;
+
+/// A ROS2 selector for event-driven single-threaded execution.
+///
+/// The selector allows registering callbacks for subscribers, servers, timers,
+/// and other event sources, then waiting for events in a loop.
+///
+/// # Example
+///
+/// ```ignore
+/// use oxidros_core::api::RosSelector;
+///
+/// fn spin<S: RosSelector>(mut selector: S) -> Result<(), oxidros_core::Error> {
+///     loop {
+///         selector.wait()?;
+///     }
+/// }
+/// ```
+pub trait RosSelector: Sized {
+    /// The subscriber type this selector accepts.
+    type Subscriber<T: TypeSupport>;
+
+    /// The server type this selector accepts.
+    type Server<T: ServiceMsg>;
+
+    /// The action server type this selector accepts.
+    type ActionServer<T: ActionMsg>;
+
+    /// The action client type this selector accepts.
+    type ActionClient<T: ActionMsg>;
+
+    /// The parameter server type this selector accepts.
+    type ParameterServer;
+
+    /// Register a subscriber with a callback function.
+    ///
+    /// The callback is invoked when messages arrive on the topic.
+    /// Takes ownership of the subscriber.
+    ///
+    /// # Returns
+    ///
+    /// `true` if successfully added, `false` if context mismatch.
+    fn add_subscriber<T: TypeSupport + 'static>(
+        &mut self,
+        subscriber: Self::Subscriber<T>,
+        handler: Box<dyn FnMut(TakenMsg<T>)>,
+    ) -> bool;
+
+    /// Register a server with a callback function.
+    ///
+    /// The callback receives requests and must return responses.
+    /// Takes ownership of the server.
+    ///
+    /// # Returns
+    ///
+    /// `true` if successfully added, `false` if context mismatch.
+    fn add_server<T: ServiceMsg + 'static>(
+        &mut self,
+        server: Self::Server<T>,
+        handler: Box<dyn FnMut(T::Request) -> T::Response>,
+    ) -> bool;
+
+    /// Register a parameter server with a callback.
+    ///
+    /// The callback is invoked when parameters are updated.
+    fn add_parameter_server(
+        &mut self,
+        param_server: Self::ParameterServer,
+        handler: ParameterHandler,
+    );
+
+    /// Add a one-shot timer.
+    ///
+    /// The callback is invoked once after the specified duration.
+    ///
+    /// # Returns
+    ///
+    /// A timer ID that can be used to remove the timer.
+    fn add_timer(&mut self, duration: Duration, handler: Box<dyn FnMut()>) -> u64;
+
+    /// Add a repeating wall timer.
+    ///
+    /// The callback is invoked periodically at the specified interval.
+    ///
+    /// # Returns
+    ///
+    /// A timer ID that can be used to remove the timer.
+    fn add_wall_timer(&mut self, name: &str, period: Duration, handler: Box<dyn FnMut()>) -> u64;
+
+    /// Remove a timer by its ID.
+    fn remove_timer(&mut self, id: u64);
+
+    /// Register an action server with handlers.
+    ///
+    /// # Arguments
+    ///
+    /// * `server` - The action server
+    /// * `goal_handler` - Called when a new goal arrives, returns `true` to accept
+    /// * `accept_handler` - Called after goal is accepted, receives the goal handle
+    /// * `cancel_handler` - Called when cancel is requested, returns `true` to cancel
+    ///
+    /// # Returns
+    ///
+    /// `Ok(true)` if successfully added, `Ok(false)` if context mismatch,
+    /// `Err(NotSupported)` if actions are not supported by this backend.
+    fn add_action_server<T, GR, A, CR>(
+        &mut self,
+        server: Self::ActionServer<T>,
+        goal_handler: GR,
+        accept_handler: A,
+        cancel_handler: CR,
+    ) -> Result<bool>
+    where
+        T: ActionMsg + 'static,
+        GR: Fn(&<T::Goal as crate::ActionGoal>::Request) -> bool + 'static,
+        A: Fn(Self::ActionGoalHandle<T>) + 'static,
+        CR: Fn(&[u8; 16]) -> bool + 'static;
+
+    /// The goal handle type for action servers.
+    type ActionGoalHandle<T: ActionMsg>;
+
+    /// Register an action client for async operations.
+    ///
+    /// This is primarily for internal use by the async action client.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(true)` if successfully added, `Ok(false)` if context mismatch,
+    /// `Err(NotSupported)` if actions are not supported by this backend.
+    fn add_action_client<T: ActionMsg + 'static>(
+        &mut self,
+        client: Self::ActionClient<T>,
+    ) -> Result<bool>;
+
+    /// Wait for events and invoke registered callbacks.
+    ///
+    /// Blocks until at least one event occurs.
+    fn wait(&mut self) -> Result<()>;
+
+    /// Wait for events with a timeout.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(true)` - At least one event occurred
+    /// - `Ok(false)` - Timeout elapsed with no events
+    /// - `Err(_)` - An error occurred
+    fn wait_timeout(&mut self, timeout: Duration) -> Result<bool>;
 }

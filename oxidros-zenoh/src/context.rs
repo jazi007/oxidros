@@ -276,6 +276,7 @@ impl Context {
 
 impl oxidros_core::api::RosContext for Context {
     type Node = Node;
+    type Selector = crate::selector::Selector;
 
     fn create_node(
         self: &Arc<Self>,
@@ -283,6 +284,10 @@ impl oxidros_core::api::RosContext for Context {
         namespace: Option<&str>,
     ) -> crate::error::Result<Arc<Self::Node>> {
         Context::create_node(self, name, namespace)
+    }
+
+    fn create_selector(self: &Arc<Self>) -> crate::error::Result<Self::Selector> {
+        Ok(crate::selector::Selector::new())
     }
 
     fn domain_id(&self) -> u32 {

@@ -39,6 +39,7 @@ mod graph_cache;
 mod keyexpr;
 mod node;
 mod qos;
+mod selector;
 
 pub mod service;
 pub mod topic;
@@ -51,6 +52,7 @@ pub use error::{Error, Result};
 pub use graph_cache::GraphCache;
 pub use node::Node;
 pub use qos::QosMapping;
+pub use selector::Selector;
 pub use service::ServiceRequest;
 
 // Re-export core types

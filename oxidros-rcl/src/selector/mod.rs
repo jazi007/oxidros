@@ -1539,6 +1539,109 @@ fn notify_action_client(
     ret
 }
 
+// ============================================================================
+// RosSelector trait implementation
+// ============================================================================
+
+impl oxidros_core::api::RosSelector for Selector {
+    type Subscriber<T: TypeSupport> = Subscriber<T>;
+    type Server<T: ServiceMsg> = Server<T>;
+    type ActionServer<T: ActionMsg> = action::server::Server<T>;
+    type ActionClient<T: ActionMsg> = action::client::Client<T>;
+    type ActionGoalHandle<T: ActionMsg> = action::handle::GoalHandle<T>;
+    type ParameterServer = ParameterServer;
+
+    fn add_subscriber<T: TypeSupport + 'static>(
+        &mut self,
+        subscriber: Self::Subscriber<T>,
+        handler: Box<dyn FnMut(TakenMsg<T>)>,
+    ) -> bool {
+        Selector::add_subscriber(self, subscriber, handler)
+    }
+
+    fn add_server<T: ServiceMsg + 'static>(
+        &mut self,
+        server: Self::Server<T>,
+        mut handler: Box<dyn FnMut(T::Request) -> T::Response>,
+    ) -> bool {
+        // Wrap the handler to match the RCL signature that includes Header
+        let wrapped = Box::new(move |request: T::Request, _header: Header| handler(request));
+        Selector::add_server(self, server, wrapped)
+    }
+
+    fn add_parameter_server(
+        &mut self,
+        param_server: Self::ParameterServer,
+        handler: Box<
+            dyn FnMut(&mut oxidros_core::parameter::Parameters, std::collections::BTreeSet<String>),
+        >,
+    ) {
+        Selector::add_parameter_server(self, param_server, handler)
+    }
+
+    fn add_timer(&mut self, duration: std::time::Duration, handler: Box<dyn FnMut()>) -> u64 {
+        Selector::add_timer(self, duration, handler)
+    }
+
+    fn add_wall_timer(
+        &mut self,
+        name: &str,
+        period: std::time::Duration,
+        handler: Box<dyn FnMut()>,
+    ) -> u64 {
+        Selector::add_wall_timer(self, name, period, handler)
+    }
+
+    fn remove_timer(&mut self, id: u64) {
+        Selector::remove_timer(self, id)
+    }
+
+    fn add_action_server<T, GR, A, CR>(
+        &mut self,
+        server: Self::ActionServer<T>,
+        goal_handler: GR,
+        accept_handler: A,
+        cancel_handler: CR,
+    ) -> oxidros_core::Result<bool>
+    where
+        T: ActionMsg + 'static,
+        GR: Fn(&<<T as ActionMsg>::Goal as oxidros_core::ActionGoal>::Request) -> bool + 'static,
+        A: Fn(Self::ActionGoalHandle<T>) + 'static,
+        CR: Fn(&[u8; 16]) -> bool + 'static,
+    {
+        // Wrap goal_handler to work with SendGoalServiceRequest<T>
+        let wrapped_goal =
+            move |req: action::SendGoalServiceRequest<T>| -> bool { goal_handler(&req) };
+        // Wrap cancel_handler to work with GoalInfo
+        let wrapped_cancel = move |info: &GoalInfo| -> bool { cancel_handler(&info.goal_id.uuid) };
+        Ok(Selector::add_action_server(
+            self,
+            server,
+            wrapped_goal,
+            accept_handler,
+            wrapped_cancel,
+        ))
+    }
+
+    fn add_action_client<T: ActionMsg + 'static>(
+        &mut self,
+        client: Self::ActionClient<T>,
+    ) -> oxidros_core::Result<bool> {
+        // Action clients are added internally with specific handlers
+        // For the trait, just register with no handlers (used for async operations)
+        self.add_action_client(client.inner_data().clone(), None, None, None, None, None);
+        Ok(true)
+    }
+
+    fn wait(&mut self) -> oxidros_core::Result<()> {
+        Selector::wait(self)
+    }
+
+    fn wait_timeout(&mut self, timeout: std::time::Duration) -> oxidros_core::Result<bool> {
+        Selector::wait_timeout(self, timeout)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::{context::Context, error::Result, selector::CallbackResult};

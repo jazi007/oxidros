@@ -110,6 +110,11 @@ where
         })
     }
 
+    /// Get the inner data for use with the selector.
+    pub(crate) fn inner_data(&self) -> &Arc<ClientData> {
+        &self.data
+    }
+
     /// Returns true if the corresponding action server is available.
     pub fn is_server_available(&self) -> RCLActionResult<bool> {
         let guard = rcl::MT_UNSAFE_FN.lock();
