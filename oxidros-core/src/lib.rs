@@ -21,8 +21,7 @@ pub use error::{ActionError, Error, RclError, Result};
 
 // Re-export API traits
 pub use api::{
-    ReceivedMessage, RosClient, RosContext, RosNode, RosPublisher, RosServer, RosSubscriber,
-    ServiceRequest,
+    RosClient, RosContext, RosNode, RosPublisher, RosServer, RosSubscriber, ServiceRequest,
 };
 
 // Re-export message traits

@@ -215,6 +215,32 @@ impl Drop for InitOptions {
 unsafe impl Sync for Context {}
 unsafe impl Send for Context {}
 
+// ============================================================================
+// RosContext trait implementation
+// ============================================================================
+
+impl oxidros_core::api::RosContext for Context {
+    type Node = Node;
+
+    fn create_node(
+        self: &Arc<Self>,
+        name: &str,
+        namespace: Option<&str>,
+    ) -> oxidros_core::Result<Arc<Self::Node>> {
+        Context::create_node(self, name, namespace, Default::default())
+            .map_err(oxidros_core::Error::Rcl)
+    }
+
+    fn domain_id(&self) -> u32 {
+        // RCL context doesn't expose domain_id directly,
+        // but it's typically 0 unless overridden by ROS_DOMAIN_ID env var
+        std::env::var("ROS_DOMAIN_ID")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0)
+    }
+}
+
 #[unsafe(no_mangle)]
 pub(crate) extern "C" fn remove_context() {
     {

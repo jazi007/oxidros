@@ -415,16 +415,16 @@ impl oxidros_core::api::RosNode for Node {
     type Client<T: oxidros_core::ServiceMsg> = Client<T>;
     type Server<T: oxidros_core::ServiceMsg> = Server<T>;
 
-    fn name(&self) -> &str {
-        Node::name(self)
+    fn name(&self) -> std::borrow::Cow<'_, str> {
+        std::borrow::Cow::Borrowed(Node::name(self))
     }
 
-    fn namespace(&self) -> &str {
-        Node::namespace(self)
+    fn namespace(&self) -> std::borrow::Cow<'_, str> {
+        std::borrow::Cow::Borrowed(Node::namespace(self))
     }
 
-    fn fully_qualified_name(&self) -> String {
-        Node::fully_qualified_name(self)
+    fn fully_qualified_name(&self) -> std::borrow::Cow<'_, str> {
+        std::borrow::Cow::Owned(Node::fully_qualified_name(self))
     }
 
     fn create_publisher<T: TypeSupport>(

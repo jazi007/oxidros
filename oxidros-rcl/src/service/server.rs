@@ -161,6 +161,7 @@ unsafe impl Send for ServerData {}
 #[must_use]
 pub struct Server<T> {
     pub(crate) data: Arc<Mutex<ServerData>>,
+    service_name: String,
     _phantom: PhantomData<T>,
     _unsync: PhantomUnsync,
 }
@@ -168,7 +169,7 @@ pub struct Server<T> {
 impl<T: ServiceMsg> Server<T> {
     pub(crate) fn new(node: Arc<Node>, service_name: &str, qos: Option<Profile>) -> OResult<Self> {
         let mut service = rcl::MTSafeFn::rcl_get_zero_initialized_service();
-        let service_name = CString::new(service_name).unwrap_or_default();
+        let service_name_c = CString::new(service_name).unwrap_or_default();
         let profile = qos.unwrap_or_else(Profile::services_default);
         let options = rcl::rcl_service_options_t {
             qos: (&profile).into(),
@@ -181,13 +182,14 @@ impl<T: ServiceMsg> Server<T> {
                 &mut service,
                 node.as_ptr(),
                 <T as ServiceMsg>::type_support() as *const rcl::rosidl_service_type_support_t,
-                service_name.as_ptr(),
+                service_name_c.as_ptr(),
                 &options,
             )?;
         }
 
         Ok(Server {
             data: Arc::new(Mutex::new(ServerData { service, node })),
+            service_name: service_name.to_string(),
             _phantom: Default::default(),
             _unsync: Default::default(),
         })
@@ -489,6 +491,54 @@ impl<'a, T> Drop for AsyncReceiver<'a, T> {
                 &data.node.context,
                 async_selector::Command::RemoveServer(cloned),
             );
+        }
+    }
+}
+
+// ============================================================================
+// RosServer trait implementation
+// ============================================================================
+
+/// A request wrapper that implements `ServiceRequest` for the API traits.
+pub struct RclServiceRequest<T: ServiceMsg> {
+    sender: ServerSend<T>,
+    request: <T as ServiceMsg>::Request,
+}
+
+impl<T: ServiceMsg> oxidros_core::api::ServiceRequest<T> for RclServiceRequest<T> {
+    fn request(&self) -> &T::Request {
+        &self.request
+    }
+
+    fn respond(self, response: T::Response) -> oxidros_core::Result<()> {
+        // ServerSend::send returns OResult which uses RclError
+        self.sender
+            .send(&response)
+            .map_err(oxidros_core::Error::Rcl)
+    }
+}
+
+impl<T: ServiceMsg> oxidros_core::api::RosServer<T> for Server<T> {
+    type Request = RclServiceRequest<T>;
+
+    fn service_name(&self) -> std::borrow::Cow<'_, str> {
+        std::borrow::Cow::Borrowed(&self.service_name)
+    }
+
+    async fn recv(&mut self) -> oxidros_core::Result<Self::Request> {
+        // Server::recv returns Result which already uses oxidros_core::Error
+        let (sender, request, _header) = Server::recv(self).await?;
+        Ok(RclServiceRequest { sender, request })
+    }
+
+    fn try_recv(&mut self) -> oxidros_core::Result<Option<Self::Request>> {
+        match Server::try_recv(self) {
+            RecvResult::Ok((sender, request, _header)) => {
+                Ok(Some(RclServiceRequest { sender, request }))
+            }
+            RecvResult::RetryLater => Ok(None),
+            // RecvResult::Err contains oxidros_core::Error already
+            RecvResult::Err(e) => Err(e),
         }
     }
 }

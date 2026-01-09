@@ -327,8 +327,8 @@ where
 {
     type Request = ServiceRequest<T>;
 
-    fn service_name(&self) -> &str {
-        Server::service_name(self)
+    fn service_name(&self) -> std::borrow::Cow<'_, str> {
+        std::borrow::Cow::Borrowed(Server::service_name(self))
     }
 
     async fn recv(&mut self) -> Result<Self::Request> {

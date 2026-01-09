@@ -246,25 +246,16 @@ where
     T::Request: TypeSupport,
     T::Response: TypeSupport,
 {
-    fn service_name(&self) -> &str {
-        Client::service_name(self)
+    fn service_name(&self) -> std::borrow::Cow<'_, str> {
+        std::borrow::Cow::Borrowed(Client::service_name(self))
     }
 
     fn is_service_available(&self) -> bool {
         Client::is_service_available(self)
     }
 
-    async fn call(&self, request: &T::Request) -> crate::error::Result<T::Response> {
+    async fn call(&mut self, request: &T::Request) -> crate::error::Result<T::Response> {
         let response = Client::call(self, request).await?;
-        Ok(response.response)
-    }
-
-    async fn call_with_timeout(
-        &self,
-        request: &T::Request,
-        timeout: Duration,
-    ) -> crate::error::Result<T::Response> {
-        let response = Client::call_with_timeout(self, request, timeout).await?;
         Ok(response.response)
     }
 }

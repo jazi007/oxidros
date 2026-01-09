@@ -25,38 +25,12 @@
 //! }
 //! ```
 
-use crate::{Result, ServiceMsg, TypeSupport, qos::Profile};
-use std::{sync::Arc, time::Duration};
+use crate::{Result, ServiceMsg, TypeSupport, message::TakenMsg, qos::Profile};
+use std::{borrow::Cow, sync::Arc};
 
 // ============================================================================
 // Common Types
 // ============================================================================
-
-/// A received message with optional metadata.
-///
-/// The metadata type is implementation-specific.
-#[derive(Debug, Clone)]
-pub struct ReceivedMessage<T, M = ()> {
-    /// The message data.
-    pub data: T,
-    /// Optional metadata (timestamps, sequence numbers, etc.).
-    pub metadata: Option<M>,
-}
-
-impl<T, M> ReceivedMessage<T, M> {
-    /// Create a new received message.
-    pub fn new(data: T, metadata: Option<M>) -> Self {
-        Self { data, metadata }
-    }
-
-    /// Create a received message without metadata.
-    pub fn without_metadata(data: T) -> Self {
-        Self {
-            data,
-            metadata: None,
-        }
-    }
-}
 
 /// A service request that can be responded to.
 ///
@@ -123,13 +97,13 @@ pub trait RosNode: Send + Sync + Sized {
     type Server<T: ServiceMsg>: RosServer<T>;
 
     /// Get the node name.
-    fn name(&self) -> &str;
+    fn name(&self) -> Cow<'_, str>;
 
     /// Get the node namespace.
-    fn namespace(&self) -> &str;
+    fn namespace(&self) -> Cow<'_, str>;
 
     /// Get the fully qualified node name (namespace + name).
-    fn fully_qualified_name(&self) -> String;
+    fn fully_qualified_name(&self) -> Cow<'_, str>;
 
     /// Create a publisher.
     ///
@@ -203,28 +177,32 @@ pub trait RosPublisher<T: TypeSupport>: Send + Sync {
 
 /// A ROS2 subscriber that can receive messages from a topic.
 ///
-/// The metadata type `M` is implementation-specific.
-pub trait RosSubscriber<T: TypeSupport, M = ()>: Send {
+/// Returns [`TakenMsg<T>`] which supports both copied and zero-copy loaned messages.
+pub trait RosSubscriber<T: TypeSupport>: Send {
     /// Get the topic name.
     fn topic_name(&self) -> &str;
 
     /// Receive a message asynchronously.
     ///
     /// This method waits until a message is available.
+    /// Returns [`TakenMsg<T>`] which may be either a copied message or a
+    /// zero-copy loaned message from shared memory.
     ///
     /// # Errors
     ///
     /// Returns an error if deserialization fails or the subscription is closed.
-    fn recv(&mut self) -> impl std::future::Future<Output = Result<ReceivedMessage<T, M>>> + Send;
+    fn recv(&mut self) -> impl std::future::Future<Output = Result<TakenMsg<T>>> + Send;
 
     /// Try to receive a message without blocking.
     ///
     /// Returns `Ok(None)` if no message is currently available.
+    /// Returns [`TakenMsg<T>`] which may be either a copied message or a
+    /// zero-copy loaned message from shared memory.
     ///
     /// # Errors
     ///
     /// Returns an error if deserialization fails or the subscription is closed.
-    fn try_recv(&mut self) -> Result<Option<ReceivedMessage<T, M>>>;
+    fn try_recv(&mut self) -> Result<Option<TakenMsg<T>>>;
 }
 
 // ============================================================================
@@ -232,9 +210,9 @@ pub trait RosSubscriber<T: TypeSupport, M = ()>: Send {
 // ============================================================================
 
 /// A ROS2 service client that can send requests and receive responses.
-pub trait RosClient<T: ServiceMsg>: Send + Sync {
+pub trait RosClient<T: ServiceMsg>: Send {
     /// Get the service name.
-    fn service_name(&self) -> &str;
+    fn service_name(&self) -> Cow<'_, str>;
 
     /// Check if the service is available.
     fn is_service_available(&self) -> bool;
@@ -243,15 +221,8 @@ pub trait RosClient<T: ServiceMsg>: Send + Sync {
     ///
     /// Uses a default timeout (implementation-specific).
     fn call(
-        &self,
+        &mut self,
         request: &T::Request,
-    ) -> impl std::future::Future<Output = Result<T::Response>> + Send;
-
-    /// Send a request with a custom timeout.
-    fn call_with_timeout(
-        &self,
-        request: &T::Request,
-        timeout: Duration,
     ) -> impl std::future::Future<Output = Result<T::Response>> + Send;
 }
 
@@ -265,7 +236,7 @@ pub trait RosServer<T: ServiceMsg>: Send {
     type Request: ServiceRequest<T>;
 
     /// Get the service name.
-    fn service_name(&self) -> &str;
+    fn service_name(&self) -> Cow<'_, str>;
 
     /// Receive a request asynchronously.
     ///

@@ -212,29 +212,20 @@ impl<T: TypeSupport> Subscriber<T> {
 // RosSubscriber trait implementation
 // ============================================================================
 
-impl<T: TypeSupport> oxidros_core::api::RosSubscriber<T, Option<Attachment>> for Subscriber<T> {
+impl<T: TypeSupport> oxidros_core::api::RosSubscriber<T> for Subscriber<T> {
     fn topic_name(&self) -> &str {
         Subscriber::topic_name(self)
     }
 
-    async fn recv(
-        &mut self,
-    ) -> crate::error::Result<oxidros_core::ReceivedMessage<T, Option<Attachment>>> {
+    async fn recv(&mut self) -> crate::error::Result<oxidros_core::message::TakenMsg<T>> {
         let msg = Subscriber::recv(self).await?;
-        Ok(oxidros_core::ReceivedMessage::new(
-            msg.data,
-            Some(msg.attachment),
-        ))
+        // Zenoh always copies messages (no loaned message support)
+        Ok(oxidros_core::message::TakenMsg::Copied(msg.data))
     }
 
-    fn try_recv(
-        &mut self,
-    ) -> crate::error::Result<Option<oxidros_core::ReceivedMessage<T, Option<Attachment>>>> {
+    fn try_recv(&mut self) -> crate::error::Result<Option<oxidros_core::message::TakenMsg<T>>> {
         match Subscriber::try_recv(self)? {
-            Some(msg) => Ok(Some(oxidros_core::ReceivedMessage::new(
-                msg.data,
-                Some(msg.attachment),
-            ))),
+            Some(msg) => Ok(Some(oxidros_core::message::TakenMsg::Copied(msg.data))),
             None => Ok(None),
         }
     }

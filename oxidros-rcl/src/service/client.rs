@@ -92,13 +92,14 @@ unsafe impl Send for ClientData {}
 /// Client.
 pub struct Client<T: ServiceMsg> {
     pub(crate) data: Arc<ClientData>,
+    service_name: String,
     _phantom: PhantomData<T>,
 }
 
 impl<T: ServiceMsg> Client<T> {
     pub(crate) fn new(node: Arc<Node>, service_name: &str, qos: Option<Profile>) -> OResult<Self> {
         let mut client = rcl::MTSafeFn::rcl_get_zero_initialized_client();
-        let service_name = CString::new(service_name).unwrap_or_default();
+        let service_name_c = CString::new(service_name).unwrap_or_default();
         let profile = qos.unwrap_or_else(Profile::services_default);
         let options = rcl::rcl_client_options_t {
             qos: (&profile).into(),
@@ -110,12 +111,13 @@ impl<T: ServiceMsg> Client<T> {
             &mut client,
             node.as_ptr(),
             <T as ServiceMsg>::type_support() as *const rcl::rosidl_service_type_support_t,
-            service_name.as_ptr(),
+            service_name_c.as_ptr(),
             &options,
         )?;
 
         Ok(Client {
             data: Arc::new(ClientData { client, node }),
+            service_name: service_name.to_string(),
             _phantom: Default::default(),
         })
     }
@@ -464,5 +466,24 @@ impl<'a, T: ServiceMsg> Drop for AsyncReceiver<'a, T> {
                 async_selector::Command::RemoveClient(self.client.data.data.clone()),
             );
         }
+    }
+}
+
+// ============================================================================
+// RosClient trait implementation
+// ============================================================================
+
+impl<T: ServiceMsg> oxidros_core::api::RosClient<T> for Client<T> {
+    fn service_name(&self) -> std::borrow::Cow<'_, str> {
+        std::borrow::Cow::Borrowed(&self.service_name)
+    }
+
+    fn is_service_available(&self) -> bool {
+        Client::is_service_available(self).unwrap_or(false)
+    }
+
+    async fn call(&mut self, request: &T::Request) -> oxidros_core::Result<T::Response> {
+        let (response, _header) = Client::send(self, request)?.recv().await?;
+        Ok(response)
     }
 }
