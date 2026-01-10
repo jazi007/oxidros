@@ -4,7 +4,6 @@ use std::pin::Pin;
 
 use oxidros::{
     msg::TypeSupport,
-    oxidros_rcl::RecvResult,
     topic::{
         publisher::Publisher,
         subscriber::{Subscriber, TakenMsg},
@@ -54,9 +53,9 @@ impl<T: TypeSupport + Send + 'static> Subscribe<T> for Subscriber<T> {
         };
         while results.len() < limit {
             match self.try_recv() {
-                RecvResult::Ok(msg) => results.push(msg),
-                RecvResult::Err(e) => return Err(e),
-                RecvResult::RetryLater => break,
+                Ok(Some(msg)) => results.push(msg),
+                Err(e) => return Err(e),
+                Ok(None) => break,
             }
         }
 

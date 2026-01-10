@@ -3,7 +3,6 @@
 pub mod common;
 
 use oxidros_rcl::{
-    RecvResult,
     action::{
         GoalStatus,
         client::Client,
@@ -101,17 +100,17 @@ fn test_action() -> Result<()> {
 
     loop {
         match recv.recv_timeout(Duration::from_secs(3), &mut selector) {
-            RecvResult::Ok((data, header)) => {
+            Ok(Some((data, header))) => {
                 println!(
                     "received goal response: accepted = {:?}, seq = {}",
                     data.accepted, header.sequence_number
                 );
                 break;
             }
-            RecvResult::RetryLater => {
+            Ok(None) => {
                 println!("did not receive goal response, retrying");
             }
-            RecvResult::Err(e) => panic!("{}", e),
+            Err(e) => panic!("{}", e),
         }
     }
 
@@ -119,12 +118,12 @@ fn test_action() -> Result<()> {
     let mut received = 0;
     while received <= 5 {
         match client.recv_feedback_timeout(Duration::from_secs(3), &mut selector) {
-            RecvResult::Ok(feedback) => {
+            Ok(Some(feedback)) => {
                 println!("received feedback: {:?}", feedback);
                 received += 1;
             }
-            RecvResult::RetryLater => {}
-            RecvResult::Err(e) => panic!("{}", e),
+            Ok(None) => {}
+            Err(e) => panic!("{}", e),
         }
     }
 
@@ -137,15 +136,15 @@ fn test_action() -> Result<()> {
 
     loop {
         match recv.recv_timeout(Duration::from_secs(3), &mut selector) {
-            RecvResult::Ok((data, header)) => {
+            Ok(Some((data, header))) => {
                 println!(
                     "received result: result = {:?} status = {:?}, seq = {}",
                     data.result, data.status, header.sequence_number
                 );
                 break;
             }
-            RecvResult::RetryLater => {}
-            RecvResult::Err(e) => panic!("{}", e),
+            Ok(None) => {}
+            Err(e) => panic!("{}", e),
         };
     }
 
@@ -186,15 +185,15 @@ fn test_action_cancel() -> Result<()> {
 
     loop {
         match recv.recv_timeout(Duration::from_secs(3), &mut selector) {
-            RecvResult::Ok((data, header)) => {
+            Ok(Some((data, header))) => {
                 println!(
                     "received goal response: accepted = {:?}, seq = {}",
                     data.accepted, header.sequence_number
                 );
                 break;
             }
-            RecvResult::RetryLater => {}
-            RecvResult::Err(e) => panic!("{}", e),
+            Ok(None) => {}
+            Err(e) => panic!("{}", e),
         }
     }
 
@@ -208,17 +207,17 @@ fn test_action_cancel() -> Result<()> {
 
     loop {
         match recv.recv_timeout(Duration::from_secs(3), &mut selector) {
-            RecvResult::Ok((data, header)) => {
+            Ok(Some((data, header))) => {
                 println!(
                     "received cancel goal response: data = {:?}, seq = {}",
                     data, header.sequence_number
                 );
                 break;
             }
-            RecvResult::RetryLater => {
+            Ok(None) => {
                 println!("retrying");
             }
-            RecvResult::Err(e) => panic!("{}", e),
+            Err(e) => panic!("{}", e),
         }
     }
 
@@ -251,22 +250,22 @@ fn test_action_status() -> Result<()> {
 
     loop {
         match recv.recv_timeout(Duration::from_secs(3), &mut selector) {
-            RecvResult::Ok((data, header)) => {
+            Ok(Some((data, header))) => {
                 println!(
                     "received goal response: accepted = {:?}, seq = {}",
                     data.accepted, header.sequence_number
                 );
                 break;
             }
-            RecvResult::RetryLater => {}
-            RecvResult::Err(e) => panic!("{}", e),
+            Ok(None) => {}
+            Err(e) => panic!("{}", e),
         }
     }
 
     // get status
     loop {
         match client.recv_status_timeout(Duration::from_secs(3), &mut selector) {
-            RecvResult::Ok(statuses) => {
+            Ok(Some(statuses)) => {
                 for stat in statuses.status_list.iter() {
                     if stat.goal_info.goal_id.uuid == uuid {
                         let status: GoalStatus = stat.status.into();
@@ -278,8 +277,8 @@ fn test_action_status() -> Result<()> {
                     }
                 }
             }
-            RecvResult::RetryLater => {}
-            RecvResult::Err(e) => panic!("{}", e),
+            Ok(None) => {}
+            Err(e) => panic!("{}", e),
         }
     }
 }

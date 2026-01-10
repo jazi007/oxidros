@@ -3,7 +3,6 @@
 pub mod common;
 
 use oxidros_rcl::{
-    RecvResult,
     context::Context,
     error::Result,
     msg::common_interfaces::example_interfaces::srv::{AddTwoInts_Request, AddTwoInts_Response},
@@ -61,15 +60,15 @@ fn test_service() -> Result<()> {
 
     // Client: receive the response
     match rcv_client.try_recv() {
-        RecvResult::Ok((data, header)) => {
+        Ok(Some((data, header))) => {
             println!("Client: sum = {}, header = {:?}", data.sum, header);
             assert_eq!(data.sum, 8);
             Ok(())
         }
-        RecvResult::RetryLater => {
+        Ok(None) => {
             println!("should retry");
             Ok(())
         }
-        RecvResult::Err(e) => Err(e),
+        Err(e) => Err(e),
     }
 }

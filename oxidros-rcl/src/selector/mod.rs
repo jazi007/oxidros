@@ -56,7 +56,7 @@
 use self::guard_condition::{GuardCondition, RCLGuardCondition};
 
 use crate::{
-    PhantomUnsend, PhantomUnsync, RecvResult,
+    PhantomUnsend, PhantomUnsync,
     action::{self, SendGoalServiceRequest, handle::GoalHandle},
     context::Context,
     error::Result,
@@ -341,11 +341,11 @@ impl Selector {
 
             loop {
                 match subscriber.try_recv() {
-                    RecvResult::Ok(n) => {
+                    Ok(Some(n)) => {
                         handler(n);
                     }
-                    RecvResult::RetryLater => return CallbackResult::Ok,
-                    RecvResult::Err(e) => {
+                    Ok(None) => return CallbackResult::Ok,
+                    Err(e) => {
                         let logger = Logger::new("oxidros");
                         pr_error_in!(logger, "failed try_recv() of subscriber: {}", e);
                         return CallbackResult::Remove;
@@ -465,7 +465,7 @@ impl Selector {
 
             loop {
                 match server.try_recv() {
-                    RecvResult::Ok((server_send, request, header)) => {
+                    Ok(Some((server_send, request, header))) => {
                         let result = handler(request, header);
                         match server_send.send(&result) {
                             Ok(()) => {}
@@ -476,10 +476,10 @@ impl Selector {
                             }
                         }
                     }
-                    RecvResult::RetryLater => {
+                    Ok(None) => {
                         return CallbackResult::Ok;
                     }
-                    RecvResult::Err(e) => {
+                    Err(e) => {
                         let logger = Logger::new("oxidros");
                         pr_fatal_in!(logger, "failed try_recv() of server: {}", e);
                         return CallbackResult::Remove;
@@ -607,7 +607,7 @@ impl Selector {
 
                 loop {
                     match server.try_recv_goal_request() {
-                        RecvResult::Ok((sender, request)) => {
+                        Ok(Some((sender, request))) => {
                             let accepted = goal_handler(request);
                             match if accepted {
                                 sender.accept(&accept_handler)
@@ -622,8 +622,8 @@ impl Selector {
                                 }
                             }
                         }
-                        RecvResult::RetryLater => {}
-                        RecvResult::Err(e) => {
+                        Ok(None) => {}
+                        Err(e) => {
                             let logger = Logger::new("oxidros");
                             pr_error_in!(
                                 logger,
@@ -654,7 +654,7 @@ impl Selector {
 
                 loop {
                     match server.try_recv_cancel_request() {
-                        RecvResult::Ok((sender, _req, goals)) => {
+                        Ok(Some((sender, _req, goals))) => {
                             let accepted_goals: Vec<_> = goals
                                 .into_iter()
                                 .filter(|goal| cancel_goal_handler(goal))
@@ -672,8 +672,8 @@ impl Selector {
                                 }
                             }
                         }
-                        RecvResult::RetryLater => {}
-                        RecvResult::Err(e) => {
+                        Ok(None) => {}
+                        Err(e) => {
                             let logger = Logger::new("oxidros");
                             pr_error_in!(
                                 logger,
@@ -704,21 +704,19 @@ impl Selector {
 
                 loop {
                     match server.try_recv_result_request() {
-                        RecvResult::Ok((sender, request)) => {
-                            match sender.send(request.get_uuid()) {
-                                Ok(_) => return CallbackResult::Ok,
-                                Err(e) => {
-                                    let logger = Logger::new("oxidros");
-                                    pr_error_in!(
-                                        logger,
-                                        "failed to send cancel responses from action server: {e}",
-                                    );
-                                    return CallbackResult::Remove;
-                                }
+                        Ok(Some((sender, request))) => match sender.send(request.get_uuid()) {
+                            Ok(_) => return CallbackResult::Ok,
+                            Err(e) => {
+                                let logger = Logger::new("oxidros");
+                                pr_error_in!(
+                                    logger,
+                                    "failed to send cancel responses from action server: {e}",
+                                );
+                                return CallbackResult::Remove;
                             }
-                        }
-                        RecvResult::RetryLater => {}
-                        RecvResult::Err(e) => {
+                        },
+                        Ok(None) => {}
+                        Err(e) => {
                             let logger = Logger::new("oxidros");
                             pr_error_in!(
                                 logger,

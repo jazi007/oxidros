@@ -252,21 +252,21 @@ This document details the public API differences between `oxidros-rcl` and `oxid
 
 ---
 
-### 12. Error Types
+### 12. Error Types ✅
 
 | Type | `oxidros-rcl` | `oxidros-zenoh` | Status |
 |------|---------------|-----------------|--------|
-| Result alias | `OResult<T>` = `Result<T, RclError>` | `Result<T>` = `Result<T, Error>` | ⚠️ Different |
-| Re-exports | `RclError`, `ActionError`, `Error`, `Result` | `Error`, `Result` | ⚠️ Different |
+| Result alias | `Result<T>` = `Result<T, Error>` | `Result<T>` = `Result<T, Error>` | ✅ Aligned |
+| Re-exports | `Error`, `Result`, `ActionError`, `RclError` | `Error`, `Result`, `ActionError`, `RclError` | ✅ Aligned |
 
 ---
 
-### 13. zenoh-ext Crate (Not Used!)
+### 13. zenoh-ext Crate ✅
 
-**Critical Issue:** The `zenoh-ext` crate is declared as a dependency in `oxidros-zenoh/Cargo.toml` but is **never actually used** in the code.
+**Status:** ✅ Completed - zenoh-ext is now properly used for TRANSIENT_LOCAL durability support.
 
 ```toml
-# In Cargo.toml - declared but unused:
+# In Cargo.toml - now actively used:
 zenoh-ext = { version = "1.0", features = ["unstable"] }
 ```
 
@@ -304,16 +304,17 @@ The goal is to create a unified API that allows users to write backend-agnostic 
 
 **Goal:** Establish common traits in `oxidros-core` that both backends implement.
 
-#### Step 1.1: Unify Error Types
-- [ ] Ensure both backends use `oxidros_core::Error` as the primary error type
-- [ ] Rename rcl's `OResult<T>` to `Result<T>` for consistency
-- [ ] Keep backend-specific error variants (RclError, ZenohError) as enum variants in unified Error
+#### Step 1.1: Unify Error Types ✅
+- [x] Ensure both backends use `oxidros_core::Error` as the primary error type
+- [x] Rename rcl's `OResult<T>` to `Result<T>` for consistency
+- [x] Keep backend-specific error variants (RclError, ZenohError) as enum variants in unified Error
+- [x] Re-export error types at crate root for both backends (`Error`, `Result`, `ActionError`, `RclError`)
 
-#### Step 1.2: Unify RecvResult Pattern
-- [ ] Decide on unified pattern: Either `RecvResult<T>` enum or `Result<Option<T>>`
-- [ ] Recommendation: Use `Result<Option<T>>` as it's more idiomatic Rust
-- [ ] Update rcl's `try_recv()` to return `Result<Option<T>>` instead of `RecvResult<T>`
-- [ ] Deprecate `RecvResult` enum
+#### Step 1.2: Unify RecvResult Pattern ✅
+- [x] Decide on unified pattern: Either `RecvResult<T>` enum or `Result<Option<T>>`
+- [x] Recommendation: Use `Result<Option<T>>` as it's more idiomatic Rust
+- [x] Update rcl's `try_recv()` to return `Result<Option<T>>` instead of `RecvResult<T>`
+- [x] Remove `RecvResult` enum completely
 
 #### Step 1.3: Review & Extend Core Traits
 - [ ] Audit `oxidros_core::api` traits (RosContext, RosNode, RosPublisher, etc.)

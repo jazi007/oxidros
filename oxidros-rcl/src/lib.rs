@@ -254,13 +254,8 @@ pub use signal_handler::is_halt;
 // Re-export oxidros_core so external crates can access traits without direct dependency
 pub use oxidros_core;
 
-/// A type of return values of some receive functions.
-#[derive(Debug)]
-pub enum RecvResult<T> {
-    Ok(T),
-    RetryLater,
-    Err(crate::error::Error),
-}
+// Re-export error types at crate root for API parity with oxidros-zenoh
+pub use error::{ActionError, Error, RclError, Result};
 
 /// Single-threaded container.
 /// `ST<T>` cannot be send to another thread and shared by multiple threads.
@@ -297,12 +292,12 @@ impl<T> DerefMut for ST<T> {
 
 impl<'a, T: msg::ServiceMsg> ST<ClientRecv<'a, T>> {
     /// This function calls `ClientRecv::try_recv` internally,
-    /// but `RecvResult::RetryLater` includes `ST<CleintRecv<T>>` instead of `ClientRecv<T>`.
-    pub fn try_recv(&self) -> RecvResult<(<T as ServiceMsg>::Response, Header)> {
+    /// but `Ok(None)` includes `ST<CleintRecv<T>>` instead of `ClientRecv<T>`.
+    pub fn try_recv(&self) -> Result<Option<(<T as ServiceMsg>::Response, Header)>> {
         match self.data.try_recv() {
-            RecvResult::Ok((response, header)) => RecvResult::Ok((response, header)),
-            RecvResult::RetryLater => RecvResult::RetryLater,
-            RecvResult::Err(e) => RecvResult::Err(e),
+            Ok(Some((response, header))) => Ok(Some((response, header))),
+            Ok(None) => Ok(None),
+            Err(e) => Err(e),
         }
     }
 }

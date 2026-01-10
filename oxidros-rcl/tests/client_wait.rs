@@ -5,7 +5,7 @@ pub mod common;
 use oxidros_rcl::msg::common_interfaces::example_interfaces::srv::{
     AddTwoInts_Request, AddTwoInts_Response,
 };
-use oxidros_rcl::{RecvResult, context::Context, error::Result};
+use oxidros_rcl::{context::Context, error::Result};
 use std::time::Duration;
 
 const SERVICE_NAME2: &str = "test_service2";
@@ -58,14 +58,14 @@ fn test_client_wait() -> Result<()> {
     std::thread::sleep(Duration::from_millis(1));
 
     match rcv_client.recv_timeout(Duration::from_millis(20), &mut selector) {
-        RecvResult::Ok((response, _)) => {
+        Ok(Some((response, _))) => {
             println!("received: {}", response.sum);
             Ok(())
         }
-        RecvResult::RetryLater => {
+        Ok(None) => {
             println!("retry later");
             Ok(())
         }
-        RecvResult::Err(e) => Err(e),
+        Err(e) => Err(e),
     }
 }

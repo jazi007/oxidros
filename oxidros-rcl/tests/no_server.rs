@@ -5,7 +5,7 @@ pub mod common;
 use oxidros_rcl::msg::common_interfaces::example_interfaces::srv::{
     AddTwoInts_Request, AddTwoInts_Response,
 };
-use oxidros_rcl::{RecvResult, context::Context, error::Result};
+use oxidros_rcl::{context::Context, error::Result};
 use std::time::Duration;
 
 const SERVICE_NAME3: &str = "test_service3";
@@ -34,13 +34,13 @@ fn test_no_server() -> Result<()> {
     let srv;
     let request;
     match server.try_recv() {
-        RecvResult::Ok((s, req, header)) => {
+        Ok(Some((s, req, header))) => {
             println!("server:recv: seq = {:?}", header.get_sequence());
             srv = s;
             request = req;
         }
-        RecvResult::RetryLater => panic!("server:try_recv: retry later"),
-        RecvResult::Err(e) => panic!("server:try_recv:error: {e}"),
+        Ok(None) => panic!("server:try_recv: retry later"),
+        Err(e) => panic!("server:try_recv:error: {e}"),
     }
 
     std::thread::sleep(Duration::from_millis(50));
@@ -60,17 +60,17 @@ fn test_no_server() -> Result<()> {
     std::thread::sleep(Duration::from_millis(50));
 
     match receiver.try_recv() {
-        RecvResult::Ok((msg, header)) => {
+        Ok(Some((msg, header))) => {
             panic!(
                 "try_recv: msg = {:?}, seq = {:?}",
                 msg,
                 header.get_sequence()
             );
         }
-        RecvResult::Err(_e) => {
+        Err(_e) => {
             panic!("try_recv: error");
         }
-        RecvResult::RetryLater => {
+        Ok(None) => {
             println!("try_recv: retry later");
         }
     }

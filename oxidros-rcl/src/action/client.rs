@@ -8,7 +8,6 @@ use std::{ffi::CString, marker::PhantomData, sync::Arc, task::Poll, time::Durati
 
 use crate::helper::is_unpin;
 use crate::{
-    RecvResult,
     error::Result,
     get_allocator, is_halt,
     msg::{
@@ -202,12 +201,12 @@ where
         })
     }
 
-    /// Takes a feedback for the goal. If there is no feedback, it returns [`RecvResult::RetryLater`].
-    pub fn try_recv_feedback(&mut self) -> RecvResult<<T as ActionMsg>::Feedback> {
+    /// Takes a feedback for the goal. If there is no feedback
+    pub fn try_recv_feedback(&mut self) -> Result<Option<<T as ActionMsg>::Feedback>> {
         match rcl_action_take_feedback::<T>(&self.data.client) {
-            Ok(feedback) => RecvResult::Ok(feedback),
-            Err(Error::Action(ActionError::ClientTakeFailed)) => RecvResult::RetryLater,
-            Err(e) => RecvResult::Err(e),
+            Ok(feedback) => Ok(Some(feedback)),
+            Err(Error::Action(ActionError::ClientTakeFailed)) => Ok(None),
+            Err(e) => Err(e),
         }
     }
 
@@ -216,12 +215,12 @@ where
         &mut self,
         t: Duration,
         selector: &mut Selector,
-    ) -> RecvResult<<T as ActionMsg>::Feedback> {
+    ) -> Result<Option<<T as ActionMsg>::Feedback>> {
         selector.add_action_client(self.data.clone(), None, None, None, None, None);
         match selector.wait_timeout(t) {
             Ok(true) => self.try_recv_feedback(),
-            Ok(false) => RecvResult::RetryLater,
-            Err(e) => RecvResult::Err(e),
+            Ok(false) => Ok(None),
+            Err(e) => Err(e),
         }
     }
 
@@ -236,11 +235,11 @@ where
     }
 
     /// Takes a status message for all the ongoing goals.
-    pub fn try_recv_status(&mut self) -> RecvResult<GoalStatusArray> {
+    pub fn try_recv_status(&mut self) -> Result<Option<GoalStatusArray>> {
         match rcl_action_take_status(&self.data.client) {
-            Ok(status_array) => RecvResult::Ok(status_array),
-            Err(Error::Action(ActionError::ClientTakeFailed)) => RecvResult::RetryLater,
-            Err(e) => RecvResult::Err(e),
+            Ok(status_array) => Ok(Some(status_array)),
+            Err(Error::Action(ActionError::ClientTakeFailed)) => Ok(None),
+            Err(e) => Err(e),
         }
     }
 
@@ -249,12 +248,12 @@ where
         &mut self,
         t: Duration,
         selector: &mut Selector,
-    ) -> RecvResult<GoalStatusArray> {
+    ) -> Result<Option<GoalStatusArray>> {
         selector.add_action_client(self.data.clone(), None, None, None, None, None);
         match selector.wait_timeout(t) {
             Ok(true) => self.try_recv_status(),
-            Ok(false) => RecvResult::RetryLater,
-            Err(e) => RecvResult::Err(e),
+            Ok(false) => Ok(None),
+            Err(e) => Err(e),
         }
     }
 
@@ -292,18 +291,18 @@ pub struct ClientGoalRecv<'a, T: ActionMsg> {
 }
 
 impl<'a, T: ActionMsg> ClientGoalRecv<'a, T> {
-    /// Returns a response if available. If there is no response, it returns [`RecvResult::RetryLater`].
-    pub fn try_recv(&self) -> RecvResult<(SendGoalServiceResponse<T>, rcl::rmw_request_id_t)> {
+    /// Returns a response if available. If there is no response, it returns [`Ok(None)`].
+    pub fn try_recv(&self) -> Result<Option<(SendGoalServiceResponse<T>, rcl::rmw_request_id_t)>> {
         match rcl_action_take_goal_response::<T>(&self.inner.client.data.client) {
             Ok((response, header)) => {
                 if header.sequence_number == self.seq {
-                    RecvResult::Ok((response, header))
+                    Ok(Some((response, header)))
                 } else {
-                    RecvResult::RetryLater
+                    Ok(None)
                 }
             }
-            Err(Error::Action(ActionError::ClientTakeFailed)) => RecvResult::RetryLater,
-            Err(e) => RecvResult::Err(e),
+            Err(Error::Action(ActionError::ClientTakeFailed)) => Ok(None),
+            Err(e) => Err(e),
         }
     }
 
@@ -312,13 +311,13 @@ impl<'a, T: ActionMsg> ClientGoalRecv<'a, T> {
         &self,
         t: Duration,
         selector: &mut Selector,
-    ) -> RecvResult<(SendGoalServiceResponse<T>, rcl::rmw_request_id_t)> {
+    ) -> Result<Option<(SendGoalServiceResponse<T>, rcl::rmw_request_id_t)>> {
         selector.add_action_client(self.inner.client.data.clone(), None, None, None, None, None);
 
         match selector.wait_timeout(t) {
             Ok(true) => self.try_recv(),
-            Ok(false) => RecvResult::RetryLater,
-            Err(e) => RecvResult::Err(e),
+            Ok(false) => Ok(None),
+            Err(e) => Err(e),
         }
     }
 
@@ -369,9 +368,9 @@ impl<'a, T: ActionMsg> Future for AsyncGoalReceiver<'a, T> {
         let (client, is_waiting) = self.project();
         *is_waiting = false;
         match client.try_recv() {
-            RecvResult::Ok(v) => Poll::Ready(Ok(v)),
-            RecvResult::Err(e) => Poll::Ready(Err(e)),
-            RecvResult::RetryLater => {
+            Ok(Some(v)) => Poll::Ready(Ok(v)),
+            Err(e) => Poll::Ready(Err(e)),
+            Ok(None) => {
                 let mut waker = Some(cx.waker().clone());
                 let mut guard = SELECTOR.lock();
                 match guard.send_command(
@@ -406,17 +405,17 @@ pub struct ClientCancelRecv<'a, T: ActionMsg> {
 }
 
 impl<'a, T: ActionMsg> ClientCancelRecv<'a, T> {
-    pub fn try_recv(&self) -> RecvResult<(CancelGoal_Response, rcl::rmw_request_id_t)> {
+    pub fn try_recv(&self) -> Result<Option<(CancelGoal_Response, rcl::rmw_request_id_t)>> {
         match rcl_action_take_cancel_response(&self.inner.client.data.client) {
             Ok((response, header)) => {
                 if header.sequence_number == self.seq {
-                    RecvResult::Ok((response, header))
+                    Ok(Some((response, header)))
                 } else {
-                    RecvResult::RetryLater
+                    Ok(None)
                 }
             }
-            Err(Error::Action(ActionError::ClientTakeFailed)) => RecvResult::RetryLater,
-            Err(e) => RecvResult::Err(e),
+            Err(Error::Action(ActionError::ClientTakeFailed)) => Ok(None),
+            Err(e) => Err(e),
         }
     }
 
@@ -425,12 +424,12 @@ impl<'a, T: ActionMsg> ClientCancelRecv<'a, T> {
         &self,
         t: Duration,
         selector: &mut Selector,
-    ) -> RecvResult<(CancelGoal_Response, rcl::rmw_request_id_t)> {
+    ) -> Result<Option<(CancelGoal_Response, rcl::rmw_request_id_t)>> {
         selector.add_action_client(self.inner.client.data.clone(), None, None, None, None, None);
         match selector.wait_timeout(t) {
             Ok(true) => self.try_recv(),
-            Ok(false) => RecvResult::RetryLater,
-            Err(e) => RecvResult::Err(e),
+            Ok(false) => Ok(None),
+            Err(e) => Err(e),
         }
     }
 
@@ -480,9 +479,9 @@ impl<'a, T: ActionMsg> Future for AsyncCancelReceiver<'a, T> {
         let (client, is_waiting) = self.project();
         *is_waiting = false;
         match client.try_recv() {
-            RecvResult::Ok(v) => Poll::Ready(Ok(v)),
-            RecvResult::Err(e) => Poll::Ready(Err(e)),
-            RecvResult::RetryLater => {
+            Ok(Some(v)) => Poll::Ready(Ok(v)),
+            Err(e) => Poll::Ready(Err(e)),
+            Ok(None) => {
                 let mut waker = Some(cx.waker().clone());
                 let mut guard = SELECTOR.lock();
 
@@ -518,17 +517,17 @@ pub struct ClientResultRecv<'a, T: ActionMsg> {
 }
 
 impl<'a, T: ActionMsg> ClientResultRecv<'a, T> {
-    pub fn try_recv(&self) -> RecvResult<(GetResultServiceResponse<T>, rcl::rmw_request_id_t)> {
+    pub fn try_recv(&self) -> Result<Option<(GetResultServiceResponse<T>, rcl::rmw_request_id_t)>> {
         match rcl_action_take_result_response::<T>(&self.inner.client.data.client) {
             Ok((response, header)) => {
                 if header.sequence_number == self.seq {
-                    RecvResult::Ok((response, header))
+                    Ok(Some((response, header)))
                 } else {
-                    RecvResult::RetryLater
+                    Ok(None)
                 }
             }
-            Err(Error::Action(ActionError::ClientTakeFailed)) => RecvResult::RetryLater,
-            Err(e) => RecvResult::Err(e),
+            Err(Error::Action(ActionError::ClientTakeFailed)) => Ok(None),
+            Err(e) => Err(e),
         }
     }
 
@@ -537,13 +536,13 @@ impl<'a, T: ActionMsg> ClientResultRecv<'a, T> {
         &self,
         t: Duration,
         selector: &mut Selector,
-    ) -> RecvResult<(GetResultServiceResponse<T>, rcl::rmw_request_id_t)> {
+    ) -> Result<Option<(GetResultServiceResponse<T>, rcl::rmw_request_id_t)>> {
         selector.add_action_client(self.inner.client.data.clone(), None, None, None, None, None);
 
         match selector.wait_timeout(t) {
             Ok(true) => self.try_recv(),
-            Ok(false) => RecvResult::RetryLater,
-            Err(e) => RecvResult::Err(e),
+            Ok(false) => Ok(None),
+            Err(e) => Err(e),
         }
     }
 
@@ -593,9 +592,9 @@ impl<'a, T: ActionMsg> Future for AsyncResultReceiver<'a, T> {
         let (client, is_waiting) = self.project();
         *is_waiting = false;
         match client.try_recv() {
-            RecvResult::Ok(v) => Poll::Ready(Ok(v)),
-            RecvResult::Err(e) => Poll::Ready(Err(e)),
-            RecvResult::RetryLater => {
+            Ok(Some(v)) => Poll::Ready(Ok(v)),
+            Err(e) => Poll::Ready(Err(e)),
+            Ok(None) => {
                 let mut waker = Some(cx.waker().clone());
                 let mut guard = SELECTOR.lock();
                 match guard.send_command(
@@ -663,9 +662,9 @@ impl<'a, T: ActionMsg> Future for AsyncFeedbackReceiver<'a, T> {
         let (client, is_waiting) = self.project();
         *is_waiting = false;
         match client.try_recv_feedback() {
-            RecvResult::Ok(v) => Poll::Ready(Ok(v)),
-            RecvResult::Err(e) => Poll::Ready(Err(e)),
-            RecvResult::RetryLater => {
+            Ok(Some(v)) => Poll::Ready(Ok(v)),
+            Err(e) => Poll::Ready(Err(e)),
+            Ok(None) => {
                 let mut waker = Some(cx.waker().clone());
                 let mut guard = SELECTOR.lock();
 
@@ -734,9 +733,9 @@ impl<'a, T: ActionMsg> Future for AsyncStatusReceiver<'a, T> {
         let (client, is_waiting) = self.project();
         *is_waiting = false;
         match client.try_recv_status() {
-            RecvResult::Ok(v) => Poll::Ready(Ok(v)),
-            RecvResult::Err(e) => Poll::Ready(Err(e)),
-            RecvResult::RetryLater => {
+            Ok(Some(v)) => Poll::Ready(Ok(v)),
+            Err(e) => Poll::Ready(Err(e)),
+            Ok(None) => {
                 let mut waker = Some(cx.waker().clone());
                 let mut guard = SELECTOR.lock();
 

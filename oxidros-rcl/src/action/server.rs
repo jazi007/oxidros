@@ -17,7 +17,6 @@ use crate::helper::is_unpin;
 use crate::logger::{Logger, pr_error_in};
 use crate::msg::GetUUID;
 use crate::{
-    RecvResult,
     clock::Clock,
     error::Result,
     get_allocator, is_halt,
@@ -181,7 +180,7 @@ where
 
     pub fn try_recv_goal_request(
         &mut self,
-    ) -> RecvResult<(ServerGoalSend<T>, SendGoalServiceRequest<T>)> {
+    ) -> Result<Option<(ServerGoalSend<T>, SendGoalServiceRequest<T>)>> {
         match rcl_action_take_goal_request::<T>(&self.data.server) {
             Ok((header, request)) => {
                 let sender = ServerGoalSend {
@@ -190,20 +189,23 @@ where
                     request_id: header,
                     _unsync: Default::default(),
                 };
-                RecvResult::Ok((sender, request))
+                Ok(Some((sender, request)))
             }
-            Err(Error::Action(ActionError::ServerTakeFailed)) => RecvResult::RetryLater,
-            Err(e) => RecvResult::Err(e),
+            Err(Error::Action(ActionError::ServerTakeFailed)) => Ok(None),
+            Err(e) => Err(e),
         }
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn try_recv_cancel_request(
         &mut self,
-    ) -> RecvResult<(
-        ServerCancelSend<T>,
-        rcl_action_cancel_request_t,
-        Vec<GoalInfo>,
-    )> {
+    ) -> Result<
+        Option<(
+            ServerCancelSend<T>,
+            rcl_action_cancel_request_t,
+            Vec<GoalInfo>,
+        )>,
+    > {
         match rcl_recv_cancel_request(&self.data.server) {
             Ok((header, request, goals)) => {
                 // return sender
@@ -212,16 +214,16 @@ where
                     request_id: header,
                     _unsync: Default::default(),
                 };
-                RecvResult::Ok((sender, request, goals))
+                Ok(Some((sender, request, goals)))
             }
-            Err(Error::Action(ActionError::ServerTakeFailed)) => RecvResult::RetryLater,
-            Err(e) => RecvResult::Err(e),
+            Err(Error::Action(ActionError::ServerTakeFailed)) => Ok(None),
+            Err(e) => Err(e),
         }
     }
 
     pub fn try_recv_result_request(
         &mut self,
-    ) -> RecvResult<(ServerResultSend<T>, GetResultServiceRequest<T>)> {
+    ) -> Result<Option<(ServerResultSend<T>, GetResultServiceRequest<T>)>> {
         match rcl_action_take_result_request::<T>(&self.data.server) {
             Ok((header, request)) => {
                 let sender = ServerResultSend {
@@ -229,10 +231,10 @@ where
                     request_id: header,
                     _unsync: Default::default(),
                 };
-                RecvResult::Ok((sender, request))
+                Ok(Some((sender, request)))
             }
-            Err(Error::Action(ActionError::ServerTakeFailed)) => RecvResult::RetryLater,
-            Err(e) => RecvResult::Err(e),
+            Err(Error::Action(ActionError::ServerTakeFailed)) => Ok(None),
+            Err(e) => Err(e),
         }
     }
 
@@ -371,9 +373,9 @@ impl<'a, T: ActionMsg> Future for AsyncGoalReceiver<'a, T> {
         let (server, is_waiting) = self.project();
         *is_waiting = false;
         match server.try_recv_goal_request() {
-            RecvResult::Ok(v) => Poll::Ready(Ok(v)),
-            RecvResult::Err(e) => Poll::Ready(Err(e)),
-            RecvResult::RetryLater => {
+            Ok(Some(v)) => Poll::Ready(Ok(v)),
+            Err(e) => Poll::Ready(Err(e)),
+            Ok(None) => {
                 let mut waker = Some(cx.waker().clone());
                 let mut guard = SELECTOR.lock();
 
@@ -512,9 +514,9 @@ impl<'a, T: ActionMsg> Future for AsyncCancelReceiver<'a, T> {
         let (server, is_waiting) = self.project();
         *is_waiting = false;
         match server.try_recv_cancel_request() {
-            RecvResult::Ok((s, _, g)) => Poll::Ready(Ok((s, g))),
-            RecvResult::Err(e) => Poll::Ready(Err(e)),
-            RecvResult::RetryLater => {
+            Ok(Some((s, _, g))) => Poll::Ready(Ok((s, g))),
+            Err(e) => Poll::Ready(Err(e)),
+            Ok(None) => {
                 let mut waker = Some(cx.waker().clone());
                 let mut guard = SELECTOR.lock();
 
@@ -625,9 +627,9 @@ impl<'a, T: ActionMsg> Future for AsyncResultReceiver<'a, T> {
         let (server, is_waiting) = self.project();
         *is_waiting = false;
         match server.try_recv_result_request() {
-            RecvResult::Ok(v) => Poll::Ready(Ok(v)),
-            RecvResult::Err(e) => Poll::Ready(Err(e)),
-            RecvResult::RetryLater => {
+            Ok(Some(v)) => Poll::Ready(Ok(v)),
+            Err(e) => Poll::Ready(Err(e)),
+            Ok(None) => {
                 let mut waker = Some(cx.waker().clone());
                 let mut guard = SELECTOR.lock();
                 let cmd = Command::ActionServer {

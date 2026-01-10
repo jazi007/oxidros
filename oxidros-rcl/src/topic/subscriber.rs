@@ -18,7 +18,6 @@
 //! ```
 //! use oxidros_rcl::{
 //!     context::Context, logger::Logger, msg::common_interfaces::std_msgs, pr_error, pr_info,
-//!     RecvResult,
 //! };
 //!
 //! let ctx = Context::new().unwrap();
@@ -45,9 +44,9 @@
 //!
 //! // Receive the message.
 //! match subscriber.try_recv() {
-//!     RecvResult::Ok(msg) => pr_info!(logger, "msg = {}", msg.data),
-//!     RecvResult::RetryLater => pr_info!(logger, "retry later"),
-//!     RecvResult::Err(e) => pr_error!(logger, "error = {}", e),
+//!     Ok(Some(msg)) => pr_info!(logger, "msg = {}", msg.data),
+//!     Ok(None) => pr_info!(logger, "retry later"),
+//!     Err(e) => pr_error!(logger, "error = {}", e),
 //! }
 //! ```
 //!
@@ -151,7 +150,7 @@
 //! `None` of the 2nd argument of `create_subscriber` is equivalent to `Some(Profile::default())`.
 
 use crate::{
-    PhantomUnsync, RecvResult,
+    PhantomUnsync,
     error::Result,
     get_allocator,
     helper::is_unpin,
@@ -297,7 +296,7 @@ impl<T: TypeSupport> Subscriber<T> {
     /// Non-blocking receive.
     ///
     /// Because `rcl::rcl_take` is non-blocking,
-    /// `try_recv()` returns `RecvResult::RetryLater` if
+    /// `try_recv()` returns `Ok(None)` if
     /// data is not available.
     ///
     /// # Example
@@ -305,15 +304,15 @@ impl<T: TypeSupport> Subscriber<T> {
     /// ```
     /// use oxidros_rcl::{
     ///     logger::Logger, msg::common_interfaces::std_msgs, pr_error, pr_info,
-    ///     topic::subscriber::Subscriber, RecvResult,
+    ///     topic::subscriber::Subscriber,
     /// };
     ///
     /// fn pubsub(subscriber: Subscriber<std_msgs::msg::UInt32>, logger: Logger) {
     ///     // Receive the message.
     ///     match subscriber.try_recv() {
-    ///         RecvResult::Ok(msg) => pr_info!(logger, "msg = {}", msg.data),
-    ///         RecvResult::RetryLater => pr_info!(logger, "retry later"),
-    ///         RecvResult::Err(e) => pr_error!(logger, "error = {}", e),
+    ///         Ok(Some(msg)) => pr_info!(logger, "msg = {}", msg.data),
+    ///         Ok(None) => pr_info!(logger, "retry later"),
+    ///         Err(e) => pr_error!(logger, "error = {}", e),
     ///     }
     /// }
     /// ```
@@ -324,8 +323,7 @@ impl<T: TypeSupport> Subscriber<T> {
     /// - `RCLError::SubscriptionInvalid` if the subscription is invalid, or
     /// - `RCLError::BadAlloc if allocating` memory failed, or
     /// - `RCLError::Error` if an unspecified error occurs.
-    #[must_use]
-    pub fn try_recv(&self) -> RecvResult<TakenMsg<T>> {
+    pub fn try_recv(&self) -> Result<Option<TakenMsg<T>>> {
         #[cfg(feature = "rcl_stat")]
         let start = std::time::SystemTime::now();
 
@@ -335,15 +333,15 @@ impl<T: TypeSupport> Subscriber<T> {
                 #[cfg(feature = "rcl_stat")]
                 self.subscription.measure_latency(start);
 
-                RecvResult::Ok(n)
+                Ok(Some(n))
             }
             Err(Error::Rcl(RclError::SubscriptionTakeFailed)) => {
                 #[cfg(feature = "rcl_stat")]
                 self.subscription.measure_latency(start);
 
-                RecvResult::RetryLater
+                Ok(None)
             }
-            Err(e) => RecvResult::Err(e),
+            Err(e) => Err(e),
         }
     }
     /// Blocking receive.
@@ -359,9 +357,9 @@ impl<T: TypeSupport> Subscriber<T> {
         selector.add_rcl_subscription(self.subscription.clone(), None, false);
         loop {
             match self.try_recv() {
-                RecvResult::Ok(msg) => return Ok(msg),
-                RecvResult::Err(e) => return Err(e),
-                RecvResult::RetryLater => {}
+                Ok(Some(msg)) => return Ok(msg),
+                Err(e) => return Err(e),
+                Ok(None) => {}
             }
             selector.wait()?;
         }
@@ -454,9 +452,9 @@ impl<'a, T: TypeSupport> Future for AsyncReceiver<'a, T> {
         let (subscriber, is_waiting) = self.project();
         *is_waiting = false;
         match subscriber.try_recv() {
-            RecvResult::Ok(v) => Poll::Ready(Ok(v)),
-            RecvResult::Err(e) => Poll::Ready(Err(e)),
-            RecvResult::RetryLater => {
+            Ok(Some(v)) => Poll::Ready(Ok(v)),
+            Err(e) => Poll::Ready(Err(e)),
+            Ok(None) => {
                 let mut guard = SELECTOR.lock();
                 let mut waker = Some(cx.waker().clone());
                 guard.send_command(
@@ -571,9 +569,9 @@ impl<T: TypeSupport> oxidros_core::api::RosSubscriber<T> for Subscriber<T> {
 
     fn try_recv_msg(&mut self) -> oxidros_core::Result<Option<TakenMsg<T>>> {
         match self.try_recv() {
-            RecvResult::Ok(msg) => Ok(Some(msg)),
-            RecvResult::RetryLater => Ok(None),
-            RecvResult::Err(e) => Err(e),
+            Ok(Some(msg)) => Ok(Some(msg)),
+            Ok(None) => Ok(None),
+            Err(e) => Err(e),
         }
     }
 }

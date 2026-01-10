@@ -55,7 +55,6 @@
 
 use super::Header;
 use crate::{
-    RecvResult,
     error::Result,
     get_allocator, is_halt,
     msg::ServiceMsg,
@@ -239,7 +238,7 @@ pub struct ClientRecv<'a, T: ServiceMsg> {
 impl<'a, T: ServiceMsg> ClientRecv<'a, T> {
     /// Receive a message.
     /// `try_recv` is a non-blocking function, and this
-    /// returns `RecvResult::RetryLater`.
+    /// returns `Ok(None)`.
     /// So, please retry later if this value is returned.
     ///
     /// # Errors
@@ -247,21 +246,21 @@ impl<'a, T: ServiceMsg> ClientRecv<'a, T> {
     /// - `RCLError::InvalidArgument` if any arguments are invalid, or
     /// - `RCLError::ClientInvalid` if the client is invalid, or
     /// - `RCLError::Error` if an unspecified error occurs.
-    pub fn try_recv(&self) -> RecvResult<(<T as ServiceMsg>::Response, Header)> {
+    pub fn try_recv(&self) -> Result<Option<(<T as ServiceMsg>::Response, Header)>> {
         let (response, header) = match rcl_take_response_with_info::<<T as ServiceMsg>::Response>(
             &self.data.data.client,
             self.seq,
         ) {
             Ok(data) => data,
-            Err(Error::Rcl(RclError::ClientTakeFailed)) => return RecvResult::RetryLater,
-            Err(e) => return RecvResult::Err(e),
+            Err(Error::Rcl(RclError::ClientTakeFailed)) => return Ok(None),
+            Err(e) => return Err(e),
         };
 
         if header.request_id.sequence_number != self.seq {
-            return RecvResult::RetryLater;
+            return Ok(None);
         }
 
-        RecvResult::Ok((response, Header { header }))
+        Ok(Some((response, Header { header })))
     }
 
     /// Receive a response asynchronously.
@@ -323,7 +322,6 @@ impl<'a, T: ServiceMsg> ClientRecv<'a, T> {
     ///     selector::Selector,
     ///     service::client::Client,
     ///     topic::subscriber::Subscriber,
-    ///     RecvResult,
     /// };
     /// use std::time::Duration;
     ///
@@ -343,9 +341,9 @@ impl<'a, T: ServiceMsg> ClientRecv<'a, T> {
     ///             let receiver = client.send(&request).unwrap();
     ///             // Receive a response.
     ///             match receiver.recv_timeout(Duration::from_millis(20), &mut selector_client) {
-    ///                 RecvResult::Ok((_response, _header)) => {},
-    ///                 RecvResult::RetryLater => {},
-    ///                 RecvResult::Err(e) => {
+    ///                 Ok(Some((_response, _header))) => {},
+    ///                 Ok(None) => {},
+    ///                 Err(e) => {
     ///                     pr_fatal!(logger, "{e}");
     ///                     panic!()
     ///                 }
@@ -362,32 +360,32 @@ impl<'a, T: ServiceMsg> ClientRecv<'a, T> {
         &self,
         t: Duration,
         selector: &mut Selector,
-    ) -> RecvResult<(<T as ServiceMsg>::Response, Header)> {
+    ) -> Result<Option<(<T as ServiceMsg>::Response, Header)>> {
         // Add the receiver.
         selector.add_client_recv(self);
         // Wait a response with timeout.
         match selector.wait_timeout(t) {
             Ok(true) => match self.try_recv() {
-                RecvResult::Ok((response, header)) => {
+                Ok(Some((response, header))) => {
                     // Received a response.
-                    RecvResult::Ok((response, header))
+                    Ok(Some((response, header)))
                 }
-                RecvResult::RetryLater => {
+                Ok(None) => {
                     // No correspondent response.
-                    RecvResult::RetryLater
+                    Ok(None)
                 }
-                RecvResult::Err(e) => {
+                Err(e) => {
                     // Failed to receive.
-                    RecvResult::Err(e)
+                    Err(e)
                 }
             },
             Ok(false) => {
                 // Timeout.
-                RecvResult::RetryLater
+                Ok(None)
             }
             Err(e) => {
                 // Failed to wait.
-                RecvResult::Err(e)
+                Err(e)
             }
         }
     }
@@ -432,9 +430,9 @@ impl<'a, T: ServiceMsg> Future for AsyncReceiver<'a, T> {
         let mut this = self.as_mut();
         this.is_waiting = false;
         match this.client.try_recv() {
-            RecvResult::Ok(v) => return Poll::Ready(Ok(v)),
-            RecvResult::RetryLater => (),
-            RecvResult::Err(e) => return Poll::Ready(Err(e)),
+            Ok(Some(v)) => return Poll::Ready(Ok(v)),
+            Ok(None) => (),
+            Err(e) => return Poll::Ready(Err(e)),
         }
         // wait message arrival
         let mut waker = Some(cx.waker().clone());

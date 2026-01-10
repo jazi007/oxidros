@@ -93,7 +93,7 @@ use super::Header;
 #[cfg(feature = "jazzy")]
 use crate::msg::interfaces::rosgraph_msgs::msg::Clock;
 use crate::{
-    PhantomUnsync, RecvResult,
+    PhantomUnsync,
     error::Result,
     get_allocator,
     helper::is_unpin,
@@ -220,12 +220,12 @@ impl<T: ServiceMsg> Server<T> {
 
     /// Receive a request.
     /// `try_recv` is a non-blocking function, and
-    /// this returns `RecvResult::RetryLater` if there is no available data.
+    /// this returns `Ok(None)` if there is no available data.
     /// So, please retry later if this error is returned.
     ///
     /// # Return value
     ///
-    /// `RecvResult::Ok((ServerSend<T>, <T as ServiceMsg>::Request, Header))` is returned.
+    /// `Ok(Some((ServerSend<T>, <T as ServiceMsg>::Request, Header)))` is returned.
     /// `T` is a type of the request and response.
     /// After receiving a request, `ServerSend<T>` can be used to send a response.
     ///
@@ -234,13 +234,12 @@ impl<T: ServiceMsg> Server<T> {
     /// ```
     /// use oxidros_rcl::{
     ///     logger::Logger, msg::common_interfaces::std_srvs, pr_error, pr_info, service::server::Server,
-    ///     RecvResult,
     /// };
     ///
     /// fn server_fn(mut server: Server<std_srvs::srv::Empty>, logger: Logger) {
     ///     loop {
     ///         match server.try_recv() {
-    ///             RecvResult::Ok((sender, request, header)) => {
+    ///             Ok(Some((sender, request, header))) => {
     ///                 pr_info!(logger, "received: header = {:?}", header);
     ///                 let msg = std_srvs::srv::Empty_Response::new().unwrap();
     ///                 match sender.send(&msg) {
@@ -248,10 +247,10 @@ impl<T: ServiceMsg> Server<T> {
     ///                     Err(_e) => {}, // Failed to send.
     ///                 }
     ///             }
-    ///             RecvResult::RetryLater => {
+    ///             Ok(None) => {
     ///                 pr_info!(logger, "retry later");
     ///             }
-    ///             RecvResult::Err(e) => {
+    ///             Err(e) => {
     ///                 pr_error!(logger, "error: {e}");
     ///                 break;
     ///             }
@@ -266,21 +265,23 @@ impl<T: ServiceMsg> Server<T> {
     /// - `RCLError::ServiceInvalid` if the service is invalid, or
     /// - `RCLError::BadAlloc` if allocating memory failed, or
     /// - `RCLError::Error` if an unspecified error occurs.
-    #[must_use]
-    pub fn try_recv(&mut self) -> RecvResult<(ServerSend<T>, <T as ServiceMsg>::Request, Header)> {
+    #[allow(clippy::type_complexity)]
+    pub fn try_recv(
+        &mut self,
+    ) -> Result<Option<(ServerSend<T>, <T as ServiceMsg>::Request, Header)>> {
         let data = self.data.lock();
         let (request, header) =
             match rcl_take_request_with_info::<<T as ServiceMsg>::Request>(&data.service) {
                 Ok(data) => data,
                 Err(Error::Rcl(RclError::ServiceTakeFailed)) => {
                     drop(data);
-                    return RecvResult::RetryLater;
+                    return Ok(None);
                 }
-                Err(e) => return RecvResult::Err(e),
+                Err(e) => return Err(e),
             };
 
         drop(data);
-        RecvResult::Ok((
+        Ok(Some((
             ServerSend {
                 data: self.data.clone(),
                 request_id: header.request_id,
@@ -289,7 +290,7 @@ impl<T: ServiceMsg> Server<T> {
             },
             request,
             Header { header },
-        ))
+        )))
     }
 
     /// Receive a request asynchronously.
@@ -456,9 +457,9 @@ impl<'a, T: ServiceMsg> Future for AsyncReceiver<'a, T> {
         *is_waiting = false;
         let data = server.data.clone();
         match server.try_recv() {
-            RecvResult::Ok(v) => Poll::Ready(Ok(v)),
-            RecvResult::Err(e) => Poll::Ready(Err(e)),
-            RecvResult::RetryLater => {
+            Ok(Some(v)) => Poll::Ready(Ok(v)),
+            Err(e) => Poll::Ready(Err(e)),
+            Ok(None) => {
                 let mut waker = Some(cx.waker().clone());
                 let mut guard = SELECTOR.lock();
                 if let Err(e) = guard.send_command(
@@ -531,12 +532,9 @@ impl<T: ServiceMsg> oxidros_core::api::RosServer<T> for Server<T> {
 
     fn try_recv_request(&mut self) -> oxidros_core::Result<Option<Self::Request>> {
         match self.try_recv() {
-            RecvResult::Ok((sender, request, _header)) => {
-                Ok(Some(RclServiceRequest { sender, request }))
-            }
-            RecvResult::RetryLater => Ok(None),
-            // RecvResult::Err contains oxidros_core::Error already
-            RecvResult::Err(e) => Err(e),
+            Ok(Some((sender, request, _header))) => Ok(Some(RclServiceRequest { sender, request })),
+            Ok(None) => Ok(None),
+            Err(e) => Err(e),
         }
     }
 }
