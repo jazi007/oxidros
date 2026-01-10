@@ -114,12 +114,14 @@ impl Node {
         enclave: &str,
     ) -> Result<Arc<Self>> {
         let gid = generate_gid();
-
         // Compute effective name/namespace for liveliness token
         let ros2_args = context.ros2_args();
         let effective_name = compute_effective_node_name(name, ros2_args);
         let effective_namespace = compute_effective_namespace(name, namespace, ros2_args);
-
+        // Validate node name
+        ros2args::names::validate_node_name(&effective_name).map_name_err()?;
+        // Validate namespace if provided
+        ros2args::names::validate_namespace(&effective_namespace).map_name_err()?;
         // Create liveliness token key using effective name/namespace
         let token_key = liveliness_node_keyexpr(
             context.domain_id(),
@@ -156,11 +158,6 @@ impl Node {
         compute_effective_node_name(&self.inner.name, self.inner.context.ros2_args())
     }
 
-    /// Get the effective node name (alias for `name()` for API compatibility with oxidros-rcl).
-    pub fn get_name(&self) -> String {
-        self.name()
-    }
-
     /// Get the effective node namespace (after applying `__ns` remapping).
     pub fn namespace(&self) -> String {
         compute_effective_namespace(
@@ -168,11 +165,6 @@ impl Node {
             &self.inner.namespace,
             self.inner.context.ros2_args(),
         )
-    }
-
-    /// Get the effective node namespace (alias for `namespace()` for API compatibility with oxidros-rcl).
-    pub fn get_namespace(&self) -> String {
-        self.namespace()
     }
 
     /// Get the fully qualified node name (using effective name/namespace).
@@ -187,11 +179,6 @@ impl Node {
             },
             &effective_name,
         )
-    }
-
-    /// Get the fully qualified node name (alias for API compatibility with oxidros-rcl).
-    pub fn get_fully_qualified_name(&self) -> String {
-        self.fully_qualified_name()
     }
 
     /// Get the node GID.
@@ -212,6 +199,13 @@ impl Node {
     /// Get the enclave.
     pub fn enclave(&self) -> &str {
         &self.inner.enclave
+    }
+
+    /// Get the original (pre-remapping) node name.
+    ///
+    /// This is used internally for matching node-specific rules (params, topics).
+    pub(crate) fn original_name(&self) -> &str {
+        &self.inner.name
     }
 
     /// Allocate a new entity ID.
@@ -238,37 +232,46 @@ impl Node {
         // Validate the input name
         ros2args::names::validate_topic_name(name).map_name_err()?;
 
-        // Get the effective namespace (use "/" if empty)
-        let namespace = if self.inner.namespace.is_empty() {
+        // Get the effective namespace and name for expansion
+        // (topic names should expand using the remapped node identity)
+        let effective_ns = self.namespace();
+        let effective_name = self.name();
+        let namespace = if effective_ns.is_empty() {
             "/"
         } else {
-            &self.inner.namespace
+            &effective_ns
         };
 
         // Expand the name (handles ~, relative, and absolute names)
         let expanded =
-            ros2args::names::expand_topic_name(namespace, &self.inner.name, name).map_name_err()?;
+            ros2args::names::expand_topic_name(namespace, &effective_name, name).map_name_err()?;
 
         // Apply remapping rules
         let ros2_args = self.inner.context.ros2_args();
-        let remapped = self.apply_remap_rules(&expanded, kind, ros2_args);
+        let remapped =
+            self.apply_remap_rules(&expanded, &effective_ns, &effective_name, kind, ros2_args);
 
         Ok(remapped)
     }
 
     /// Apply remapping rules to a fully qualified name.
+    ///
+    /// Uses the original node name for matching node-specific rules,
+    /// but the effective namespace/name for expanding relative rules.
     fn apply_remap_rules(
         &self,
         fq_name: &str,
+        effective_ns: &str,
+        effective_name: &str,
         _kind: NameKind,
         ros2_args: &ros2args::Ros2Args,
     ) -> String {
-        // Get remapping rules that apply to this node
-        let node_name = &self.inner.name;
+        // Use original node name for matching node-specific rules
+        let original_node_name = &self.inner.name;
 
         for rule in &ros2_args.remap_rules {
-            // Check if rule applies to this node
-            if !rule.applies_to_node(node_name) {
+            // Check if rule applies to this node (using original name)
+            if !rule.applies_to_node(original_node_name) {
                 continue;
             }
 
@@ -279,14 +282,14 @@ impl Node {
 
             // Check for relative match (rule.from without leading /)
             if !rule.from.starts_with('/') {
-                // Expand the rule's from field
-                let namespace = if self.inner.namespace.is_empty() {
+                // Expand the rule's from field using effective namespace/name
+                let namespace = if effective_ns.is_empty() {
                     "/"
                 } else {
-                    &self.inner.namespace
+                    effective_ns
                 };
                 if let Ok(expanded_from) =
-                    ros2args::names::expand_topic_name(namespace, node_name, &rule.from)
+                    ros2args::names::expand_topic_name(namespace, effective_name, &rule.from)
                     && expanded_from == fq_name
                 {
                     // Expand the rule's to field as well
@@ -294,7 +297,7 @@ impl Node {
                         return rule.to.clone();
                     }
                     if let Ok(expanded_to) =
-                        ros2args::names::expand_topic_name(namespace, node_name, &rule.to)
+                        ros2args::names::expand_topic_name(namespace, effective_name, &rule.to)
                     {
                         return expanded_to;
                     }

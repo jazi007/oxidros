@@ -12,8 +12,13 @@ use crate::{
     qos::QosMapping,
 };
 use oxidros_core::{TypeSupport, qos::Profile};
-use parking_lot::Mutex;
-use std::{marker::PhantomData, sync::Arc};
+use std::{
+    marker::PhantomData,
+    sync::{
+        Arc,
+        atomic::{AtomicI64, Ordering},
+    },
+};
 use zenoh::{Wait, bytes::ZBytes};
 use zenoh_ext::AdvancedPublisherBuilderExt;
 
@@ -41,7 +46,7 @@ pub struct Publisher<T> {
     /// Publisher GID.
     gid: [u8; GID_SIZE],
     /// Sequence number counter.
-    sequence_number: Mutex<i64>,
+    sequence_number: AtomicI64,
     /// Liveliness token.
     _liveliness_token: zenoh::liveliness::LivelinessToken,
     /// Phantom data for type.
@@ -135,7 +140,7 @@ impl<T: TypeSupport> Publisher<T> {
             fq_topic_name: fq_topic_name.to_string(),
             zenoh_publisher,
             gid,
-            sequence_number: Mutex::new(0),
+            sequence_number: AtomicI64::new(0),
             _liveliness_token: liveliness_token,
             _phantom: PhantomData,
         })
@@ -168,12 +173,7 @@ impl<T: TypeSupport> Publisher<T> {
         let payload = msg.to_bytes()?;
 
         // Increment sequence number
-        let seq = {
-            let mut seq = self.sequence_number.lock();
-            let current = *seq;
-            *seq += 1;
-            current
-        };
+        let seq = self.sequence_number.fetch_add(1, Ordering::Relaxed);
 
         // Create attachment
         let attachment = Attachment::new(seq, self.gid);

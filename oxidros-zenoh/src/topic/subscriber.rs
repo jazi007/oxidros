@@ -92,7 +92,7 @@ impl<T: TypeSupport> Subscriber<T> {
             node.context().domain_id(),
             fq_topic_name,
             type_name,
-            "*", // Wildcard to match any hash
+            &type_hash,
         );
 
         // Create channel for received messages

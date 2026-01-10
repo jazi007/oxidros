@@ -83,12 +83,13 @@ impl ParameterServer {
         let mut params = Parameters::new();
 
         // Load parameters from command-line assignments
+        // Use original name for matching node-specific parameter rules
         let ros2_args = node.context().ros2_args();
-        let node_name = node.name();
+        let original_name = node.original_name();
         let fqn = node.fully_qualified_name();
 
-        // Get parameters that apply to this node
-        if let Ok(param_assignments) = ros2_args.get_params_for_node(&node_name) {
+        // Get parameters that apply to this node (using original name for matching)
+        if let Ok(param_assignments) = ros2_args.get_params_for_node(original_name) {
             for param in param_assignments {
                 if let Some(value) = yaml_to_value(&param.value) {
                     let _ = params.set_parameter(param.name.clone(), value, false, None);
@@ -107,40 +108,28 @@ impl ParameterServer {
 
         let params = Arc::new(RwLock::new(params));
 
-        // Get node name for service naming
-        let name = node.name();
         let qos = Profile::services_default();
 
         // Create parameter services with private names (~/service_name)
-        let srv_list = node.create_server::<ListParameters>(
-            &format!("~/{}/list_parameters", name),
-            Some(qos.clone()),
-        )?;
+        // The ~ prefix expands to /<namespace>/<node_name>, so the full path becomes
+        // /<namespace>/<node_name>/list_parameters etc.
+        let srv_list =
+            node.create_server::<ListParameters>("~/list_parameters", Some(qos.clone()))?;
 
-        let srv_get = node.create_server::<GetParameters>(
-            &format!("~/{}/get_parameters", name),
-            Some(qos.clone()),
-        )?;
+        let srv_get = node.create_server::<GetParameters>("~/get_parameters", Some(qos.clone()))?;
 
-        let srv_set = node.create_server::<SetParameters>(
-            &format!("~/{}/set_parameters", name),
-            Some(qos.clone()),
-        )?;
+        let srv_set = node.create_server::<SetParameters>("~/set_parameters", Some(qos.clone()))?;
 
         let srv_set_atomic = node.create_server::<SetParametersAtomically>(
-            &format!("~/{}/set_parameters_atomically", name),
+            "~/set_parameters_atomically",
             Some(qos.clone()),
         )?;
 
-        let srv_describe = node.create_server::<DescribeParameters>(
-            &format!("~/{}/describe_parameters", name),
-            Some(qos.clone()),
-        )?;
+        let srv_describe =
+            node.create_server::<DescribeParameters>("~/describe_parameters", Some(qos.clone()))?;
 
-        let srv_get_types = node.create_server::<GetParameterTypes>(
-            &format!("~/{}/get_parameter_types", name),
-            Some(qos),
-        )?;
+        let srv_get_types =
+            node.create_server::<GetParameterTypes>("~/get_parameter_types", Some(qos))?;
 
         Ok(ParameterServer {
             params,

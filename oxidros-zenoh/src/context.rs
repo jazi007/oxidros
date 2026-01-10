@@ -206,16 +206,6 @@ impl Context {
     ///
     /// Returns an error if the name or namespace is invalid.
     pub fn create_node(self: &Arc<Self>, name: &str, namespace: Option<&str>) -> Result<Arc<Node>> {
-        // Validate node name
-        ros2args::names::validate_node_name(name).map_name_err()?;
-
-        // Validate namespace if provided
-        if let Some(ns) = namespace
-            && !ns.is_empty()
-        {
-            ros2args::names::validate_namespace(ns).map_name_err()?;
-        }
-
         // Get enclave from ROS2 args
         let enclave = self.inner.ros2_args.enclave.as_deref().unwrap_or("");
 
