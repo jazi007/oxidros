@@ -30,13 +30,15 @@ fn create_server(
     action: &str,
     qos: Option<ServerQosOption>,
 ) -> Result<Server<Fibonacci>> {
-    let node_server = ctx.create_node(node, None, Default::default()).unwrap();
+    let node_server = ctx
+        .create_node_with_opt(node, None, Default::default())
+        .unwrap();
 
     Server::new(node_server, action, qos)
 }
 
 fn create_client(ctx: &Arc<Context>, node: &str, action: &str) -> Result<Client<Fibonacci>> {
-    let node_client = ctx.create_node(node, None, Default::default())?;
+    let node_client = ctx.create_node_with_opt(node, None, Default::default())?;
     Client::new(node_client, action, None)
 }
 

@@ -22,7 +22,7 @@
 //!
 //! let ctx = Context::new().unwrap();
 //! let node = ctx
-//!     .create_node("subscriber_rs_try_recv", None, Default::default())
+//!     .create_node_with_opt("subscriber_rs_try_recv", None, Default::default())
 //!     .unwrap();
 //!
 //! // Create a subscriber.
@@ -64,7 +64,7 @@
 //!
 //! // Create nodes.
 //! let node_sub = ctx
-//!     .create_node("subscriber_rs_recv", None, Default::default())
+//!     .create_node_with_opt("subscriber_rs_recv", None, Default::default())
 //!     .unwrap();
 //!
 //! // Create a subscriber.
@@ -113,7 +113,7 @@
 //!
 //! let ctx = Context::new().unwrap();
 //! let node = ctx
-//! .create_node("subscriber_rs", None, Default::default())
+//! .create_node_with_opt("subscriber_rs", None, Default::default())
 //! .unwrap();
 //!
 //! // Use default QoS profile.
@@ -134,7 +134,7 @@
 //!
 //! let ctx = Context::new().unwrap();
 //! let node = ctx
-//!     .create_node("subscriber_rs", None, Default::default())
+//!     .create_node_with_opt("subscriber_rs", None, Default::default())
 //!     .unwrap();
 //!
 //! // Create a QoS profile.

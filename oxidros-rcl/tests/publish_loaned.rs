@@ -12,7 +12,7 @@ const TOPIC_NAME: &str = "test_publish_loaned";
 fn test_publish_loaned() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
     let ctx = Context::new()?;
     let node = ctx
-        .create_node("test_publish_node", None, Default::default())
+        .create_node_with_opt("test_publish_node", None, Default::default())
         .unwrap();
 
     let publisher = node.create_publisher::<Int64>(TOPIC_NAME, Default::default())?;

@@ -16,8 +16,10 @@ fn test_no_server() -> Result<()> {
     let ctx = Context::new()?;
 
     // create a client and a server node
-    let node_client = ctx.create_node("test_client_no_server_node", None, Default::default())?;
-    let node_server = ctx.create_node("test_server_no_server_node", None, Default::default())?;
+    let node_client =
+        ctx.create_node_with_opt("test_client_no_server_node", None, Default::default())?;
+    let node_server =
+        ctx.create_node_with_opt("test_server_no_server_node", None, Default::default())?;
 
     // create a server and a client
     let mut client = common::create_client(node_client, SERVICE_NAME3)?;

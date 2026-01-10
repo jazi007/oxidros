@@ -23,8 +23,10 @@ async fn test_async_service() -> Result<()> {
     let ctx = Context::new()?;
 
     // create nodes
-    let node_server = ctx.create_node("test_async_server_node", None, Default::default())?;
-    let node_client = ctx.create_node("test_async_client_node", None, Default::default())?;
+    let node_server =
+        ctx.create_node_with_opt("test_async_server_node", None, Default::default())?;
+    let node_client =
+        ctx.create_node_with_opt("test_async_client_node", None, Default::default())?;
 
     // create a server
     let server = common::create_server(node_server, SERVICE_NAME).unwrap();
@@ -110,7 +112,7 @@ async fn test_client_rs() {
 
     // Create a server node.
     let node = ctx
-        .create_node("service_test_client_rs", None, Default::default())
+        .create_node_with_opt("service_test_client_rs", None, Default::default())
         .unwrap();
 
     // Create a client.

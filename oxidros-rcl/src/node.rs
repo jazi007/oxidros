@@ -1,5 +1,5 @@
 //! Node of ROS2.
-//! Nodes can be create by `Context::create_node`.
+//! Nodes can be create by `Context::create_node_with_opt`.
 //!
 //! # Example
 //!
@@ -11,7 +11,7 @@
 //!
 //! // Create a node.
 //! let node = ctx
-//!     .create_node("node_rs", Some("namespace"), Default::default())
+//!     .create_node_with_opt("node_rs", Some("namespace"), Default::default())
 //!     .unwrap();
 //! ```
 

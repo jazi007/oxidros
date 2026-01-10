@@ -11,7 +11,7 @@
 //!
 //! let ctx = Context::new().unwrap();
 //! let node_pub = ctx
-//!     .create_node("publisher_rs", None, Default::default())
+//!     .create_node_with_opt("publisher_rs", None, Default::default())
 //!     .unwrap();
 //!
 //! // Create a publisher.
@@ -32,7 +32,7 @@
 //!
 //! let ctx = Context::new().unwrap();
 //! let node_pub = ctx
-//!     .create_node("publisher_rs_qos", None, Default::default())
+//!     .create_node_with_opt("publisher_rs_qos", None, Default::default())
 //!     .unwrap();
 //!
 //! // Create a QoS policy.
@@ -68,7 +68,7 @@ use parking_lot::Mutex;
 ///
 /// let ctx = Context::new().unwrap();
 /// let node_pub = ctx
-///     .create_node("publish_rs", None, Default::default())
+///     .create_node_with_opt("publish_rs", None, Default::default())
 ///     .unwrap();
 ///
 /// // Create a publisher.
@@ -186,7 +186,7 @@ impl<T: TypeSupport> Publisher<T> {
     ///
     /// let ctx = Context::new().unwrap();
     /// let node = ctx
-    ///     .create_node("publish_rs_send", None, Default::default())
+    ///     .create_node_with_opt("publish_rs_send", None, Default::default())
     ///     .unwrap();
     ///
     /// // Create a publisher.

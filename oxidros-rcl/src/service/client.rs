@@ -17,7 +17,7 @@
 //!
 //! // Create a server node.
 //! let node = ctx
-//!     .create_node("service_client_rs", None, Default::default())
+//!     .create_node_with_opt("service_client_rs", None, Default::default())
 //!     .unwrap();
 //!
 //! // Create a client.

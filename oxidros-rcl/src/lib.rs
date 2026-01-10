@@ -74,12 +74,12 @@
 //!
 //! // Create a publish node.
 //! let node_pub = ctx
-//!     .create_node("publish_node", None, Default::default())
+//!     .create_node_with_opt("publish_node", None, Default::default())
 //!     .unwrap();
 //!
 //! // Create a subscribe node.
 //! let node_sub = ctx
-//!     .create_node("subscribe_node", None, Default::default())
+//!     .create_node_with_opt("subscribe_node", None, Default::default())
 //!     .unwrap();
 //!
 //! // Create a publisher.
@@ -152,10 +152,10 @@
 //!
 //! // Create nodes.
 //! let node_pub = ctx
-//!     .create_node("publish_node_async", None, Default::default())
+//!     .create_node_with_opt("publish_node_async", None, Default::default())
 //!     .unwrap();
 //! let node_sub = ctx
-//!     .create_node("subscribe_node_async", None, Default::default())
+//!     .create_node_with_opt("subscribe_node_async", None, Default::default())
 //!     .unwrap();
 //!
 //! // Create a publisher.

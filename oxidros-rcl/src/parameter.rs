@@ -14,7 +14,7 @@
 //!
 //! // Create a context and a node.
 //! let ctx = Context::new().unwrap();
-//! let node = ctx.create_node("param_server", None, Default::default()).unwrap();
+//! let node = ctx.create_node_with_opt("param_server", None, Default::default()).unwrap();
 //!
 //! // Create a parameter server.
 //! let param_server = node.create_parameter_server().unwrap();
@@ -93,7 +93,7 @@
 //!
 //! // Create a context and a node.
 //! let ctx = Context::new().unwrap();
-//! let node = ctx.create_node("async_param_server", None, Default::default()).unwrap();
+//! let node = ctx.create_node_with_opt("async_param_server", None, Default::default()).unwrap();
 //!
 //! // Create a parameter server.
 //! let mut param_server = node.create_parameter_server().unwrap();
@@ -210,7 +210,7 @@ use std::{cell::Cell, collections::BTreeSet, future::Future, rc::Rc, sync::Arc, 
 ///
 /// // Create a context and a node.
 /// let ctx = Context::new().unwrap();
-/// let node = ctx.create_node("param_server_ex", None, Default::default()).unwrap();
+/// let node = ctx.create_node_with_opt("param_server_ex", None, Default::default()).unwrap();
 ///
 /// // Create a parameter server.
 /// let param_server = node.create_parameter_server().unwrap();

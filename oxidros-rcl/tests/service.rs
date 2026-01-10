@@ -17,10 +17,12 @@ fn test_service() -> Result<()> {
     let ctx = Context::new()?;
 
     // create a server node
-    let node_server = ctx.create_node("test_service_server_node", None, Default::default())?;
+    let node_server =
+        ctx.create_node_with_opt("test_service_server_node", None, Default::default())?;
 
     // create a client node
-    let node_client = ctx.create_node("test_service_client_node", None, Default::default())?;
+    let node_client =
+        ctx.create_node_with_opt("test_service_client_node", None, Default::default())?;
 
     // create a server and a client
     let server = common::create_server(node_server, SERVICE_NAME1)?;

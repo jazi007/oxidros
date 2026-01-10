@@ -15,7 +15,7 @@
 //!
 //! // Create a subscribe node.
 //! let node_sub = ctx
-//!     .create_node("selector_rs", None, Default::default())
+//!     .create_node_with_opt("selector_rs", None, Default::default())
 //!     .unwrap();
 //!
 //! // Create a subscriber.

@@ -13,7 +13,7 @@
 //!
 //! // Create a server node.
 //! let node = ctx
-//!     .create_node("service_server_rs", None, Default::default())
+//!     .create_node_with_opt("service_server_rs", None, Default::default())
 //!     .unwrap();
 //!
 //! // Create a server.
@@ -55,7 +55,7 @@
 //! let ctx = Context::new().unwrap();
 //!
 //! // Create a server node.
-//! let node = ctx.create_node("service_server_rs", None, Default::default()).unwrap();
+//! let node = ctx.create_node_with_opt("service_server_rs", None, Default::default()).unwrap();
 //!
 //! // Create a server.
 //! let server = node

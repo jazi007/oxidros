@@ -14,10 +14,12 @@ fn test_pubsub_loaned() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
     let ctx = Context::new()?;
 
     // create a publish node
-    let node_pub = ctx.create_node("test_pubsub_loaned_pub_node", None, Default::default())?;
+    let node_pub =
+        ctx.create_node_with_opt("test_pubsub_loaned_pub_node", None, Default::default())?;
 
     // create a subscribe node
-    let node_sub = ctx.create_node("test_pubsub_loaned_sub_node", None, Default::default())?;
+    let node_sub =
+        ctx.create_node_with_opt("test_pubsub_loaned_sub_node", None, Default::default())?;
 
     // create a publisher and a subscriber
     let publisher = common::create_publisher(node_pub, TOPIC_NAME, false)?;

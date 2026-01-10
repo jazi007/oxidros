@@ -9,7 +9,7 @@ use std::error::Error;
 fn test_publish() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
     let ctx = Context::new()?;
     let node = ctx
-        .create_node("test_publish_node", None, Default::default())
+        .create_node_with_opt("test_publish_node", None, Default::default())
         .unwrap();
 
     let publisher = node.create_publisher::<Int64>("test_publish", Default::default())?;

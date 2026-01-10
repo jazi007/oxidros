@@ -12,7 +12,7 @@ async fn ros2_main() -> Result<()> {
     // Create a context.
     let ctx = Context::new()?;
     // Create a node.
-    let node = ctx.create_node(NAME, None, Default::default())?;
+    let node = ctx.create_node_with_opt(NAME, None, Default::default())?;
     let publisher = node.new_publisher::<std_msgs::msg::String>(&Attributes::new("ex2_pub"))?;
     let subscriber = node.new_subscriber::<std_msgs::msg::String>(&Attributes::new("ex1_pub"))?;
     let mut interval = interval(Duration::from_secs(1));

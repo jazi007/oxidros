@@ -14,10 +14,10 @@ fn test_pubsub() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
     let ctx = Context::new()?;
 
     // create a publish node
-    let node_pub = ctx.create_node("test_pubusub_pub_node", None, Default::default())?;
+    let node_pub = ctx.create_node_with_opt("test_pubusub_pub_node", None, Default::default())?;
 
     // create a subscribe node
-    let node_sub = ctx.create_node("test_pubusub_sub_node", None, Default::default())?;
+    let node_sub = ctx.create_node_with_opt("test_pubusub_sub_node", None, Default::default())?;
 
     // create a publisher and a subscriber
     let publisher = common::create_publisher(node_pub, TOPIC_NAME, true)?;
@@ -50,10 +50,12 @@ fn test_pubsub_string() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
     let mut selector = ctx.create_selector()?;
 
     // create a subscribe node
-    let node_sub = ctx.create_node("test_pubusub_string_sub_node", None, Default::default())?;
+    let node_sub =
+        ctx.create_node_with_opt("test_pubusub_string_sub_node", None, Default::default())?;
 
     // create a publish node
-    let node_pub = ctx.create_node("test_pubusub_string_pub_node", None, Default::default())?;
+    let node_pub =
+        ctx.create_node_with_opt("test_pubusub_string_pub_node", None, Default::default())?;
 
     // create a publisher and a subscriber
     let subscriber =

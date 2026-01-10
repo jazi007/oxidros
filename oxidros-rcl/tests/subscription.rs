@@ -10,7 +10,7 @@ use std::error::Error;
 fn test_subscription() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
     let ctx = Context::new()?;
     let node = ctx
-        .create_node("test_subscription_node", None, Default::default())
+        .create_node_with_opt("test_subscription_node", None, Default::default())
         .unwrap();
 
     let subscription = node.create_subscriber::<Int64>("test_subscription", Default::default())?;

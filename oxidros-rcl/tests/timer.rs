@@ -41,7 +41,7 @@ fn test_wall_timer() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
     let mut selector = ctx.create_selector()?;
 
     // create a publish node
-    let node = ctx.create_node("test_wall_timer_node", None, Default::default())?;
+    let node = ctx.create_node_with_opt("test_wall_timer_node", None, Default::default())?;
 
     // create a publisher and a subscriber
     let publisher =

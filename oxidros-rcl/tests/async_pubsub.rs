@@ -17,8 +17,8 @@ async fn test_async_pubsub() -> Result<(), Box<dyn Error + Sync + Send + 'static
     let ctx = Context::new()?;
 
     // create nodes
-    let node_pub = ctx.create_node("test_async_pub_node", None, Default::default())?;
-    let node_sub = ctx.create_node("test_async_sub_node", None, Default::default())?;
+    let node_pub = ctx.create_node_with_opt("test_async_pub_node", None, Default::default())?;
+    let node_sub = ctx.create_node_with_opt("test_async_sub_node", None, Default::default())?;
 
     // create a publisher
     let p = common::create_publisher(node_pub, TOPIC_NAME, true).unwrap();

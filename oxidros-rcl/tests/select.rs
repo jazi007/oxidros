@@ -19,10 +19,10 @@ fn test_select_subscriptions() -> Result<(), Box<dyn Error + Sync + Send + 'stat
     let ctx = oxidros_rcl::context::Context::new()?;
 
     // create nodes
-    let node_pub1 = ctx.create_node("test_select_pub1_node", None, Default::default())?;
-    let node_pub2 = ctx.create_node("test_select_pub2_node", None, Default::default())?;
-    let node_sub1 = ctx.create_node("test_select_sub1_node", None, Default::default())?;
-    let node_sub2 = ctx.create_node("test_select_sub2_node", None, Default::default())?;
+    let node_pub1 = ctx.create_node_with_opt("test_select_pub1_node", None, Default::default())?;
+    let node_pub2 = ctx.create_node_with_opt("test_select_pub2_node", None, Default::default())?;
+    let node_sub1 = ctx.create_node_with_opt("test_select_sub1_node", None, Default::default())?;
+    let node_sub2 = ctx.create_node_with_opt("test_select_sub2_node", None, Default::default())?;
 
     // create publishers
     let p1 = thread::spawn(move || {
@@ -90,8 +90,8 @@ fn test_callback() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
     let ctx = oxidros_rcl::context::Context::new()?;
 
     // create nodes
-    let node_pub = ctx.create_node("test_callback_pub_node", None, Default::default())?;
-    let node_sub = ctx.create_node("test_callback_pub_node", None, Default::default())?;
+    let node_pub = ctx.create_node_with_opt("test_callback_pub_node", None, Default::default())?;
+    let node_sub = ctx.create_node_with_opt("test_callback_pub_node", None, Default::default())?;
 
     // create a publisher
     let p = thread::spawn(move || {

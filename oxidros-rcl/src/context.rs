@@ -11,7 +11,7 @@
 //!
 //! // Create a node.
 //! let node = ctx
-//!     .create_node("context_rs", None, Default::default())
+//!     .create_node_with_opt("context_rs", None, Default::default())
 //!     .unwrap();
 //!
 //! // Create a selector.
@@ -107,7 +107,7 @@ impl Context {
     ///
     /// // Create a node.
     /// let node = ctx
-    ///     .create_node("context_rs", None, Default::default())
+    ///     .create_node("context_rs", None)
     ///     .unwrap();
     /// ```
     ///
@@ -120,7 +120,37 @@ impl Context {
     /// - `RCLError::NodeInvalidName` if the name is invalid, or
     /// - `RCLError::NodeInvalidNamespace` if the namespace_ is invalid, or
     /// - `RCLError::Error` if an unspecified error occurs.
-    pub fn create_node(
+    pub fn create_node(self: &Arc<Self>, name: &str, namespace: Option<&str>) -> Result<Arc<Node>> {
+        let a = self.clone();
+        Node::new(a, name, namespace, Default::default())
+    }
+
+    /// Create a new node of ROS2.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use oxidros_rcl::context::Context;
+    ///
+    /// // Create a context.
+    /// let ctx = Context::new().unwrap();
+    ///
+    /// // Create a node.
+    /// let node = ctx
+    ///     .create_node_with_opt("context_rs", None, Default::default())
+    ///     .unwrap();
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// - `RCLError::AlreadyInit` if the node has already be initialized, or
+    /// - `RCLError::NotInit` if the given context is invalid, or
+    /// - `RCLError::InvalidArgument` if any arguments are invalid, or
+    /// - `RCLError::BadAlloc` if allocating memory failed, or
+    /// - `RCLError::NodeInvalidName` if the name is invalid, or
+    /// - `RCLError::NodeInvalidNamespace` if the namespace_ is invalid, or
+    /// - `RCLError::Error` if an unspecified error occurs.
+    pub fn create_node_with_opt(
         self: &Arc<Self>,
         name: &str,
         namespace: Option<&str>,
@@ -228,7 +258,7 @@ impl oxidros_core::api::RosContext for Context {
         name: &str,
         namespace: Option<&str>,
     ) -> oxidros_core::Result<Arc<Self::Node>> {
-        self.create_node(name, namespace, Default::default())
+        self.create_node(name, namespace)
     }
 
     fn new_selector(self: &Arc<Self>) -> oxidros_core::Result<Self::Selector> {
