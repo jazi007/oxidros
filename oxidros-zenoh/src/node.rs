@@ -120,8 +120,10 @@ impl Node {
         let effective_namespace = compute_effective_namespace(name, namespace, ros2_args);
         // Validate node name
         ros2args::names::validate_node_name(&effective_name).map_name_err()?;
-        // Validate namespace if provided
-        ros2args::names::validate_namespace(&effective_namespace).map_name_err()?;
+        // Validate namespace if non-empty
+        if !effective_namespace.is_empty() {
+            ros2args::names::validate_namespace(&effective_namespace).map_name_err()?;
+        }
         // Create liveliness token key using effective name/namespace
         let token_key = liveliness_node_keyexpr(
             context.domain_id(),
@@ -516,5 +518,172 @@ impl oxidros_core::api::RosNode for Node {
         qos: Option<Profile>,
     ) -> Result<Self::Server<T>> {
         self.create_server(service_name, qos)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ros2args::{RemapRule, Ros2Args};
+
+    /// Helper to create Ros2Args with remap rules
+    fn args_with_remaps(rules: Vec<RemapRule>) -> Ros2Args {
+        Ros2Args {
+            remap_rules: rules,
+            ..Default::default()
+        }
+    }
+
+    // ========================================================================
+    // Tests for compute_effective_node_name
+    // ========================================================================
+
+    #[test]
+    fn test_node_name_no_remapping() {
+        let args = Ros2Args::default();
+        let result = compute_effective_node_name("my_node", &args);
+        assert_eq!(result, "my_node");
+    }
+
+    #[test]
+    fn test_node_name_global_remapping() {
+        let args = args_with_remaps(vec![RemapRule::new_global(
+            "__node".to_string(),
+            "renamed_node".to_string(),
+        )]);
+        let result = compute_effective_node_name("my_node", &args);
+        assert_eq!(result, "renamed_node");
+    }
+
+    #[test]
+    fn test_node_name_node_specific_remapping_matches() {
+        let args = args_with_remaps(vec![RemapRule::new_node_specific(
+            "my_node".to_string(),
+            "__node".to_string(),
+            "renamed_node".to_string(),
+        )]);
+        let result = compute_effective_node_name("my_node", &args);
+        assert_eq!(result, "renamed_node");
+    }
+
+    #[test]
+    fn test_node_name_node_specific_remapping_no_match() {
+        let args = args_with_remaps(vec![RemapRule::new_node_specific(
+            "other_node".to_string(),
+            "__node".to_string(),
+            "renamed_node".to_string(),
+        )]);
+        let result = compute_effective_node_name("my_node", &args);
+        assert_eq!(result, "my_node"); // No change, rule doesn't apply
+    }
+
+    #[test]
+    fn test_node_name_ignores_other_rules() {
+        let args = args_with_remaps(vec![
+            RemapRule::new_global("topic_a".to_string(), "topic_b".to_string()),
+            RemapRule::new_global("__ns".to_string(), "/new_ns".to_string()),
+        ]);
+        let result = compute_effective_node_name("my_node", &args);
+        assert_eq!(result, "my_node"); // Only __node rules should apply
+    }
+
+    // ========================================================================
+    // Tests for compute_effective_namespace
+    // ========================================================================
+
+    #[test]
+    fn test_namespace_no_remapping() {
+        let args = Ros2Args::default();
+        let result = compute_effective_namespace("my_node", "/original_ns", &args);
+        assert_eq!(result, "/original_ns");
+    }
+
+    #[test]
+    fn test_namespace_global_remapping() {
+        let args = args_with_remaps(vec![RemapRule::new_global(
+            "__ns".to_string(),
+            "/new_namespace".to_string(),
+        )]);
+        let result = compute_effective_namespace("my_node", "/original_ns", &args);
+        assert_eq!(result, "/new_namespace");
+    }
+
+    #[test]
+    fn test_namespace_node_specific_remapping_matches() {
+        let args = args_with_remaps(vec![RemapRule::new_node_specific(
+            "my_node".to_string(),
+            "__ns".to_string(),
+            "/node_specific_ns".to_string(),
+        )]);
+        let result = compute_effective_namespace("my_node", "/original_ns", &args);
+        assert_eq!(result, "/node_specific_ns");
+    }
+
+    #[test]
+    fn test_namespace_node_specific_remapping_no_match() {
+        let args = args_with_remaps(vec![RemapRule::new_node_specific(
+            "other_node".to_string(),
+            "__ns".to_string(),
+            "/other_ns".to_string(),
+        )]);
+        let result = compute_effective_namespace("my_node", "/original_ns", &args);
+        assert_eq!(result, "/original_ns"); // No change
+    }
+
+    #[test]
+    fn test_namespace_empty_original() {
+        let args = args_with_remaps(vec![RemapRule::new_global(
+            "__ns".to_string(),
+            "/new_ns".to_string(),
+        )]);
+        let result = compute_effective_namespace("my_node", "", &args);
+        assert_eq!(result, "/new_ns");
+    }
+
+    // ========================================================================
+    // Tests for combined node + namespace remapping
+    // ========================================================================
+
+    #[test]
+    fn test_both_node_and_namespace_remapping() {
+        let args = args_with_remaps(vec![
+            RemapRule::new_global("__node".to_string(), "new_node".to_string()),
+            RemapRule::new_global("__ns".to_string(), "/new_ns".to_string()),
+        ]);
+
+        let effective_name = compute_effective_node_name("original_node", &args);
+        let effective_ns = compute_effective_namespace("original_node", "/original_ns", &args);
+
+        assert_eq!(effective_name, "new_node");
+        assert_eq!(effective_ns, "/new_ns");
+    }
+
+    #[test]
+    fn test_first_matching_rule_wins() {
+        let args = args_with_remaps(vec![
+            RemapRule::new_global("__node".to_string(), "first_name".to_string()),
+            RemapRule::new_global("__node".to_string(), "second_name".to_string()),
+        ]);
+
+        let result = compute_effective_node_name("my_node", &args);
+        assert_eq!(result, "first_name"); // First rule should win
+    }
+
+    #[test]
+    fn test_node_specific_rule_priority() {
+        // Global rule comes first, but node-specific should still apply
+        // when node name matches
+        let args = args_with_remaps(vec![
+            RemapRule::new_global("__node".to_string(), "global_name".to_string()),
+            RemapRule::new_node_specific(
+                "my_node".to_string(),
+                "__node".to_string(),
+                "specific_name".to_string(),
+            ),
+        ]);
+
+        // Since global comes first and applies to all nodes, it wins
+        let result = compute_effective_node_name("my_node", &args);
+        assert_eq!(result, "global_name");
     }
 }
