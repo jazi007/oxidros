@@ -156,31 +156,34 @@ impl Node {
     }
 
     /// Get the effective node name (after applying `__node` remapping).
-    pub fn name(&self) -> String {
-        compute_effective_node_name(&self.inner.name, self.inner.context.ros2_args())
+    pub fn name(&self) -> Result<String> {
+        Ok(compute_effective_node_name(
+            &self.inner.name,
+            self.inner.context.ros2_args(),
+        ))
     }
 
     /// Get the effective node namespace (after applying `__ns` remapping).
-    pub fn namespace(&self) -> String {
-        compute_effective_namespace(
+    pub fn namespace(&self) -> Result<String> {
+        Ok(compute_effective_namespace(
             &self.inner.name,
             &self.inner.namespace,
             self.inner.context.ros2_args(),
-        )
+        ))
     }
 
     /// Get the fully qualified node name (using effective name/namespace).
-    pub fn fully_qualified_name(&self) -> String {
-        let effective_ns = self.namespace();
-        let effective_name = self.name();
-        ros2args::names::build_node_fqn(
+    pub fn fully_qualified_name(&self) -> Result<String> {
+        let effective_ns = self.namespace()?;
+        let effective_name = self.name()?;
+        Ok(ros2args::names::build_node_fqn(
             if effective_ns.is_empty() {
                 "/"
             } else {
                 &effective_ns
             },
             &effective_name,
-        )
+        ))
     }
 
     /// Get the node GID.
@@ -236,8 +239,8 @@ impl Node {
 
         // Get the effective namespace and name for expansion
         // (topic names should expand using the remapped node identity)
-        let effective_ns = self.namespace();
-        let effective_name = self.name();
+        let effective_ns = self.namespace()?;
+        let effective_name = self.name()?;
         let namespace = if effective_ns.is_empty() {
             "/"
         } else {
@@ -476,16 +479,16 @@ impl oxidros_core::api::RosNode for Node {
     type Client<T: oxidros_core::ServiceMsg> = Client<T>;
     type Server<T: oxidros_core::ServiceMsg> = Server<T>;
 
-    fn name(&self) -> std::borrow::Cow<'_, str> {
-        std::borrow::Cow::Owned(Node::name(self))
+    fn name(&self) -> Result<String> {
+        Node::name(self)
     }
 
-    fn namespace(&self) -> std::borrow::Cow<'_, str> {
-        std::borrow::Cow::Owned(Node::namespace(self))
+    fn namespace(&self) -> Result<String> {
+        Node::namespace(self)
     }
 
-    fn fully_qualified_name(&self) -> std::borrow::Cow<'_, str> {
-        std::borrow::Cow::Owned(Node::fully_qualified_name(self))
+    fn fully_qualified_name(&self) -> Result<String> {
+        Node::fully_qualified_name(self)
     }
 
     fn new_publisher<T: TypeSupport>(

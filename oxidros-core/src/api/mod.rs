@@ -99,13 +99,13 @@ pub trait RosNode: Send + Sync + Sized {
     type Server<T: ServiceMsg>: RosServer<T>;
 
     /// Get the node name.
-    fn name(&self) -> Cow<'_, str>;
+    fn name(&self) -> Result<String>;
 
     /// Get the node namespace.
-    fn namespace(&self) -> Cow<'_, str>;
+    fn namespace(&self) -> Result<String>;
 
     /// Get the fully qualified node name (namespace + name).
-    fn fully_qualified_name(&self) -> Cow<'_, str>;
+    fn fully_qualified_name(&self) -> Result<String>;
 
     /// Create a publisher.
     ///
@@ -163,7 +163,7 @@ pub trait RosNode: Send + Sync + Sized {
 /// A ROS2 publisher that can send messages to a topic.
 pub trait RosPublisher<T: TypeSupport>: Send + Sync {
     /// Get the topic name.
-    fn topic_name(&self) -> &str;
+    fn topic_name(&self) -> Result<Cow<'_, String>>;
 
     /// Publish a message.
     ///
@@ -182,7 +182,7 @@ pub trait RosPublisher<T: TypeSupport>: Send + Sync {
 /// Returns [`TakenMsg<T>`] which supports both copied and zero-copy loaned messages.
 pub trait RosSubscriber<T: TypeSupport>: Send {
     /// Get the topic name.
-    fn topic_name(&self) -> &str;
+    fn topic_name(&self) -> Result<Cow<'_, String>>;
 
     /// Receive a message asynchronously.
     ///

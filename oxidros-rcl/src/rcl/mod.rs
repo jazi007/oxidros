@@ -852,6 +852,69 @@ impl MTUnsafeFn {
             )
         })
     }
+
+    pub fn rcl_node_get_name(&self, node: *const rcl_node_t) -> Result<String> {
+        let name_c = unsafe { self::rcl_node_get_name(node) };
+        if name_c.is_null() {
+            return Err(RclError::NodeInvalid.into());
+        }
+        let name_c = unsafe { CStr::from_ptr(name_c) };
+        Ok(name_c
+            .to_str()
+            .map_err(|_| RclError::NodeInvalidName)?
+            .to_owned())
+    }
+
+    pub fn rcl_node_get_fully_qualified_name(&self, node: *const rcl_node_t) -> Result<String> {
+        let name_c = unsafe { self::rcl_node_get_fully_qualified_name(node) };
+        if name_c.is_null() {
+            return Err(RclError::NodeInvalid.into());
+        }
+        let name_c = unsafe { CStr::from_ptr(name_c) };
+        Ok(name_c
+            .to_str()
+            .map_err(|_| RclError::NodeInvalidName)?
+            .to_owned())
+    }
+    pub fn rcl_node_get_namespace(&self, node: *const rcl_node_t) -> Result<String> {
+        let name_c = unsafe { self::rcl_node_get_namespace(node) };
+        if name_c.is_null() {
+            return Err(RclError::NodeInvalid.into());
+        }
+        let name_c = unsafe { CStr::from_ptr(name_c) };
+        Ok(name_c
+            .to_str()
+            .map_err(|_| RclError::NodeInvalidName)?
+            .to_owned())
+    }
+    pub fn rcl_publisher_get_topic_name(
+        &self,
+        publisher: *const rcl_publisher_t,
+    ) -> Result<String> {
+        let name_c = unsafe { self::rcl_publisher_get_topic_name(publisher) };
+        if name_c.is_null() {
+            return Err(RclError::NodeInvalid.into());
+        }
+        let name_c = unsafe { CStr::from_ptr(name_c) };
+        Ok(name_c
+            .to_str()
+            .map_err(|_| RclError::TopicNameInvalid)?
+            .to_owned())
+    }
+    pub fn rcl_subscription_get_topic_name(
+        &self,
+        subscriber: *const rcl_subscription_t,
+    ) -> Result<String> {
+        let name_c = unsafe { self::rcl_subscription_get_topic_name(subscriber) };
+        if name_c.is_null() {
+            return Err(RclError::NodeInvalid.into());
+        }
+        let name_c = unsafe { CStr::from_ptr(name_c) };
+        Ok(name_c
+            .to_str()
+            .map_err(|_| RclError::TopicNameInvalid)?
+            .to_owned())
+    }
 }
 
 impl MTUnsafeLogFn {
@@ -1111,39 +1174,5 @@ impl MTSafeFn {
 
     pub fn rcl_action_get_zero_initialized_cancel_response() -> rcl_action_cancel_response_t {
         unsafe { self::rcl_action_get_zero_initialized_cancel_response() }
-    }
-
-    pub fn rcl_node_get_name(node: *const rcl_node_t) -> Result<String> {
-        let name_c = unsafe { self::rcl_node_get_name(node) };
-        if name_c.is_null() {
-            return Err(RclError::NodeInvalid.into());
-        }
-        let name_c = unsafe { CStr::from_ptr(name_c) };
-        Ok(name_c
-            .to_str()
-            .map_err(|_| RclError::NodeInvalidName)?
-            .to_owned())
-    }
-    pub fn rcl_node_get_fully_qualified_name(node: *const rcl_node_t) -> Result<String> {
-        let name_c = unsafe { self::rcl_node_get_fully_qualified_name(node) };
-        if name_c.is_null() {
-            return Err(RclError::NodeInvalid.into());
-        }
-        let name_c = unsafe { CStr::from_ptr(name_c) };
-        Ok(name_c
-            .to_str()
-            .map_err(|_| RclError::NodeInvalidName)?
-            .to_owned())
-    }
-    pub fn rcl_node_get_namespace(node: *const rcl_node_t) -> Result<String> {
-        let name_c = unsafe { self::rcl_node_get_namespace(node) };
-        if name_c.is_null() {
-            return Err(RclError::NodeInvalid.into());
-        }
-        let name_c = unsafe { CStr::from_ptr(name_c) };
-        Ok(name_c
-            .to_str()
-            .map_err(|_| RclError::NodeInvalidName)?
-            .to_owned())
     }
 }

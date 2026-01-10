@@ -83,16 +83,19 @@ impl Node {
         &self.node as *const _ as *mut _
     }
 
-    pub fn get_name(&self) -> Result<String> {
-        rcl::MTSafeFn::rcl_node_get_name(&self.node)
+    pub fn name(&self) -> Result<String> {
+        let guard = rcl::MT_UNSAFE_FN.lock();
+        guard.rcl_node_get_name(&self.node)
     }
 
-    pub fn get_fully_qualified_name(&self) -> Result<String> {
-        rcl::MTSafeFn::rcl_node_get_fully_qualified_name(&self.node)
+    pub fn fully_qualified_name(&self) -> Result<String> {
+        let guard = rcl::MT_UNSAFE_FN.lock();
+        guard.rcl_node_get_fully_qualified_name(&self.node)
     }
 
-    pub fn get_namespace(&self) -> Result<String> {
-        rcl::MTSafeFn::rcl_node_get_namespace(&self.node)
+    pub fn namespace(&self) -> Result<String> {
+        let guard = rcl::MT_UNSAFE_FN.lock();
+        guard.rcl_node_get_namespace(&self.node)
     }
 
     pub fn create_parameter_server(self: &Arc<Self>) -> Result<ParameterServer> {
@@ -300,16 +303,16 @@ impl oxidros_core::api::RosNode for Node {
     type Client<T: ServiceMsg> = Client<T>;
     type Server<T: ServiceMsg> = Server<T>;
 
-    fn name(&self) -> std::borrow::Cow<'_, str> {
-        std::borrow::Cow::Owned(Node::get_name(self).unwrap_or_default())
+    fn name(&self) -> Result<String> {
+        Node::name(self)
     }
 
-    fn namespace(&self) -> std::borrow::Cow<'_, str> {
-        std::borrow::Cow::Owned(Node::get_namespace(self).unwrap_or_default())
+    fn namespace(&self) -> Result<String> {
+        Node::namespace(self)
     }
 
-    fn fully_qualified_name(&self) -> std::borrow::Cow<'_, str> {
-        std::borrow::Cow::Owned(Node::get_fully_qualified_name(self).unwrap_or_default())
+    fn fully_qualified_name(&self) -> Result<String> {
+        Node::fully_qualified_name(self)
     }
 
     fn new_publisher<T: TypeSupport>(

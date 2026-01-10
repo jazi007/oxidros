@@ -13,6 +13,7 @@ use crate::{
 };
 use oxidros_core::{TypeSupport, qos::Profile};
 use std::{
+    borrow::Cow,
     marker::PhantomData,
     sync::{
         Arc,
@@ -124,8 +125,8 @@ impl<T: TypeSupport> Publisher<T> {
             entity_id,
             entity_kind,
             node.enclave(),
-            &node.namespace(),
-            &node.name(),
+            &node.namespace()?,
+            &node.name()?,
             fq_topic_name,
             type_name,
             &type_hash,
@@ -149,12 +150,12 @@ impl<T: TypeSupport> Publisher<T> {
 
 impl<T: TypeSupport> Publisher<T> {
     /// Get the topic name.
-    pub fn topic_name(&self) -> &str {
-        &self.topic_name
+    pub fn topic_name(&self) -> Result<Cow<'_, String>> {
+        Ok(Cow::Borrowed(&self.topic_name))
     }
 
     /// Get the fully qualified topic name.
-    pub fn fq_topic_name(&self) -> &str {
+    pub fn fully_qualified_topic_name(&self) -> &str {
         &self.fq_topic_name
     }
 
@@ -199,7 +200,7 @@ impl<T: TypeSupport> Publisher<T> {
 // ============================================================================
 
 impl<T: TypeSupport> oxidros_core::api::RosPublisher<T> for Publisher<T> {
-    fn topic_name(&self) -> &str {
+    fn topic_name(&self) -> Result<Cow<'_, String>> {
         Publisher::topic_name(self)
     }
 

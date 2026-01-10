@@ -86,7 +86,7 @@ impl ParameterServer {
         // Use original name for matching node-specific parameter rules
         let ros2_args = node.context().ros2_args();
         let original_name = node.original_name();
-        let fqn = node.fully_qualified_name();
+        let fqn = node.fully_qualified_name()?;
 
         // Get parameters that apply to this node (using original name for matching)
         if let Ok(param_assignments) = ros2_args.get_params_for_node(original_name) {

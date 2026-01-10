@@ -157,7 +157,8 @@ use crate::{
     is_halt,
     msg::TypeSupport,
     node::Node,
-    qos, rcl,
+    qos,
+    rcl::{self, MT_UNSAFE_FN},
     selector::async_selector::{self, SELECTOR},
     signal_handler::Signaled,
     topic::subscriber_loaned_message::SubscriberLoanedMessage,
@@ -165,6 +166,7 @@ use crate::{
 pub use oxidros_core::message::TakenMsg;
 use oxidros_core::{Error, RclError, selector::CallbackResult};
 use std::{
+    borrow::Cow,
     ffi::CString,
     future::Future,
     marker::PhantomData,
@@ -183,7 +185,6 @@ use parking_lot::Mutex;
 
 pub(crate) struct RCLSubscription {
     pub subscription: Box<rcl::rcl_subscription_t>,
-    topic_name: String,
     #[cfg(feature = "rcl_stat")]
     pub latency_take: Mutex<TimeStatistics<4096>>,
     pub node: Arc<Node>,
@@ -245,8 +246,6 @@ impl<T: TypeSupport> Subscriber<T> {
             subscription: Arc::new(RCLSubscription {
                 subscription,
                 node,
-                topic_name: topic_name.to_string(),
-
                 #[cfg(feature = "rcl_stat")]
                 latency_take: Mutex::new(TimeStatistics::new()),
             }),
@@ -279,8 +278,6 @@ impl<T: TypeSupport> Subscriber<T> {
             subscription: Arc::new(RCLSubscription {
                 subscription,
                 node,
-                topic_name: topic_name.to_string(),
-
                 #[cfg(feature = "rcl_stat")]
                 latency_take: Mutex::new(TimeStatistics::new()),
             }),
@@ -289,8 +286,18 @@ impl<T: TypeSupport> Subscriber<T> {
         })
     }
 
-    pub fn get_topic_name(&self) -> &str {
-        &self.subscription.topic_name
+    /// Get the fully qualified topic name (includes namespace).
+    pub fn fully_qualified_topic_name(&self) -> Result<String> {
+        let guard = MT_UNSAFE_FN.lock();
+        guard.rcl_subscription_get_topic_name(self.subscription.subscription.as_ref())
+    }
+
+    /// Get the topic name (last segment of the fully qualified name).
+    pub fn topic_name(&self) -> Result<Cow<'_, String>> {
+        let fq_name = self.fully_qualified_topic_name()?;
+        // Extract last segment after final '/'
+        let name = fq_name.rsplit('/').next().unwrap_or(&fq_name).to_string();
+        Ok(Cow::Owned(name))
     }
 
     /// Non-blocking receive.
@@ -559,8 +566,8 @@ fn rcl_take<T>(subscription: &rcl::rcl_subscription_t) -> Result<T> {
 // ============================================================================
 
 impl<T: TypeSupport> oxidros_core::api::RosSubscriber<T> for Subscriber<T> {
-    fn topic_name(&self) -> &str {
-        Subscriber::get_topic_name(self)
+    fn topic_name(&self) -> Result<Cow<'_, String>> {
+        Subscriber::topic_name(self)
     }
 
     async fn recv_msg(&mut self) -> oxidros_core::Result<TakenMsg<T>> {

@@ -264,8 +264,8 @@ pub struct ParameterServer {
 impl ParameterServer {
     pub(crate) fn new(node: Arc<Node>) -> Result<Self> {
         let params_value = {
+            let fqn = node.fully_qualified_name()?;
             let mut guard = crate::rcl::MT_UNSAFE_FN.lock();
-            let fqn = node.get_fully_qualified_name()?;
             let arguments = unsafe { &mut (*node.context.as_ptr_mut()).global_arguments };
             guard.parameter_map(fqn.as_str(), arguments)?
         };
@@ -369,7 +369,7 @@ fn add_srv_set(
     service_name: &str,
     cond_callback: GuardCondition,
 ) -> Result<()> {
-    let name = node.get_name()?;
+    let name = node.name()?;
     let srv_set = node.create_server::<SetParameters>(
         &format!("{name}/{service_name}"),
         Some(Profile::default()),
@@ -458,7 +458,7 @@ fn add_srv_set_atomic(
     service_name: &str,
     cond_callback: GuardCondition,
 ) -> Result<()> {
-    let name = node.get_name()?;
+    let name = node.name()?;
     let srv_set = node.create_server::<SetParametersAtomically>(
         &format!("{name}/{service_name}"),
         Some(Profile::default()),
@@ -545,7 +545,7 @@ fn add_srv_get(
     selector: &mut Selector,
     params: Arc<RwLock<Parameters>>,
 ) -> Result<()> {
-    let name = node.get_name()?;
+    let name = node.name()?;
     let srv_get = node.create_server::<GetParameters>(
         &format!("{name}/get_parameters"),
         Some(Profile::default()),
@@ -594,7 +594,7 @@ fn add_srv_describe(
     selector: &mut Selector,
     params: Arc<RwLock<Parameters>>,
 ) -> Result<()> {
-    let name = node.get_name()?;
+    let name = node.name()?;
     let srv_describe = node.create_server::<DescribeParameters>(
         &format!("{name}/describe_parameters"),
         Some(Profile::default()),
@@ -669,7 +669,7 @@ fn add_srv_get_types(
     selector: &mut Selector,
     params: Arc<RwLock<Parameters>>,
 ) -> Result<()> {
-    let name = node.get_name()?;
+    let name = node.name()?;
     let srv_get_types = node.create_server::<GetParameterTypes>(
         &format!("{name}/get_parameter_types"),
         Some(Profile::default()),
@@ -710,7 +710,7 @@ fn add_srv_list(
     selector: &mut Selector,
     params: Arc<RwLock<Parameters>>,
 ) -> Result<()> {
-    let name = node.get_name()?;
+    let name = node.name()?;
     let srv_list = node.create_server::<ListParameters>(
         &format!("{name}/list_parameters"),
         Some(Profile::default()),

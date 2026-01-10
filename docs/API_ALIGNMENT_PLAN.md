@@ -327,26 +327,21 @@ The goal is to create a unified API that allows users to write backend-agnostic 
 
 **Goal:** Align Context and Node APIs for consistent creation and access patterns.
 
-#### Step 2.1: Context Creation
-- [ ] Add `with_domain_id()` to rcl Context
-- [ ] Add `domain_id()` accessor to rcl Context
-- [ ] Add `ros2_args()` accessor to rcl Context (parse from env)
-- [ ] Add `enclave()` accessor to rcl Context
-- [ ] Keep backend-specific constructors (zenoh's `with_config()`, `with_full_config()`)
-- [ ] Add `create_selector()` to zenoh Context (wraps `Selector::new()`)
+#### Step 2.1: Context Creation ✅
+- [x] Zenoh `create_node()` signature matches rcl (name, namespace) ✅
+- [x] Add `create_selector()` to zenoh Context (wraps `Selector::new()`)
+- Note: Backend-specific constructors remain (zenoh's `with_config()`, `with_domain_id()`, etc.)
+- Note: Backend-specific accessors remain (zenoh's `session()`, `session_id()`, `graph_cache()`, etc.)
 
-#### Step 2.2: Node Creation
-- [ ] Make `NodeOptions` optional in rcl's `create_node()` with default
-- [ ] Update trait signature: `create_node(name, namespace, options: Option<NodeOptions>)`
-- [ ] Add `NodeOptions` stub to zenoh (ignored but accepted for API compatibility)
+#### Step 2.2: Node Creation ✅
+- [x] rcl has `create_node(name, namespace)` and `create_node_with_opt(name, namespace, options)`
+- [x] zenoh has `create_node(name, namespace)` - aligned with rcl
+- Note: `NodeOptions` is rcl-specific (not needed in zenoh)
 
-#### Step 2.3: Node Accessors
-- [ ] Add `name()`, `namespace()`, `fully_qualified_name()` to rcl Node (non-Result versions)
-- [ ] Change rcl's `get_name()` etc. to return `&str` or `String` (not Result)
-- [ ] Add `gid()` to rcl Node
-- [ ] Add `context()` to rcl Node
-- [ ] Add `enclave()` to rcl Node
-- [ ] Add `expand_and_remap_name()` to rcl Node (use ros2args crate)
+#### Step 2.3: Node Accessors ✅
+- [x] Renamed `get_name()`, `get_namespace()`, `get_fully_qualified_name()` to `name()`, `namespace()`, `fully_qualified_name()`
+- [x] Both rcl and zenoh return `Result<String>` - aligned
+- Note: `gid()`, `context()`, `enclave()`, `expand_and_remap_name()`, `node_id()` are zenoh-specific
 
 ---
 
@@ -354,20 +349,19 @@ The goal is to create a unified API that allows users to write backend-agnostic 
 
 **Goal:** Unify naming conventions and return types.
 
-#### Step 3.1: Naming Convention
-- [ ] Add `topic_name()` alias to rcl Publisher/Subscriber (calls `get_topic_name()`)
-- [ ] Deprecate `get_topic_name()` in rcl (keep for backward compatibility)
-- [ ] Add `fq_topic_name()` to rcl Publisher/Subscriber
+#### Step 3.1: Naming Convention ✅
+- [x] Both rcl and zenoh have `topic_name()` returning the short topic name
+- [x] Both rcl and zenoh have `fully_qualified_topic_name()` returning the full path with namespace
+- [x] rcl computes `topic_name()` from `fully_qualified_topic_name()` (extracts last segment)
+- [x] Added tests in `oxidros-rcl/tests/test_fqn.rs`
 
 #### Step 3.2: Publisher Accessors
-- [ ] Add `gid()` to rcl Publisher
-- [ ] Add `node()` to rcl Publisher
+- Note: `gid()` and `node()` are zenoh-specific (not available in rcl)
 
 #### Step 3.3: Subscriber Alignment
 - [ ] Change rcl `try_recv()` to return `Result<Option<TakenMsg<T>>>` instead of `RecvResult`
 - [ ] Add `recv_blocking()` to zenoh Subscriber
-- [ ] Add `gid()` to rcl Subscriber
-- [ ] Add `node()` to rcl Subscriber
+- Note: `gid()` and `node()` are zenoh-specific (not available in rcl)
 
 #### Step 3.4: Message Types
 - [ ] Unify message wrapper: Create `ReceivedMessage<T>` in core with optional attachment
@@ -539,12 +533,7 @@ The current implementation uses basic `zenoh::Publisher` and `zenoh::Subscriber`
 - [x] Configure `HistoryConfig` to query historical samples on subscription
 - [x] Match history depth with publisher's cache
 
-#### Step 10.3: Sample Miss Detection (Future Enhancement)
-- [ ] Enable `MissDetectionConfig` for `RELIABLE` reliability
-- [ ] Use `SampleMissListener` to detect and log missed samples
-- [ ] Optionally configure `RecoveryConfig` for retransmission
-
-#### Step 10.4: Update Publisher Implementation ✅
+#### Step 10.3: Update Publisher Implementation ✅
 ```rust
 // Before (current):
 let zenoh_publisher = session.declare_publisher(key_expr).wait()?;
@@ -562,7 +551,7 @@ let zenoh_publisher = if QosMapping::is_transient_local(&qos) {
 };
 ```
 
-#### Step 10.5: Update Subscriber Implementation ✅
+#### Step 10.4: Update Subscriber Implementation ✅
 ```rust
 // Before (current):
 let zenoh_subscriber = session.declare_subscriber(key_expr).wait()?;

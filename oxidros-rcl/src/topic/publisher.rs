@@ -48,10 +48,16 @@
 //! `None` of the 2nd argument of `create_publisher` is equivalent to `Some(Profile::default())`.
 
 use crate::{
-    error::Result, get_allocator, msg::TypeSupport, node::Node, qos, rcl, signal_handler::Signaled,
+    error::Result,
+    get_allocator,
+    msg::TypeSupport,
+    node::Node,
+    qos,
+    rcl::{self, MT_UNSAFE_FN},
+    signal_handler::Signaled,
     topic::publisher_loaned_message::PublisherLoanedMessage,
 };
-use std::{ffi::CString, marker::PhantomData, ptr::null_mut, sync::Arc};
+use std::{borrow::Cow, ffi::CString, marker::PhantomData, ptr::null_mut, sync::Arc};
 
 #[cfg(feature = "rcl_stat")]
 use crate::helper::statistics::{SerializableTimeStat, TimeStatistics};
@@ -83,8 +89,6 @@ use parking_lot::Mutex;
 /// ```
 pub struct Publisher<T> {
     publisher: Arc<rcl::rcl_publisher_t>,
-    topic_name: String,
-
     #[cfg(feature = "rcl_stat")]
     latency_publish: Mutex<TimeStatistics<4096>>,
 
@@ -119,11 +123,8 @@ impl<T: TypeSupport> Publisher<T> {
         Ok(Publisher {
             publisher: Arc::new(publisher),
             node,
-            topic_name: topic_name.to_string(),
-
             #[cfg(feature = "rcl_stat")]
             latency_publish: Mutex::new(TimeStatistics::new()),
-
             _phantom: Default::default(),
         })
     }
@@ -155,17 +156,24 @@ impl<T: TypeSupport> Publisher<T> {
         Ok(Publisher {
             publisher: Arc::new(publisher),
             node,
-            topic_name: topic_name.to_string(),
-
             #[cfg(feature = "rcl_stat")]
             latency_publish: Mutex::new(TimeStatistics::new()),
-
             _phantom: Default::default(),
         })
     }
 
-    pub fn get_topic_name(&self) -> &str {
-        &self.topic_name
+    /// Get the fully qualified topic name (includes namespace).
+    pub fn fully_qualified_topic_name(&self) -> Result<String> {
+        let guard = MT_UNSAFE_FN.lock();
+        guard.rcl_publisher_get_topic_name(self.publisher.as_ref())
+    }
+
+    /// Get the topic name (last segment of the fully qualified name).
+    pub fn topic_name(&self) -> Result<Cow<'_, String>> {
+        let fq_name = self.fully_qualified_topic_name()?;
+        // Extract last segment after final '/'
+        let name = fq_name.rsplit('/').next().unwrap_or(&fq_name).to_string();
+        Ok(Cow::Owned(name))
     }
 
     pub fn can_loan_messages(&self) -> bool {
@@ -328,8 +336,8 @@ unsafe impl<T> Send for Publisher<T> {}
 // ============================================================================
 
 impl<T: TypeSupport> oxidros_core::api::RosPublisher<T> for Publisher<T> {
-    fn topic_name(&self) -> &str {
-        self.get_topic_name()
+    fn topic_name(&self) -> Result<Cow<'_, String>> {
+        self.topic_name()
     }
 
     fn publish(&self, msg: &T) -> oxidros_core::Result<()> {

@@ -226,6 +226,14 @@ impl Context {
         self.inner.graph_cache.lock().clone()
     }
 
+    /// Create a new selector.
+    ///
+    /// The selector is used to wait on events and invoke callbacks
+    /// for single-threaded execution.
+    pub fn create_selector(&self) -> crate::selector::Selector {
+        crate::selector::Selector::new()
+    }
+
     /// Start graph discovery by subscribing to liveliness tokens.
     fn start_graph_discovery(&self) -> Result<()> {
         use crate::keyexpr::LIVELINESS_PREFIX;

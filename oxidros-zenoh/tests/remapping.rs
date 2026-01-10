@@ -29,7 +29,7 @@ fn test_node_name_remapping_via_node_methods() {
         .expect("Failed to create node");
 
     // name() should return the effective (remapped) name
-    assert_eq!(node.name(), "remapped_node");
+    assert_eq!(node.name().unwrap(), "remapped_node");
 }
 
 #[test]
@@ -45,7 +45,7 @@ fn test_node_namespace_remapping_via_node_methods() {
         .expect("Failed to create node");
 
     // namespace() should return the effective (remapped) namespace
-    assert_eq!(node.namespace(), "/remapped_ns");
+    assert_eq!(node.namespace().unwrap(), "/remapped_ns");
 }
 
 #[test]
@@ -60,9 +60,9 @@ fn test_node_fqn_with_both_remappings() {
         .create_node("old_node", Some("/old_ns"))
         .expect("Failed to create node");
 
-    assert_eq!(node.name(), "new_node");
-    assert_eq!(node.namespace(), "/new_ns");
-    assert_eq!(node.fully_qualified_name(), "/new_ns/new_node");
+    assert_eq!(node.name().unwrap(), "new_node");
+    assert_eq!(node.namespace().unwrap(), "/new_ns");
+    assert_eq!(node.fully_qualified_name().unwrap(), "/new_ns/new_node");
 }
 
 #[test]
@@ -74,9 +74,9 @@ fn test_node_no_remapping() {
         .create_node("my_node", Some("/my_ns"))
         .expect("Failed to create node");
 
-    assert_eq!(node.name(), "my_node");
-    assert_eq!(node.namespace(), "/my_ns");
-    assert_eq!(node.fully_qualified_name(), "/my_ns/my_node");
+    assert_eq!(node.name().unwrap(), "my_node");
+    assert_eq!(node.namespace().unwrap(), "/my_ns");
+    assert_eq!(node.fully_qualified_name().unwrap(), "/my_ns/my_node");
 }
 
 // ============================================================================
@@ -248,7 +248,7 @@ fn test_topic_remapping_still_matches_original_node_name() {
         .expect("Failed to create node");
 
     // Node name should be remapped
-    assert_eq!(node.name(), "renamed_node");
+    assert_eq!(node.name().unwrap(), "renamed_node");
 
     // But topic rule should still match (using original name for matching)
     let result = node

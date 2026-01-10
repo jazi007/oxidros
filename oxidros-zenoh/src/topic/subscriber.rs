@@ -12,7 +12,7 @@ use crate::{
     qos::QosMapping,
 };
 use oxidros_core::{TypeSupport, qos::Profile};
-use std::{marker::PhantomData, sync::Arc};
+use std::{borrow::Cow, marker::PhantomData, sync::Arc};
 use zenoh::Wait;
 use zenoh_ext::AdvancedSubscriberBuilderExt;
 
@@ -138,8 +138,8 @@ impl<T: TypeSupport> Subscriber<T> {
             entity_id,
             entity_kind,
             node.enclave(),
-            &node.namespace(),
-            &node.name(),
+            &node.namespace()?,
+            &node.name()?,
             fq_topic_name,
             type_name,
             &type_hash,
@@ -163,12 +163,12 @@ impl<T: TypeSupport> Subscriber<T> {
 
 impl<T: TypeSupport> Subscriber<T> {
     /// Get the topic name.
-    pub fn topic_name(&self) -> &str {
-        &self.topic_name
+    pub fn topic_name(&self) -> Result<Cow<'_, String>> {
+        Ok(Cow::Borrowed(&self.topic_name))
     }
 
     /// Get the fully qualified topic name.
-    pub fn fq_topic_name(&self) -> &str {
+    pub fn fully_qualified_topic_name(&self) -> &str {
         &self.fq_topic_name
     }
 
@@ -227,7 +227,7 @@ impl<T: TypeSupport> Subscriber<T> {
 // ============================================================================
 
 impl<T: TypeSupport> oxidros_core::api::RosSubscriber<T> for Subscriber<T> {
-    fn topic_name(&self) -> &str {
+    fn topic_name(&self) -> Result<Cow<'_, String>> {
         Subscriber::topic_name(self)
     }
 
