@@ -88,7 +88,7 @@ impl ParameterServer {
         let fqn = node.fully_qualified_name();
 
         // Get parameters that apply to this node
-        if let Ok(param_assignments) = ros2_args.get_params_for_node(node_name) {
+        if let Ok(param_assignments) = ros2_args.get_params_for_node(&node_name) {
             for param in param_assignments {
                 if let Some(value) = yaml_to_value(&param.value) {
                     let _ = params.set_parameter(param.name.clone(), value, false, None);

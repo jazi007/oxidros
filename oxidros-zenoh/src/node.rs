@@ -59,8 +59,53 @@ pub struct Node {
     inner: Arc<NodeInner>,
 }
 
+/// Compute the effective node name by applying `__node` remapping rules.
+///
+/// This looks for a remapping rule where `from` is `__node` and returns
+/// the `to` value if found, otherwise returns the original name.
+pub(crate) fn compute_effective_node_name(
+    original_name: &str,
+    ros2_args: &ros2args::Ros2Args,
+) -> String {
+    for rule in &ros2_args.remap_rules {
+        // Only consider rules that apply to this node (or global rules)
+        if !rule.applies_to_node(original_name) {
+            continue;
+        }
+        if rule.from == "__node" {
+            return rule.to.clone();
+        }
+    }
+    original_name.to_string()
+}
+
+/// Compute the effective namespace by applying `__ns` remapping rules.
+///
+/// This looks for a remapping rule where `from` is `__ns` and returns
+/// the `to` value if found, otherwise returns the original namespace.
+pub(crate) fn compute_effective_namespace(
+    original_name: &str,
+    original_namespace: &str,
+    ros2_args: &ros2args::Ros2Args,
+) -> String {
+    for rule in &ros2_args.remap_rules {
+        // Only consider rules that apply to this node (or global rules)
+        if !rule.applies_to_node(original_name) {
+            continue;
+        }
+        if rule.from == "__ns" {
+            return rule.to.clone();
+        }
+    }
+    original_namespace.to_string()
+}
+
 impl Node {
     /// Create a new node.
+    ///
+    /// The `name` and `namespace` parameters are the original (requested) values.
+    /// The effective (remapped) values are computed using ros2_args when needed.
+    /// The liveliness token uses the effective name/namespace.
     pub(crate) fn new(
         context: Arc<Context>,
         node_id: u32,
@@ -70,14 +115,19 @@ impl Node {
     ) -> Result<Arc<Self>> {
         let gid = generate_gid();
 
-        // Create liveliness token key
+        // Compute effective name/namespace for liveliness token
+        let ros2_args = context.ros2_args();
+        let effective_name = compute_effective_node_name(name, ros2_args);
+        let effective_namespace = compute_effective_namespace(name, namespace, ros2_args);
+
+        // Create liveliness token key using effective name/namespace
         let token_key = liveliness_node_keyexpr(
             context.domain_id(),
             context.session_id(),
             node_id,
             enclave,
-            namespace,
-            name,
+            &effective_namespace,
+            &effective_name,
         );
 
         // Declare liveliness token
@@ -101,35 +151,41 @@ impl Node {
         Ok(Arc::new(Node { inner }))
     }
 
-    /// Get the node name.
-    pub fn name(&self) -> &str {
-        &self.inner.name
+    /// Get the effective node name (after applying `__node` remapping).
+    pub fn name(&self) -> String {
+        compute_effective_node_name(&self.inner.name, self.inner.context.ros2_args())
     }
 
-    /// Get the node name (alias for `name()` for API compatibility with oxidros-rcl).
-    pub fn get_name(&self) -> &str {
-        &self.inner.name
+    /// Get the effective node name (alias for `name()` for API compatibility with oxidros-rcl).
+    pub fn get_name(&self) -> String {
+        self.name()
     }
 
-    /// Get the node namespace.
-    pub fn namespace(&self) -> &str {
-        &self.inner.namespace
+    /// Get the effective node namespace (after applying `__ns` remapping).
+    pub fn namespace(&self) -> String {
+        compute_effective_namespace(
+            &self.inner.name,
+            &self.inner.namespace,
+            self.inner.context.ros2_args(),
+        )
     }
 
-    /// Get the node namespace (alias for `namespace()` for API compatibility with oxidros-rcl).
-    pub fn get_namespace(&self) -> &str {
-        &self.inner.namespace
+    /// Get the effective node namespace (alias for `namespace()` for API compatibility with oxidros-rcl).
+    pub fn get_namespace(&self) -> String {
+        self.namespace()
     }
 
-    /// Get the fully qualified node name.
+    /// Get the fully qualified node name (using effective name/namespace).
     pub fn fully_qualified_name(&self) -> String {
+        let effective_ns = self.namespace();
+        let effective_name = self.name();
         ros2args::names::build_node_fqn(
-            if self.inner.namespace.is_empty() {
+            if effective_ns.is_empty() {
                 "/"
             } else {
-                &self.inner.namespace
+                &effective_ns
             },
-            &self.inner.name,
+            &effective_name,
         )
     }
 
@@ -416,11 +472,11 @@ impl oxidros_core::api::RosNode for Node {
     type Server<T: oxidros_core::ServiceMsg> = Server<T>;
 
     fn name(&self) -> std::borrow::Cow<'_, str> {
-        std::borrow::Cow::Borrowed(Node::name(self))
+        std::borrow::Cow::Owned(Node::name(self))
     }
 
     fn namespace(&self) -> std::borrow::Cow<'_, str> {
-        std::borrow::Cow::Borrowed(Node::namespace(self))
+        std::borrow::Cow::Owned(Node::namespace(self))
     }
 
     fn fully_qualified_name(&self) -> std::borrow::Cow<'_, str> {
