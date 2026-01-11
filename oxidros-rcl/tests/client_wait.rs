@@ -45,10 +45,10 @@ fn test_client_wait() -> Result<()> {
     // Server: wait the request
     selector.add_server(
         server,
-        Box::new(move |request, header| {
+        Box::new(move |request| {
             println!(
                 "Server: received: data = {:?}, header = {:?}",
-                request, header
+                *request, request.info
             );
             AddTwoInts_Response {
                 sum: request.a + request.b,
@@ -60,7 +60,7 @@ fn test_client_wait() -> Result<()> {
     std::thread::sleep(Duration::from_millis(1));
 
     match rcv_client.recv_timeout(Duration::from_millis(20), &mut selector) {
-        Ok(Some((response, _))) => {
+        Ok(Some(response)) => {
             println!("received: {}", response.sum);
             Ok(())
         }

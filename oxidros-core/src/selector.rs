@@ -4,7 +4,7 @@
 //! where multiple sources (subscriptions, services, timers) can be waited on
 //! simultaneously.
 
-use crate::{ServiceMsg, parameter::Parameters};
+use crate::{Message, ServiceMsg, parameter::Parameters};
 use std::collections::BTreeSet;
 
 /// Result type for callback functions.
@@ -17,8 +17,8 @@ pub enum CallbackResult {
     Remove,
 }
 
-pub type ServerCallback<T, U> =
-    Box<dyn FnMut(<T as ServiceMsg>::Request, U) -> <T as ServiceMsg>::Response>;
+pub type ServerCallback<T> =
+    Box<dyn FnMut(Message<<T as ServiceMsg>::Request>) -> <T as ServiceMsg>::Response>;
 pub type ParameterCallback = Box<dyn FnMut(&mut Parameters, BTreeSet<String>)>;
 
 pub struct ConditionHandler<T> {

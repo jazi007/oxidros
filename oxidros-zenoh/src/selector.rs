@@ -218,7 +218,7 @@ impl oxidros_core::api::RosSelector for Selector {
     fn add_server_handler<T: oxidros_core::ServiceMsg + 'static>(
         &mut self,
         _server: Self::Server<T>,
-        _handler: Box<dyn FnMut(T::Request) -> T::Response>,
+        _handler: Box<dyn FnMut(Message<T::Request>) -> T::Response>,
     ) -> bool {
         // Server handling in Zenoh is done via async patterns
         // For now, just return true

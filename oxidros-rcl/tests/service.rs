@@ -46,11 +46,8 @@ fn test_service() -> Result<()> {
     // Server: wait the request
     selector.add_server(
         server,
-        Box::new(move |request, header| {
-            println!(
-                "Server: received: data = {:?}, header = {:?}",
-                request, header
-            );
+        Box::new(move |request| {
+            println!("Server: received: data = {request:?}",);
             AddTwoInts_Response {
                 sum: request.a + request.b,
             }
@@ -62,8 +59,8 @@ fn test_service() -> Result<()> {
 
     // Client: receive the response
     match rcv_client.try_recv() {
-        Ok(Some((data, header))) => {
-            println!("Client: sum = {}, header = {:?}", data.sum, header);
+        Ok(Some(data)) => {
+            println!("Client: sum = {}, header = {:?}", data.sum, data.info);
             assert_eq!(data.sum, 8);
             Ok(())
         }

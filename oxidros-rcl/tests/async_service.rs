@@ -51,8 +51,8 @@ async fn test_async_service() -> Result<()> {
 async fn run_server(mut server: Server<AddTwoInts>) -> Result<()> {
     for _ in 0..3 {
         // receive a request
-        let (sender, request, _) = server.recv().await?;
-        println!("Server: request = {:?}", request);
+        let (sender, request) = server.recv().await?;
+        println!("Server: request = {:?}", *request);
 
         let response = AddTwoInts_Response {
             sum: request.a + request.b,
@@ -85,8 +85,8 @@ async fn run_client(mut client: Client<AddTwoInts>) -> Result<()> {
 
         // receive a response
         match tokio::time::timeout(dur, receiver).await {
-            Ok(Ok((response, _header))) => {
-                pr_info!(logger, "received: {:?}", response);
+            Ok(Ok(response)) => {
+                pr_info!(logger, "received: {:?}", *response);
                 assert_eq!(response.sum, n + n * 10);
             }
             Ok(Err(e)) => {
@@ -133,8 +133,8 @@ async fn test_client_rs() {
 
             pr_info!(logger, "receiving");
             match tokio::time::timeout(dur, receiver).await {
-                Ok(Ok((response, _header))) => {
-                    pr_info!(logger, "received: {:?}", response);
+                Ok(Ok(response)) => {
+                    pr_info!(logger, "received: {:?}", *response);
                 }
                 Ok(Err(e)) => {
                     pr_error!(logger, "error: {e}");

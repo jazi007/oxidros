@@ -377,7 +377,7 @@ fn add_srv_set(
 
     selector.add_server(
         srv_set,
-        Box::new(move |req, _| {
+        Box::new(move |req| {
             let mut results = if let Some(seq) = SetParametersResultSeq::new(req.parameters.len()) {
                 seq
             } else {
@@ -466,7 +466,7 @@ fn add_srv_set_atomic(
 
     selector.add_server(
         srv_set,
-        Box::new(move |req, _| {
+        Box::new(move |req| {
             let mut results = if let Some(seq) = SetParametersResult::new() {
                 seq
             } else {
@@ -552,7 +552,7 @@ fn add_srv_get(
     )?;
     selector.add_server(
         srv_get,
-        Box::new(move |req, _| {
+        Box::new(move |req| {
             let mut result = Vec::new();
 
             let gurad = params.read();
@@ -601,7 +601,7 @@ fn add_srv_describe(
     )?;
     selector.add_server(
         srv_describe,
-        Box::new(move |req, _| {
+        Box::new(move |req| {
             let gurad = params.read();
 
             let mut results = Vec::new();
@@ -676,7 +676,7 @@ fn add_srv_get_types(
     )?;
     selector.add_server(
         srv_get_types,
-        Box::new(move |req, _| {
+        Box::new(move |req| {
             let mut types = Vec::new();
 
             let gurad = params.read();
@@ -717,7 +717,7 @@ fn add_srv_list(
     )?;
     selector.add_server(
         srv_list,
-        Box::new(move |req, _| {
+        Box::new(move |req| {
             let separator = b'.';
 
             let mut result = Vec::new();

@@ -401,11 +401,14 @@ The goal is to create a unified API that allows users to write backend-agnostic 
 - [ ] Add `gid()` to rcl Server
 - [ ] Add `node()` to rcl Server
 
-#### Step 4.3: Header/Attachment Unification
-- [ ] Create unified `ServiceHeader` in core
-- [ ] Include: sequence number, timestamp, writer/client GID
-- [ ] Map rcl's `Header` to `ServiceHeader`
-- [ ] Map zenoh's `Attachment` to `ServiceHeader`
+#### Step 4.3: Header/Attachment Unification ✅
+- [x] Reuse unified `Message<T>` type (contains `MessageInfo` with sequence number, timestamp, sender GID)
+- [x] rcl: `rmw_service_info_t` → `MessageInfo` conversion in `oxidros-rcl/src/rcl/conversions.rs`
+- [x] zenoh: `Attachment` → `MessageInfo` conversion (via `From<Attachment> for MessageInfo`)
+- [x] Client `call()` returns `Message<T::Response>` (both backends)
+- [x] Server `recv()` returns request wrapped with `Message<T::Request>` (both backends)
+- [x] `RosClient::call_service()` trait returns `Result<Message<T::Response>>`
+- [x] Added `Debug` impl for `Message<T>` and `MessageData<T>` when `T: Debug`
 
 ---
 

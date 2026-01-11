@@ -36,8 +36,8 @@ fn test_no_server() -> Result<()> {
     let srv;
     let request;
     match server.try_recv() {
-        Ok(Some((s, req, header))) => {
-            println!("server:recv: seq = {:?}", header.get_sequence());
+        Ok(Some((s, req))) => {
+            println!("server:recv: seq = {:?}", req.info.sequence_number);
             srv = s;
             request = req;
         }
@@ -62,12 +62,8 @@ fn test_no_server() -> Result<()> {
     std::thread::sleep(Duration::from_millis(50));
 
     match receiver.try_recv() {
-        Ok(Some((msg, header))) => {
-            panic!(
-                "try_recv: msg = {:?}, seq = {:?}",
-                msg,
-                header.get_sequence()
-            );
+        Ok(Some(msg)) => {
+            panic!("try_recv: msg = {msg:?}");
         }
         Err(_e) => {
             panic!("try_recv: error");

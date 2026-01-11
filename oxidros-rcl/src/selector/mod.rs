@@ -66,7 +66,6 @@ use crate::{
     parameter::ParameterServer,
     rcl::{self, rcl_action_client_t},
     service::{
-        Header,
         client::{ClientData, ClientRecv},
         server::{Server, ServerData},
     },
@@ -417,9 +416,6 @@ impl Selector {
     /// Register a subscriber with callback function.
     /// The callback function will be invoked when arriving data.
     ///
-    /// The callback function must take `ServiceMsg::Request` and `Header` and
-    /// return `ServiceMsg::Response`.
-    ///
     /// # Error
     ///
     /// If a selector takes a server created by a different context,
@@ -440,7 +436,7 @@ impl Selector {
     ///     // Add the server with a callback function.
     ///     selector.add_server(
     ///         server,
-    ///         Box::new(|request: <std_srvs::srv::Empty as ServiceMsg>::Request, header| {
+    ///         Box::new(|request| {
     ///             // Return the response.
     ///             let response = std_srvs::srv::Empty_Response::new().unwrap();
     ///             response
@@ -451,7 +447,7 @@ impl Selector {
     pub fn add_server<T: ServiceMsg + 'static>(
         &mut self,
         mut server: Server<T>,
-        mut handler: ServerCallback<T, Header>,
+        mut handler: ServerCallback<T>,
     ) -> bool {
         let context_ptr = {
             let data = server.data.lock();
@@ -465,8 +461,8 @@ impl Selector {
 
             loop {
                 match server.try_recv() {
-                    Ok(Some((server_send, request, header))) => {
-                        let result = handler(request, header);
+                    Ok(Some((server_send, request))) => {
+                        let result = handler(request);
                         match server_send.send(&result) {
                             Ok(()) => {}
                             Err(e) => {
@@ -1561,10 +1557,9 @@ impl oxidros_core::api::RosSelector for Selector {
     fn add_server_handler<T: ServiceMsg + 'static>(
         &mut self,
         server: Self::Server<T>,
-        mut handler: Box<dyn FnMut(T::Request) -> T::Response>,
+        mut handler: Box<dyn FnMut(Message<T::Request>) -> T::Response>,
     ) -> bool {
-        // Wrap the handler to match the RCL signature that includes Header
-        let wrapped = Box::new(move |request: T::Request, _header: Header| handler(request));
+        let wrapped = Box::new(move |request: Message<T::Request>| handler(request));
         self.add_server(server, wrapped)
     }
 

@@ -239,16 +239,16 @@ pub mod rcl;
 pub mod selector;
 pub mod service;
 pub mod topic;
+use oxidros_core::Message;
 pub use oxidros_core::qos;
 
 mod signal_handler;
-mod time;
 
 type PhantomUnsync = PhantomData<Cell<()>>;
 type PhantomUnsend = PhantomData<MutexGuard<'static, ()>>;
 
 use msg::ServiceMsg;
-use service::{Header, client::ClientRecv};
+use service::client::ClientRecv;
 pub use signal_handler::is_halt;
 
 // Re-export oxidros_core so external crates can access traits without direct dependency
@@ -293,12 +293,8 @@ impl<T> DerefMut for ST<T> {
 impl<'a, T: msg::ServiceMsg> ST<ClientRecv<'a, T>> {
     /// This function calls `ClientRecv::try_recv` internally,
     /// but `Ok(None)` includes `ST<CleintRecv<T>>` instead of `ClientRecv<T>`.
-    pub fn try_recv(&self) -> Result<Option<(<T as ServiceMsg>::Response, Header)>> {
-        match self.data.try_recv() {
-            Ok(Some((response, header))) => Ok(Some((response, header))),
-            Ok(None) => Ok(None),
-            Err(e) => Err(e),
-        }
+    pub fn try_recv(&self) -> Result<Option<Message<<T as ServiceMsg>::Response>>> {
+        self.data.try_recv()
     }
 }
 

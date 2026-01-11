@@ -225,7 +225,7 @@ pub trait RosClient<T: ServiceMsg>: Send {
     fn call_service(
         &mut self,
         request: &T::Request,
-    ) -> impl std::future::Future<Output = Result<T::Response>> + Send;
+    ) -> impl std::future::Future<Output = Result<Message<T::Response>>> + Send;
 }
 
 // ============================================================================
@@ -315,7 +315,7 @@ pub trait RosSelector: Sized {
     fn add_server_handler<T: ServiceMsg + 'static>(
         &mut self,
         server: Self::Server<T>,
-        handler: Box<dyn FnMut(T::Request) -> T::Response>,
+        handler: Box<dyn FnMut(Message<T::Request>) -> T::Response>,
     ) -> bool;
 
     /// Register a parameter server with a callback.

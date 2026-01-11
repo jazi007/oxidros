@@ -10,16 +10,14 @@ use crate::{
     keyexpr::{EntityKind, liveliness_entity_keyexpr, topic_keyexpr},
     node::Node,
 };
-use oxidros_core::{TypeSupport, qos::Profile};
+use oxidros_core::{Message, TypeSupport, qos::Profile};
 use std::{marker::PhantomData, sync::Arc};
 use zenoh::{Wait, bytes::ZBytes, query::Query};
 
 /// Incoming service request with sender for response.
 pub struct ServiceRequest<T: oxidros_core::ServiceMsg> {
     /// Request data.
-    pub request: T::Request,
-    /// Request attachment (required by rmw_zenoh protocol).
-    pub attachment: Attachment,
+    pub request: Message<T::Request>,
     /// Sender for response.
     sender: RequestSender<T>,
 }
@@ -247,8 +245,7 @@ where
         };
 
         Ok(ServiceRequest {
-            request,
-            attachment,
+            request: Message::new(request, attachment.into()),
             sender,
         })
     }
@@ -289,8 +286,7 @@ where
                 };
 
                 Ok(Some(ServiceRequest {
-                    request,
-                    attachment,
+                    request: Message::new(request, attachment.into()),
                     sender,
                 }))
             }

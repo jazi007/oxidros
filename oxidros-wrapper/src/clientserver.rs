@@ -3,7 +3,7 @@
 use crate::common::Result;
 use log::{debug, error, trace};
 use oxidros::{
-    prelude::ServiceMsg,
+    prelude::{Message, ServiceMsg},
     service::{client::Client as SdClient, server::Server as SdServer},
 };
 use std::{fmt::Debug, time::Duration};
@@ -22,7 +22,7 @@ where
     pub async fn send(
         &mut self,
         data: &<T as ServiceMsg>::Request,
-    ) -> Result<<T as ServiceMsg>::Response> {
+    ) -> Result<Message<<T as ServiceMsg>::Response>> {
         let client = &mut self.0;
         debug!("Waiting for service availability");
         while !client.is_service_available()? {
@@ -33,9 +33,9 @@ where
             let receiver = client.send(data)?.recv();
             // Send a request.
             match time::timeout(Duration::from_secs(1), receiver).await {
-                Ok(Ok((response, header))) => {
-                    trace!("Header: {header:?}");
-                    debug!("Response: {:?}", response);
+                Ok(Ok(response)) => {
+                    trace!("Header: {:?}", response.info);
+                    debug!("Response: {:?}", response.sample);
                     return Ok(response);
                 }
                 Ok(Err(e)) => {
@@ -53,7 +53,7 @@ where
 #[allow(missing_debug_implementations)]
 pub struct Server<T>(pub(crate) Option<SdServer<T>>);
 pub(crate) type ServerCallback<T> =
-    Box<dyn FnMut(<T as ServiceMsg>::Request) -> <T as ServiceMsg>::Response + Send>;
+    Box<dyn FnMut(Message<<T as ServiceMsg>::Request>) -> <T as ServiceMsg>::Response + Send>;
 
 impl<T: ServiceMsg> Server<T>
 where
@@ -70,9 +70,9 @@ where
             // Receive a request.
             let req = server.recv().await;
             match req {
-                Ok((sender, request, header)) => {
-                    trace!("Header: {header:?}");
-                    debug!("Request: {request:?}");
+                Ok((sender, request)) => {
+                    trace!("Header: {:?}", request.info);
+                    debug!("Request: {:?}", request.sample);
                     let response = callback(request);
                     debug!("Response: {response:?}");
                     match sender.send(&response) {

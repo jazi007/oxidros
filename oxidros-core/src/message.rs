@@ -60,6 +60,19 @@ impl<T> DerefMut for MessageData<T> {
     }
 }
 
+impl<T: std::fmt::Debug> std::fmt::Debug for MessageData<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MessageData::Copied(data) => f.debug_tuple("Copied").field(data).finish(),
+            MessageData::Loaned(data) => {
+                // Deref to get &T which implements Debug
+                let inner: &T = data.deref();
+                f.debug_tuple("Loaned").field(inner).finish()
+            }
+        }
+    }
+}
+
 // SAFETY: MessageData is Send/Sync if T is, loaned data comes from ROS2 middleware
 unsafe impl<T> Sync for MessageData<T> {}
 unsafe impl<T> Send for MessageData<T> {}
@@ -117,6 +130,15 @@ impl<T> Deref for Message<T> {
 impl<T> DerefMut for Message<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.sample
+    }
+}
+
+impl<T: std::fmt::Debug> std::fmt::Debug for Message<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Message")
+            .field("sample", &self.sample)
+            .field("info", &self.info)
+            .finish()
     }
 }
 

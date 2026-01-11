@@ -10,7 +10,7 @@ use crate::{
     keyexpr::{EntityKind, liveliness_entity_keyexpr, topic_keyexpr},
     node::Node,
 };
-use oxidros_core::{TypeSupport, qos::Profile};
+use oxidros_core::{Message, TypeSupport, qos::Profile};
 use std::{
     marker::PhantomData,
     sync::{Arc, atomic::AtomicI64},
@@ -18,14 +18,6 @@ use std::{
 };
 use zenoh::query::QueryTarget;
 use zenoh::{Wait, bytes::ZBytes};
-
-/// Service client response with header.
-pub struct ClientResponse<T> {
-    /// Response data.
-    pub response: T,
-    /// Response attachment (required by rmw_zenoh protocol).
-    pub attachment: Attachment,
-}
 
 /// Service client.
 ///
@@ -170,7 +162,7 @@ where
     /// - The query fails
     /// - No response is received
     /// - Deserialization fails
-    pub async fn call(&self, request: &T::Request) -> Result<ClientResponse<T::Response>> {
+    pub async fn call(&self, request: &T::Request) -> Result<Message<T::Response>> {
         // Serialize request
         let payload = request.to_bytes()?;
         // Increment sequence number
@@ -187,7 +179,7 @@ where
             .session()
             .get(&self.key_expr)
             .payload(payload)
-            .attachment(ZBytes::from(attachment_bytes.to_vec()))
+            .attachment(ZBytes::from(attachment_bytes))
             .target(QueryTarget::All) // ALL_COMPLETE equivalent
             .await?;
 
@@ -197,20 +189,16 @@ where
             let sample = reply.result().map_err(|e| Error::Zenoh(format!("{e}")))?;
             // Parse response attachment (required by protocol)
             let attachment_bytes = sample.attachment().ok_or(Error::MissingAttachment)?;
-            let response_attachment = Attachment::from_bytes(&attachment_bytes.to_bytes())?;
+            let attachment = Attachment::from_bytes(&attachment_bytes.to_bytes())?;
             // Verify sequence number matches our request
             // (server echoes back the client's sequence number)
-            if response_attachment.sequence_number != seq {
+            if attachment.sequence_number != seq {
                 // Wrong sequence number, skip this reply and wait for another
                 continue;
             }
-            let response_bytes: Vec<u8> = sample.payload().to_bytes().to_vec();
+            let response_bytes = sample.payload().to_bytes();
             let response = T::Response::from_bytes(&response_bytes)?;
-
-            return Ok(ClientResponse {
-                response,
-                attachment: response_attachment,
-            });
+            return Ok(Message::new(response, attachment.into()));
         }
     }
 
@@ -229,7 +217,7 @@ where
         &self,
         request: &T::Request,
         timeout: Duration,
-    ) -> Result<ClientResponse<T::Response>> {
+    ) -> Result<Message<T::Response>> {
         match tokio::time::timeout(timeout, self.call(request)).await {
             Ok(v) => v,
             Err(_) => Err(Error::Timeout),
@@ -254,13 +242,10 @@ where
     fn service_name(&self) -> std::borrow::Cow<'_, str> {
         std::borrow::Cow::Borrowed(Client::service_name(self))
     }
-
     fn service_available(&self) -> bool {
         self.is_service_available()
     }
-
-    async fn call_service(&mut self, request: &T::Request) -> Result<T::Response> {
-        let response = self.call(request).await?;
-        Ok(response.response)
+    async fn call_service(&mut self, request: &T::Request) -> Result<Message<T::Response>> {
+        self.call(request).await
     }
 }

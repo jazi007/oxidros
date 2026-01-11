@@ -35,7 +35,7 @@
 //!         let request = std_srvs::srv::Empty_Request::new().unwrap();
 //!         let receiver = client.send(&request).unwrap().recv();
 //!         match tokio::time::timeout(dur, receiver).await {
-//!             Ok(Ok((response, _header))) => {
+//!             Ok(Ok(response)) => {
 //!                 pr_info!(logger, "received: {:?}", response);
 //!             }
 //!             Ok(Err(e)) => {
@@ -53,7 +53,6 @@
 //! rt.block_on(run_client(client, logger)); // Spawn an asynchronous task.
 //! ```
 
-use super::Header;
 use crate::{
     error::Result,
     get_allocator, is_halt,
@@ -67,7 +66,7 @@ use crate::{
     },
     signal_handler::Signaled,
 };
-use oxidros_core::{Error, RclError, selector::CallbackResult};
+use oxidros_core::{Error, Message, RclError, selector::CallbackResult};
 use std::{
     ffi::CString, future::Future, marker::PhantomData, os::raw::c_void, sync::Arc, task::Poll,
     time::Duration,
@@ -149,7 +148,7 @@ impl<T: ServiceMsg> Client<T> {
     ///         let request = std_srvs::srv::Empty_Request::new().unwrap();
     ///         let receiver = client.send(&request).unwrap().recv();
     ///         match tokio::time::timeout(dur, receiver).await {
-    ///             Ok(Ok((response, _header))) => {
+    ///             Ok(Ok(response)) => {
     ///                 pr_info!(logger, "received: {:?}", response);
     ///             }
     ///             Ok(Err(e)) => {
@@ -194,7 +193,7 @@ impl<T: ServiceMsg> Client<T> {
     ///         let receiver = receiver.recv();
     ///         pr_info!(logger, "sent: sequence = {sequence}");
     ///         match tokio::time::timeout(dur, receiver).await {
-    ///             Ok(Ok((response, _header))) => {
+    ///             Ok(Ok(response)) => {
     ///                 pr_info!(logger, "received: {:?}", response);
     ///             }
     ///             Ok(Err(e)) => {
@@ -246,7 +245,7 @@ impl<'a, T: ServiceMsg> ClientRecv<'a, T> {
     /// - `RCLError::InvalidArgument` if any arguments are invalid, or
     /// - `RCLError::ClientInvalid` if the client is invalid, or
     /// - `RCLError::Error` if an unspecified error occurs.
-    pub fn try_recv(&self) -> Result<Option<(<T as ServiceMsg>::Response, Header)>> {
+    pub fn try_recv(&self) -> Result<Option<Message<<T as ServiceMsg>::Response>>> {
         let (response, header) = match rcl_take_response_with_info::<<T as ServiceMsg>::Response>(
             &self.data.data.client,
             self.seq,
@@ -260,11 +259,10 @@ impl<'a, T: ServiceMsg> ClientRecv<'a, T> {
             return Ok(None);
         }
 
-        Ok(Some((response, Header { header })))
+        Ok(Some(Message::new(response, header.into())))
     }
 
     /// Receive a response asynchronously.
-    /// this returns `super::Header` including some information together.
     ///
     /// # Example
     ///
@@ -281,8 +279,8 @@ impl<'a, T: ServiceMsg> ClientRecv<'a, T> {
     ///         let request = std_srvs::srv::Empty_Request::new().unwrap();
     ///         let receiver = client.send(&request).unwrap().recv();
     ///         match tokio::time::timeout(dur, receiver).await {
-    ///             Ok(Ok((response, header))) => {
-    ///                 pr_info!(logger, "received: header = {:?}", header);
+    ///             Ok(Ok(response)) => {
+    ///                 pr_info!(logger, "received: response = {response:?}");
     ///             }
     ///             Ok(Err(e)) => {
     ///                 pr_error!(logger, "error: {e}");
@@ -301,7 +299,7 @@ impl<'a, T: ServiceMsg> ClientRecv<'a, T> {
     /// - `RCLError::InvalidArgument` if any arguments are invalid, or
     /// - `RCLError::ClientInvalid` if the client is invalid, or
     /// - `RCLError::Error` if an unspecified error occurs.
-    pub async fn recv(self) -> Result<(<T as ServiceMsg>::Response, Header)> {
+    pub async fn recv(self) -> Result<Message<<T as ServiceMsg>::Response>> {
         AsyncReceiver {
             client: self,
             is_waiting: false,
@@ -341,7 +339,7 @@ impl<'a, T: ServiceMsg> ClientRecv<'a, T> {
     ///             let receiver = client.send(&request).unwrap();
     ///             // Receive a response.
     ///             match receiver.recv_timeout(Duration::from_millis(20), &mut selector_client) {
-    ///                 Ok(Some((_response, _header))) => {},
+    ///                 Ok(Some(_response)) => {},
     ///                 Ok(None) => {},
     ///                 Err(e) => {
     ///                     pr_fatal!(logger, "{e}");
@@ -360,25 +358,12 @@ impl<'a, T: ServiceMsg> ClientRecv<'a, T> {
         &self,
         t: Duration,
         selector: &mut Selector,
-    ) -> Result<Option<(<T as ServiceMsg>::Response, Header)>> {
+    ) -> Result<Option<Message<<T as ServiceMsg>::Response>>> {
         // Add the receiver.
         selector.add_client_recv(self);
         // Wait a response with timeout.
         match selector.wait_timeout(t) {
-            Ok(true) => match self.try_recv() {
-                Ok(Some((response, header))) => {
-                    // Received a response.
-                    Ok(Some((response, header)))
-                }
-                Ok(None) => {
-                    // No correspondent response.
-                    Ok(None)
-                }
-                Err(e) => {
-                    // Failed to receive.
-                    Err(e)
-                }
-            },
+            Ok(true) => self.try_recv(),
             Ok(false) => {
                 // Timeout.
                 Ok(None)
@@ -418,7 +403,7 @@ pub struct AsyncReceiver<'a, T: ServiceMsg> {
 }
 
 impl<'a, T: ServiceMsg> Future for AsyncReceiver<'a, T> {
-    type Output = Result<(<T as ServiceMsg>::Response, Header)>;
+    type Output = Result<Message<<T as ServiceMsg>::Response>>;
 
     fn poll(
         mut self: std::pin::Pin<&mut Self>,
@@ -480,8 +465,7 @@ impl<T: ServiceMsg> oxidros_core::api::RosClient<T> for Client<T> {
         self.is_service_available().unwrap_or(false)
     }
 
-    async fn call_service(&mut self, request: &T::Request) -> oxidros_core::Result<T::Response> {
-        let (response, _header) = self.send(request)?.recv().await?;
-        Ok(response)
+    async fn call_service(&mut self, request: &T::Request) -> Result<Message<T::Response>> {
+        self.send(request)?.recv().await
     }
 }
