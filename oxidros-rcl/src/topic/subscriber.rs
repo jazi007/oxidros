@@ -163,8 +163,8 @@ use crate::{
     signal_handler::Signaled,
     topic::subscriber_loaned_message::SubscriberLoanedMessage,
 };
-pub use oxidros_core::message::TakenMsg;
-use oxidros_core::{Error, RclError, selector::CallbackResult};
+pub use oxidros_core::message::Message;
+use oxidros_core::{Error, MessageInfo, RclError, selector::CallbackResult};
 use std::{
     borrow::Cow,
     ffi::CString,
@@ -330,7 +330,7 @@ impl<T: TypeSupport> Subscriber<T> {
     /// - `RCLError::SubscriptionInvalid` if the subscription is invalid, or
     /// - `RCLError::BadAlloc if allocating` memory failed, or
     /// - `RCLError::Error` if an unspecified error occurs.
-    pub fn try_recv(&self) -> Result<Option<TakenMsg<T>>> {
+    pub fn try_recv(&self) -> Result<Option<Message<T>>> {
         #[cfg(feature = "rcl_stat")]
         let start = std::time::SystemTime::now();
 
@@ -359,7 +359,7 @@ impl<T: TypeSupport> Subscriber<T> {
     /// - `RCLError::SubscriptionInvalid` if the subscription is invalid, or
     /// - `RCLError::BadAlloc if allocating` memory failed, or
     /// - `RCLError::Error` if an unspecified error occurs.
-    pub fn recv_blocking(&self) -> Result<TakenMsg<T>> {
+    pub fn recv_blocking(&self) -> Result<Message<T>> {
         let mut selector = self.subscription.node.context.create_selector()?;
         selector.add_rcl_subscription(self.subscription.clone(), None, false);
         loop {
@@ -415,7 +415,7 @@ impl<T: TypeSupport> Subscriber<T> {
     /// - `RCLError::SubscriptionInvalid` if the subscription is invalid, or
     /// - `RCLError::BadAlloc` if allocating memory failed, or
     /// - `RCLError::Error` if an unspecified error occurs.
-    pub async fn recv(&mut self) -> Result<TakenMsg<T>> {
+    pub async fn recv(&mut self) -> Result<Message<T>> {
         AsyncReceiver {
             subscriber: self,
             is_waiting: false,
@@ -450,7 +450,7 @@ impl<'a, T> AsyncReceiver<'a, T> {
 }
 
 impl<'a, T: TypeSupport> Future for AsyncReceiver<'a, T> {
-    type Output = Result<TakenMsg<T>>;
+    type Output = Result<Message<T>>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
         if is_halt() {
@@ -524,39 +524,42 @@ impl Options {
     }
 }
 
-fn take<T: 'static>(subscription: &Arc<RCLSubscription>) -> Result<TakenMsg<T>> {
+fn take<T: 'static>(subscription: &Arc<RCLSubscription>) -> Result<Message<T>> {
     if rcl::MTSafeFn::rcl_subscription_can_loan_messages(subscription.subscription.as_ref()) {
-        take_loaned_message(subscription.clone()).map(move |x| TakenMsg::Loaned(Box::new(x)))
+        take_loaned_message(subscription.clone())
+            .map(move |(x, i)| Message::new_loaned(Box::new(x), i))
     } else {
-        rcl_take(subscription.subscription.as_ref()).map(TakenMsg::Copied)
+        rcl_take(subscription.subscription.as_ref()).map(|(x, i)| Message::new(x, i))
     }
 }
 
 fn take_loaned_message<T>(
     subscription: Arc<RCLSubscription>,
-) -> Result<SubscriberLoanedMessage<T>> {
+) -> Result<(SubscriberLoanedMessage<T>, MessageInfo)> {
     let guard = rcl::MT_UNSAFE_FN.lock();
     let message: *mut T = null_mut();
-    guard
-        .rcl_take_loaned_message(
-            subscription.subscription.as_ref(),
-            &message as *const _ as *mut _,
-            null_mut(),
-            null_mut(),
-        )
-        .map(|_| SubscriberLoanedMessage::new(subscription, message))
+    let mut info: rcl::rmw_message_info_t = unsafe { std::mem::zeroed() };
+    guard.rcl_take_loaned_message(
+        subscription.subscription.as_ref(),
+        &message as *const _ as *mut _,
+        &mut info,
+        null_mut(),
+    )?;
+    let message = SubscriberLoanedMessage::new(subscription, message);
+    Ok((message, info.into()))
 }
 
-fn rcl_take<T>(subscription: &rcl::rcl_subscription_t) -> Result<T> {
+fn rcl_take<T>(subscription: &rcl::rcl_subscription_t) -> Result<(T, MessageInfo)> {
     let guard = rcl::MT_UNSAFE_FN.lock();
     let mut ros_message: T = unsafe { std::mem::zeroed() };
+    let mut info: rcl::rmw_message_info_t = unsafe { std::mem::zeroed() };
     match guard.rcl_take(
         subscription,
         &mut ros_message as *mut _ as *mut c_void,
-        null_mut(),
+        &mut info,
         null_mut(),
     ) {
-        Ok(_) => Ok(ros_message),
+        Ok(_) => Ok((ros_message, info.into())),
         Err(e) => Err(e),
     }
 }
@@ -570,11 +573,11 @@ impl<T: TypeSupport> oxidros_core::api::RosSubscriber<T> for Subscriber<T> {
         Subscriber::topic_name(self)
     }
 
-    async fn recv_msg(&mut self) -> oxidros_core::Result<TakenMsg<T>> {
+    async fn recv_msg(&mut self) -> oxidros_core::Result<Message<T>> {
         self.recv().await
     }
 
-    fn try_recv_msg(&mut self) -> oxidros_core::Result<Option<TakenMsg<T>>> {
+    fn try_recv_msg(&mut self) -> oxidros_core::Result<Option<Message<T>>> {
         match self.try_recv() {
             Ok(Some(msg)) => Ok(Some(msg)),
             Ok(None) => Ok(None),

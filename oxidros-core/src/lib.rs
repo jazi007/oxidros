@@ -26,6 +26,7 @@ pub use api::{
 };
 
 // Re-export message traits
+pub use message::{Message, MessageData, MessageInfo};
 pub use msg::{
     ActionGoal, ActionMsg, ActionResult, GetUUID, GoalResponse, ResultResponse, ServiceMsg,
     TryClone, TypeSupport,

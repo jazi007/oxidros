@@ -37,8 +37,8 @@ fn test_pubsub() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     selector.add_subscriber_handler(
         subscriber,
-        Box::new(move |msg: TakenMsg<Int64>| {
-            // TakenMsg implements Deref, so we can directly access fields
+        Box::new(move |msg: Message<Int64>| {
+            // Message implements Deref, so we can directly access fields
             let data = msg.deref().data;
             assert_eq!(data, n);
             COUNT.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
@@ -73,7 +73,7 @@ fn test_pubsub_multiple_messages() -> Result<(), Box<dyn Error + Send + Sync>> {
     static COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
     selector.add_subscriber_handler(
         subscriber,
-        Box::new(|_msg: TakenMsg<Int64>| {
+        Box::new(|_msg: Message<Int64>| {
             COUNT.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
         }),
     );

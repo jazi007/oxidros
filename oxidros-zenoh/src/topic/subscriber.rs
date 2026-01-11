@@ -11,19 +11,10 @@ use crate::{
     node::Node,
     qos::QosMapping,
 };
-use oxidros_core::{TypeSupport, qos::Profile};
+use oxidros_core::{Message, TypeSupport, qos::Profile};
 use std::{borrow::Cow, marker::PhantomData, sync::Arc};
 use zenoh::Wait;
 use zenoh_ext::AdvancedSubscriberBuilderExt;
-
-/// Received message with metadata.
-#[derive(Debug)]
-pub struct ReceivedMessage<T> {
-    /// The message data.
-    pub data: T,
-    /// Message attachment (sequence number, timestamp, GID).
-    pub attachment: Option<Attachment>,
-}
 
 /// Topic subscriber.
 ///
@@ -182,17 +173,19 @@ impl<T: TypeSupport> Subscriber<T> {
     /// # Errors
     ///
     /// Returns an error if deserialization fails or the channel is closed.
-    pub async fn recv(&mut self) -> Result<ReceivedMessage<T>> {
+    pub async fn recv(&mut self) -> Result<Message<T>> {
         let sample = self
             .receiver
             .recv_async()
             .await
             .map_err(|_| Error::ChannelClosed)?;
         let data = T::from_bytes(&sample.payload().to_bytes())?;
-        let attachment = sample
+        let info = sample
             .attachment()
-            .and_then(|bytes| Attachment::from_bytes(&bytes.to_bytes()));
-        Ok(ReceivedMessage { data, attachment })
+            .and_then(|bytes| Attachment::from_bytes(&bytes.to_bytes()))
+            .unwrap_or_default()
+            .into();
+        Ok(Message::new(data, info))
     }
 
     /// Try to receive a message without blocking.
@@ -202,18 +195,36 @@ impl<T: TypeSupport> Subscriber<T> {
     /// # Errors
     ///
     /// Returns an error if deserialization fails.
-    pub fn try_recv(&mut self) -> Result<Option<ReceivedMessage<T>>> {
+    pub fn try_recv(&mut self) -> Result<Option<Message<T>>> {
         match self.receiver.try_recv() {
             Ok(sample) => {
                 let data = T::from_bytes(&sample.payload().to_bytes())?;
-                let attachment = sample
+                let info = sample
                     .attachment()
-                    .and_then(|bytes| Attachment::from_bytes(&bytes.to_bytes()));
-                Ok(Some(ReceivedMessage { data, attachment }))
+                    .and_then(|bytes| Attachment::from_bytes(&bytes.to_bytes()))
+                    .unwrap_or_default()
+                    .into();
+                Ok(Some(Message::new(data, info)))
             }
             Err(flume::TryRecvError::Empty) => Ok(None),
             Err(flume::TryRecvError::Disconnected) => Err(Error::ChannelClosed),
         }
+    }
+
+    /// Receive a message, blocking until one is available.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if deserialization fails or the channel is closed.
+    pub fn recv_blocking(&self) -> Result<Message<T>> {
+        let sample = self.receiver.recv().map_err(|_| Error::ChannelClosed)?;
+        let data = T::from_bytes(&sample.payload().to_bytes())?;
+        let info = sample
+            .attachment()
+            .and_then(|bytes| Attachment::from_bytes(&bytes.to_bytes()))
+            .unwrap_or_default()
+            .into();
+        Ok(Message::new(data, info))
     }
 
     /// Get the parent node.
@@ -231,16 +242,11 @@ impl<T: TypeSupport> oxidros_core::api::RosSubscriber<T> for Subscriber<T> {
         Subscriber::topic_name(self)
     }
 
-    async fn recv_msg(&mut self) -> crate::error::Result<oxidros_core::message::TakenMsg<T>> {
-        let msg = self.recv().await?;
-        // Zenoh always copies messages (no loaned message support)
-        Ok(oxidros_core::message::TakenMsg::Copied(msg.data))
+    async fn recv_msg(&mut self) -> Result<Message<T>> {
+        self.recv().await
     }
 
-    fn try_recv_msg(&mut self) -> crate::error::Result<Option<oxidros_core::message::TakenMsg<T>>> {
-        match self.try_recv()? {
-            Some(msg) => Ok(Some(oxidros_core::message::TakenMsg::Copied(msg.data))),
-            None => Ok(None),
-        }
+    fn try_recv_msg(&mut self) -> Result<Option<Message<T>>> {
+        self.try_recv()
     }
 }

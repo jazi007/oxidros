@@ -88,22 +88,21 @@ This document details the public API differences between `oxidros-rcl` and `oxid
 
 | API | `oxidros-rcl` | `oxidros-zenoh` | Status |
 |-----|---------------|-----------------|--------|
-| `get_topic_name()` | `fn get_topic_name(&self) -> &str` | ❌ Missing | ⚠️ Naming difference |
-| `topic_name()` | ❌ Missing | `fn topic_name(&self) -> &str` | ⚠️ Naming difference |
-| `fq_topic_name()` | ❌ Missing | `fn fq_topic_name(&self) -> &str` | ❌ Missing in rcl |
+| `topic_name()` | `fn topic_name(&self) -> Result<Cow<'_, String>>` | `fn topic_name(&self) -> Result<Cow<'_, String>>` | ✅ Aligned |
+| `fully_qualified_topic_name()` | `fn fully_qualified_topic_name(&self) -> Result<Cow<'_, String>>` | `fn fully_qualified_topic_name(&self) -> Result<Cow<'_, String>>` | ✅ Aligned |
 | `send()` | `fn send(&self, msg: &T) -> Result<()>` | `fn send(&self, msg: &T) -> Result<()>` | ✅ Aligned |
 | `send_loaned()` | `fn send_loaned(&self, msg: PublisherLoanedMessage<T>) -> Result<()>` | ❌ Missing | 🔧 RCL-specific |
 | `send_raw()` | `unsafe fn send_raw(&self, msg: &[u8]) -> Result<()>` | ❌ Missing | 🔧 RCL-specific |
 | `can_loan_messages()` | `fn can_loan_messages(&self) -> bool` | ❌ Missing | 🔧 RCL-specific |
 | `borrow_loaned_message()` | `fn borrow_loaned_message(&self) -> OResult<PublisherLoanedMessage<T>>` | ❌ Missing | 🔧 RCL-specific |
-| `gid()` | ❌ Missing | `fn gid(&self) -> &[u8; GID_SIZE]` | ❌ Missing in rcl |
-| `node()` | ❌ Missing | `fn node(&self) -> &Arc<Node>` | ❌ Missing in rcl |
+| `gid()` | ❌ Missing | `fn gid(&self) -> &[u8; GID_SIZE]` | 🔧 Zenoh-specific |
+| `node()` | ❌ Missing | `fn node(&self) -> &Arc<Node>` | 🔧 Zenoh-specific |
 | `statistics()` | `fn statistics(&self) -> SerializableTimeStat` (feature-gated) | ❌ Missing | 🔧 RCL-specific |
 
 **Summary:**
-- Different naming: `get_topic_name()` vs `topic_name()`
-- Loaned message APIs are rcl-specific
-- rcl is missing `gid()`, `node()`, `fq_topic_name()`
+- ✅ Topic name accessors aligned (`topic_name()`, `fully_qualified_topic_name()`)
+- Loaned message APIs are rcl-specific (shared memory)
+- `gid()` and `node()` are zenoh-specific
 
 ---
 
@@ -111,21 +110,20 @@ This document details the public API differences between `oxidros-rcl` and `oxid
 
 | API | `oxidros-rcl` | `oxidros-zenoh` | Status |
 |-----|---------------|-----------------|--------|
-| `get_topic_name()` | `fn get_topic_name(&self) -> &str` | ❌ Missing | ⚠️ Naming difference |
-| `topic_name()` | ❌ Missing | `fn topic_name(&self) -> &str` | ⚠️ Naming difference |
-| `fq_topic_name()` | ❌ Missing | `fn fq_topic_name(&self) -> &str` | ❌ Missing in rcl |
-| `try_recv()` | `fn try_recv(&self) -> RecvResult<TakenMsg<T>>` | `fn try_recv(&mut self) -> Result<Option<ReceivedMessage<T>>>` | ⚠️ Different signature & return |
-| `recv()` | `async fn recv(&mut self) -> Result<TakenMsg<T>>` | `async fn recv(&mut self) -> Result<ReceivedMessage<T>>` | ⚠️ Different return type |
-| `recv_blocking()` | `fn recv_blocking(&self) -> Result<TakenMsg<T>>` | ❌ Missing | ❌ Missing in zenoh |
-| `gid()` | ❌ Missing | `fn gid(&self) -> &[u8; GID_SIZE]` | ❌ Missing in rcl |
-| `node()` | ❌ Missing | `fn node(&self) -> &Arc<Node>` | ❌ Missing in rcl |
+| `topic_name()` | `fn topic_name(&self) -> Result<Cow<'_, String>>` | `fn topic_name(&self) -> Result<Cow<'_, String>>` | ✅ Aligned |
+| `fully_qualified_topic_name()` | `fn fully_qualified_topic_name(&self) -> Result<Cow<'_, String>>` | `fn fully_qualified_topic_name(&self) -> Result<Cow<'_, String>>` | ✅ Aligned |
+| `try_recv()` | `fn try_recv(&self) -> Result<Option<Message<T>>>` | `fn try_recv(&mut self) -> Result<Option<Message<T>>>` | ✅ Aligned (return type) |
+| `recv()` | `async fn recv(&mut self) -> Result<Message<T>>` | `async fn recv(&mut self) -> Result<Message<T>>` | ✅ Aligned |
+| `recv_blocking()` | `fn recv_blocking(&self) -> Result<Message<T>>` | `fn recv_blocking(&self) -> Result<Message<T>>` | ✅ Aligned |
+| `gid()` | ❌ Missing | `fn gid(&self) -> &[u8; GID_SIZE]` | 🔧 Zenoh-specific |
+| `node()` | ❌ Missing | `fn node(&self) -> &Arc<Node>` | 🔧 Zenoh-specific |
 | `statistics()` | `fn statistics(&self) -> SerializableTimeStat` (feature-gated) | ❌ Missing | 🔧 RCL-specific |
 
 **Summary:**
-- `try_recv()` has different signature: `RecvResult<TakenMsg<T>>` vs `Result<Option<ReceivedMessage<T>>>`
-- Return types differ: `TakenMsg<T>` (can be Loaned) vs `ReceivedMessage<T>` (includes attachment)
+- ✅ Both backends now return unified `Message<T>` from `recv()` and `try_recv()`
+- ✅ Topic name accessors aligned (`topic_name()`, `fully_qualified_topic_name()`)
 - rcl has `recv_blocking()`, zenoh does not
-- Different naming conventions
+- `gid()` and `node()` are zenoh-specific
 
 ---
 
@@ -236,12 +234,14 @@ This document details the public API differences between `oxidros-rcl` and `oxid
 
 | Type | `oxidros-rcl` | `oxidros-zenoh` | Status |
 |------|---------------|-----------------|--------|
-| `RecvResult<T>` | `enum { Ok(T), RetryLater, Err(Error) }` | ❌ Missing | ⚠️ Different pattern |
-| `TakenMsg<T>` | Re-exported (Copied/Loaned variants) | Internal only | ⚠️ Different |
-| `ReceivedMessage<T>` | ❌ Missing | `struct { data: T, attachment: Option<Attachment> }` | ⚠️ Different |
+| `Message<T>` | ✅ Unified type with `sample: MessageData<T>` + `info: MessageInfo` | ✅ Same | ✅ Aligned |
+| `MessageData<T>` | `enum { Copied(T), Loaned(...) }` | `enum { Copied(T), Loaned(...) }` | ✅ Aligned |
+| `MessageInfo` | `struct { sequence_number, source_timestamp_ns, publisher_gid }` | Same | ✅ Aligned |
+| `RecvResult<T>` | ❌ Removed | ❌ N/A | ✅ Removed |
+| `TakenMsg<T>` | ❌ Replaced by `Message<T>` | ❌ Replaced by `Message<T>` | ✅ Unified |
+| `Attachment` | ❌ N/A | Internal only (wire encoding for MessageInfo) | 🔧 Internal |
 | `Header` (service) | ✅ Includes timestamps, sequence, guid | ❌ Missing | ❌ Missing in zenoh |
-| `Attachment` | ❌ Missing | ✅ Includes seq, timestamp, gid | ❌ Missing in rcl |
-| `NodeOptions` | ✅ Full struct | ❌ Missing | ❌ Missing in zenoh |
+| `NodeOptions` | ✅ Full struct | ❌ Missing | 🔧 RCL-specific |
 | `GraphCache` | ❌ Missing | ✅ Full implementation | 🔧 Zenoh-specific |
 | `QosMapping` | ❌ Missing | ✅ Full implementation | 🔧 Zenoh-specific |
 | `ST<T>` | ✅ Single-threaded container | ❌ Missing | 🔧 RCL-specific |
@@ -358,15 +358,23 @@ The goal is to create a unified API that allows users to write backend-agnostic 
 #### Step 3.2: Publisher Accessors
 - Note: `gid()` and `node()` are zenoh-specific (not available in rcl)
 
-#### Step 3.3: Subscriber Alignment
-- [ ] Change rcl `try_recv()` to return `Result<Option<TakenMsg<T>>>` instead of `RecvResult`
-- [ ] Add `recv_blocking()` to zenoh Subscriber
+#### Step 3.3: Subscriber Alignment ✅
+- [x] Both backends return `Result<Option<Message<T>>>` from `try_recv()`
+- [x] Both backends return `Result<Message<T>>` from `recv()`
+- [x] Both backends have `recv_blocking()` returning `Result<Message<T>>`
 - Note: `gid()` and `node()` are zenoh-specific (not available in rcl)
 
-#### Step 3.4: Message Types
-- [ ] Unify message wrapper: Create `ReceivedMessage<T>` in core with optional attachment
-- [ ] Have both backends return `ReceivedMessage<T>` from `recv()`
-- [ ] Keep `TakenMsg<T>` for loaned message support (rcl-specific feature)
+#### Step 3.4: Message Types ✅
+- [x] Created unified `Message<T>` in oxidros-core with:
+  - `sample: MessageData<T>` - the message data (Copied or Loaned)
+  - `info: MessageInfo` - metadata (sequence_number, source_timestamp_ns, publisher_gid)
+- [x] `MessageData<T>` enum replaces old `TakenMsg<T>` with `Copied(T)` and `Loaned(...)` variants
+- [x] `MessageInfo` struct with: `sequence_number: i64`, `source_timestamp_ns: i64`, `publisher_gid: [u8; 16]`
+- [x] `Message<T>` implements `Deref<Target=T>` for ergonomic access
+- [x] zenoh: Fills `MessageInfo` from `Attachment` via `From<Attachment> for MessageInfo`
+- [x] rcl: Fills `MessageInfo` from `rmw_message_info_t` via conversion
+- [x] zenoh's `ReceivedMessage<T>` remains internal (wire format)
+- [x] Both `RosSubscriber` trait and `Selector` updated to use `Message<T>`
 
 ---
 

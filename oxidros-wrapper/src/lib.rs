@@ -97,7 +97,7 @@ pub mod prelude {
     pub use crate::pubsub::{Publish, Subscribe};
     pub use oxidros::topic::{
         publisher::Publisher,
-        subscriber::{Subscriber, TakenMsg},
+        subscriber::{Message, Subscriber},
     };
     pub use tokio_stream::{Stream, StreamExt};
 }

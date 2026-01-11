@@ -1,42 +1,125 @@
-use std::ops::DerefMut;
+use std::ops::{Deref, DerefMut};
 
-/// A smart pointer for the message taken from the topic with `rcl_take` or `rcl_take_loaned_message`.
-pub enum TakenMsg<T> {
+/// Metadata about a received message.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct MessageInfo {
+    /// Sequence number of the message.
+    pub sequence_number: i64,
+    /// Source timestamp in nanoseconds since UNIX epoch.
+    pub source_timestamp_ns: i64,
+    /// Publisher's global identifier (GID).
+    pub publisher_gid: [u8; 16],
+}
+
+/// The underlying message data, which can be copied or loaned (zero-copy).
+pub enum MessageData<T> {
+    /// Message data was copied into owned memory.
     Copied(T),
+    /// Message data is loaned from shared memory (zero-copy).
     Loaned(Box<dyn DerefMut<Target = T>>),
 }
 
-impl<T> TakenMsg<T> {
-    // Returns the owned message without cloning
-    // if the subscriber owns the memory region and its data.
-    // None is returned when it does not own the memory region (i.e. the message is loaned).
-    pub fn get_owned(self) -> Option<T> {
+impl<T> MessageData<T> {
+    /// Returns the owned message if it was copied, consuming self.
+    /// Returns `None` if the message is loaned (zero-copy).
+    pub fn into_owned(self) -> Option<T> {
         match self {
-            TakenMsg::Copied(inner) => Some(inner),
-            TakenMsg::Loaned(_) => None,
+            MessageData::Copied(inner) => Some(inner),
+            MessageData::Loaned(_) => None,
         }
+    }
+
+    /// Returns `true` if the message data is copied (owned).
+    pub fn is_copied(&self) -> bool {
+        matches!(self, MessageData::Copied(_))
+    }
+
+    /// Returns `true` if the message data is loaned (zero-copy).
+    pub fn is_loaned(&self) -> bool {
+        matches!(self, MessageData::Loaned(_))
     }
 }
 
-impl<T> std::ops::Deref for TakenMsg<T> {
+impl<T> Deref for MessageData<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
         match self {
-            TakenMsg::Copied(copied) => copied,
-            TakenMsg::Loaned(loaned) => loaned.deref(),
+            MessageData::Copied(copied) => copied,
+            MessageData::Loaned(loaned) => loaned.deref(),
         }
     }
 }
 
-impl<T> std::ops::DerefMut for TakenMsg<T> {
+impl<T> DerefMut for MessageData<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         match self {
-            TakenMsg::Copied(copied) => copied,
-            TakenMsg::Loaned(loaned) => loaned.deref_mut(),
+            MessageData::Copied(copied) => copied,
+            MessageData::Loaned(loaned) => loaned.deref_mut(),
         }
     }
 }
 
-unsafe impl<T> Sync for TakenMsg<T> {}
-unsafe impl<T> Send for TakenMsg<T> {}
+// SAFETY: MessageData is Send/Sync if T is, loaned data comes from ROS2 middleware
+unsafe impl<T> Sync for MessageData<T> {}
+unsafe impl<T> Send for MessageData<T> {}
+
+/// A received message with its data and metadata.
+pub struct Message<T> {
+    /// The message data (copied or loaned).
+    pub sample: MessageData<T>,
+    /// Metadata about the message (sequence number, timestamp, publisher GID).
+    pub info: MessageInfo,
+}
+
+impl<T> Message<T> {
+    /// Create a new message with copied data and info.
+    pub fn new(data: T, info: MessageInfo) -> Self {
+        Self {
+            sample: MessageData::Copied(data),
+            info,
+        }
+    }
+
+    /// Create a new message with loaned data and info.
+    pub fn new_loaned(data: Box<dyn DerefMut<Target = T>>, info: MessageInfo) -> Self {
+        Self {
+            sample: MessageData::Loaned(data),
+            info,
+        }
+    }
+
+    /// Consume the message and return the owned data if it was copied.
+    /// Returns `None` if the data was loaned.
+    pub fn into_owned(self) -> Option<T> {
+        self.sample.into_owned()
+    }
+
+    /// Returns `true` if the message data is copied (owned).
+    pub fn is_copied(&self) -> bool {
+        self.sample.is_copied()
+    }
+
+    /// Returns `true` if the message data is loaned (zero-copy).
+    pub fn is_loaned(&self) -> bool {
+        self.sample.is_loaned()
+    }
+}
+
+impl<T> Deref for Message<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.sample
+    }
+}
+
+impl<T> DerefMut for Message<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.sample
+    }
+}
+
+// SAFETY: Message is Send/Sync if T is
+unsafe impl<T> Sync for Message<T> {}
+unsafe impl<T> Send for Message<T> {}

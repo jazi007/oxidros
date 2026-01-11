@@ -25,7 +25,7 @@
 //! }
 //! ```
 
-use crate::{ActionMsg, Result, ServiceMsg, TypeSupport, message::TakenMsg, qos::Profile};
+use crate::{ActionMsg, Result, ServiceMsg, TypeSupport, message::Message, qos::Profile};
 use std::{borrow::Cow, sync::Arc, time::Duration};
 
 // ============================================================================
@@ -179,7 +179,7 @@ pub trait RosPublisher<T: TypeSupport>: Send + Sync {
 
 /// A ROS2 subscriber that can receive messages from a topic.
 ///
-/// Returns [`TakenMsg<T>`] which supports both copied and zero-copy loaned messages.
+/// Returns [`Message<T>`] which contains both the data and metadata.
 pub trait RosSubscriber<T: TypeSupport>: Send {
     /// Get the topic name.
     fn topic_name(&self) -> Result<Cow<'_, String>>;
@@ -187,24 +187,24 @@ pub trait RosSubscriber<T: TypeSupport>: Send {
     /// Receive a message asynchronously.
     ///
     /// This method waits until a message is available.
-    /// Returns [`TakenMsg<T>`] which may be either a copied message or a
-    /// zero-copy loaned message from shared memory.
+    /// Returns [`Message<T>`] which contains the data (copied or loaned)
+    /// and metadata (sequence number, timestamp, publisher GID).
     ///
     /// # Errors
     ///
     /// Returns an error if deserialization fails or the subscription is closed.
-    fn recv_msg(&mut self) -> impl std::future::Future<Output = Result<TakenMsg<T>>> + Send;
+    fn recv_msg(&mut self) -> impl std::future::Future<Output = Result<Message<T>>> + Send;
 
     /// Try to receive a message without blocking.
     ///
     /// Returns `Ok(None)` if no message is currently available.
-    /// Returns [`TakenMsg<T>`] which may be either a copied message or a
-    /// zero-copy loaned message from shared memory.
+    /// Returns [`Message<T>`] which contains the data (copied or loaned)
+    /// and metadata (sequence number, timestamp, publisher GID).
     ///
     /// # Errors
     ///
     /// Returns an error if deserialization fails or the subscription is closed.
-    fn try_recv_msg(&mut self) -> Result<Option<TakenMsg<T>>>;
+    fn try_recv_msg(&mut self) -> Result<Option<Message<T>>>;
 }
 
 // ============================================================================
@@ -301,7 +301,7 @@ pub trait RosSelector: Sized {
     fn add_subscriber_handler<T: TypeSupport + 'static>(
         &mut self,
         subscriber: Self::Subscriber<T>,
-        handler: Box<dyn FnMut(TakenMsg<T>)>,
+        handler: Box<dyn FnMut(Message<T>)>,
     ) -> bool;
 
     /// Register a server with a callback function.

@@ -7,7 +7,7 @@ use crate::{
     error::Result, parameter::ParameterServer as ZenohParameterServer, service::server::Server,
     topic::subscriber::Subscriber,
 };
-use oxidros_core::{TypeSupport, message::TakenMsg, parameter::Parameters};
+use oxidros_core::{Message, TypeSupport, parameter::Parameters};
 use std::{
     collections::{BTreeSet, HashMap},
     sync::atomic::{AtomicU64, Ordering},
@@ -72,13 +72,13 @@ impl Selector {
     pub fn add_subscriber<T: TypeSupport + 'static>(
         &mut self,
         mut subscriber: Subscriber<T>,
-        mut handler: Box<dyn FnMut(TakenMsg<T>)>,
+        mut handler: Box<dyn FnMut(Message<T>)>,
     ) -> bool {
         // Create a closure that tries to receive and call the handler
         let poll_fn = Box::new(move || -> bool {
             match subscriber.try_recv() {
                 Ok(Some(msg)) => {
-                    handler(TakenMsg::Copied(msg.data));
+                    handler(msg);
                     true
                 }
                 _ => false,
@@ -210,7 +210,7 @@ impl oxidros_core::api::RosSelector for Selector {
     fn add_subscriber_handler<T: TypeSupport + 'static>(
         &mut self,
         subscriber: Self::Subscriber<T>,
-        handler: Box<dyn FnMut(TakenMsg<T>)>,
+        handler: Box<dyn FnMut(Message<T>)>,
     ) -> bool {
         self.add_subscriber(subscriber, handler)
     }

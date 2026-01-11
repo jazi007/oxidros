@@ -5,7 +5,7 @@ use oxidros::{
     msg::TypeSupport,
     prelude::Node,
     qos::{DurabilityPolicy, HistoryPolicy, Profile, ReliabilityPolicy},
-    topic::subscriber::{Subscriber, TakenMsg},
+    topic::subscriber::{Message, Subscriber},
 };
 use std::pin::Pin;
 use std::sync::Arc;
@@ -54,7 +54,7 @@ pub fn create_qos(depth: usize) -> Profile {
 }
 
 /// Implement a wrapper for [`Subscriber`] that implement Stream
-pub type RecvResult<T> = Result<TakenMsg<T>>;
+pub type RecvResult<T> = Result<Message<T>>;
 
 /// Subscriber Wrapper to make a Stream
 #[derive(Debug)]

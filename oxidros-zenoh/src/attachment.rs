@@ -37,6 +37,12 @@ pub struct Attachment {
     pub gid: [u8; GID_SIZE],
 }
 
+impl Default for Attachment {
+    fn default() -> Self {
+        Self::new(0, [0; GID_SIZE])
+    }
+}
+
 impl Attachment {
     /// Create a new attachment with current timestamp.
     pub fn new(sequence_number: i64, gid: [u8; GID_SIZE]) -> Self {
@@ -104,6 +110,30 @@ impl Attachment {
             timestamp_ns,
             gid,
         })
+    }
+}
+
+// ============================================================================
+// MessageInfo conversion
+// ============================================================================
+
+impl From<Attachment> for oxidros_core::MessageInfo {
+    fn from(attachment: Attachment) -> Self {
+        Self {
+            sequence_number: attachment.sequence_number,
+            source_timestamp_ns: attachment.timestamp_ns,
+            publisher_gid: attachment.gid,
+        }
+    }
+}
+
+impl From<&Attachment> for oxidros_core::MessageInfo {
+    fn from(attachment: &Attachment) -> Self {
+        Self {
+            sequence_number: attachment.sequence_number,
+            source_timestamp_ns: attachment.timestamp_ns,
+            publisher_gid: attachment.gid,
+        }
     }
 }
 

@@ -2,13 +2,11 @@
 
 pub mod common;
 
+use oxidros_core::MessageData;
 use oxidros_rcl::msg::common_interfaces::example_interfaces::msg::Int64;
 use oxidros_rcl::{
     context::Context,
-    topic::{
-        publisher::Publisher,
-        subscriber::{Subscriber, TakenMsg},
-    },
+    topic::{publisher::Publisher, subscriber::Subscriber},
 };
 use std::{error::Error, time::Duration};
 
@@ -64,9 +62,9 @@ async fn run_subscriber(mut s: Subscriber<Int64>) {
         // receive a message specifying timeout of 500ms
         match tokio::time::timeout(dur, s.recv()).await {
             Ok(Ok(msg)) => {
-                match &msg {
-                    TakenMsg::Loaned(_) => println!("loaned!"),
-                    TakenMsg::Copied(_) => println!("copied!"),
+                match &msg.sample {
+                    MessageData::Loaned(_) => println!("loaned!"),
+                    MessageData::Copied(_) => println!("copied!"),
                 }
 
                 // received a message

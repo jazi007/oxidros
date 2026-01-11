@@ -76,7 +76,7 @@ use crate::{
 use oxidros_core::{
     Error, RclError,
     delta_list::DeltaList,
-    message::TakenMsg,
+    message::Message,
     selector::{
         ActionHandler, CallbackResult, ConditionHandler, ParameterCallback, ServerCallback,
     },
@@ -300,7 +300,7 @@ impl Selector {
     /// # Example
     ///
     /// ```
-    /// use oxidros_rcl::{msg::common_interfaces::std_msgs, node::Node, selector::Selector, topic::subscriber::TakenMsg};
+    /// use oxidros_rcl::{msg::common_interfaces::std_msgs, node::Node, selector::Selector, topic::subscriber::Message};
     /// use std::sync::Arc;
     ///
     /// fn add_new_subscriber(selector: &mut Selector, node: Arc<Node>) {
@@ -311,14 +311,14 @@ impl Selector {
     ///     // Add the subscriber with a callback function.
     ///     selector.add_subscriber(
     ///         subscriber,
-    ///         Box::new(|msg: TakenMsg<std_msgs::msg::Bool>| /* some tasks */ ()), // Callback function.
+    ///         Box::new(|msg: Message<std_msgs::msg::Bool>| /* some tasks */ ()), // Callback function.
     ///     );
     /// }
     /// ```
     pub fn add_subscriber<T: TypeSupport + 'static>(
         &mut self,
         subscriber: Subscriber<T>,
-        mut handler: Box<dyn FnMut(TakenMsg<T>)>,
+        mut handler: Box<dyn FnMut(Message<T>)>,
     ) -> bool {
         let sub = subscriber.subscription.clone();
         let context_ptr = subscriber.subscription.node.context.as_ptr();
@@ -1553,7 +1553,7 @@ impl oxidros_core::api::RosSelector for Selector {
     fn add_subscriber_handler<T: TypeSupport + 'static>(
         &mut self,
         subscriber: Self::Subscriber<T>,
-        handler: Box<dyn FnMut(TakenMsg<T>)>,
+        handler: Box<dyn FnMut(Message<T>)>,
     ) -> bool {
         self.add_subscriber(subscriber, handler)
     }

@@ -32,7 +32,7 @@ pub use oxidros_core::{ActionGoal, ActionMsg, ActionResult, ServiceMsg, TypeSupp
 pub use oxidros_core::qos::Profile;
 
 // Re-export message utilities
-pub use oxidros_core::message::TakenMsg;
+pub use oxidros_core::message::Message;
 
 // Re-export selector callback result
 pub use oxidros_core::selector::CallbackResult;

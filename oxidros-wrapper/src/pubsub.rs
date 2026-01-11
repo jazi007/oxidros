@@ -6,7 +6,7 @@ use oxidros::{
     msg::TypeSupport,
     topic::{
         publisher::Publisher,
-        subscriber::{Subscriber, TakenMsg},
+        subscriber::{Message, Subscriber},
     },
 };
 use tokio_stream::Stream;
@@ -28,9 +28,9 @@ pub trait Publish<T>: Send + Sync {
 /// Subscribe trait
 pub trait Subscribe<T>: Send {
     /// receive messages
-    fn recv_many(&self, limit: usize) -> Result<Vec<TakenMsg<T>>>;
+    fn recv_many(&self, limit: usize) -> Result<Vec<Message<T>>>;
     /// stream for receiving messages
-    fn into_stream(self) -> MessageStream<Result<TakenMsg<T>>>;
+    fn into_stream(self) -> MessageStream<Result<Message<T>>>;
 }
 impl<T: TypeSupport> Publish<T> for Publisher<T> {
     fn send_many<'a>(&self, messages: impl IntoIterator<Item = &'a T>) -> Result<()>
@@ -45,7 +45,7 @@ impl<T: TypeSupport> Publish<T> for Publisher<T> {
 }
 
 impl<T: TypeSupport + Send + 'static> Subscribe<T> for Subscriber<T> {
-    fn recv_many(&self, limit: usize) -> Result<Vec<TakenMsg<T>>> {
+    fn recv_many(&self, limit: usize) -> Result<Vec<Message<T>>> {
         let mut results = if limit == usize::MAX {
             Vec::new()
         } else {
@@ -61,7 +61,7 @@ impl<T: TypeSupport + Send + 'static> Subscribe<T> for Subscriber<T> {
 
         Ok(results)
     }
-    fn into_stream(self) -> MessageStream<Result<TakenMsg<T>>> {
+    fn into_stream(self) -> MessageStream<Result<Message<T>>> {
         Box::pin(SubscriberStream::new(self))
     }
 }

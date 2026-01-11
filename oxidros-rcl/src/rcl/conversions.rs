@@ -7,6 +7,7 @@ use std::slice::from_raw_parts;
 use std::time::Duration;
 
 use crate::error::ActionError;
+use crate::rcl::rmw_message_info_t;
 
 use super::RclRetErr;
 
@@ -376,5 +377,15 @@ impl From<u32> for RclRetErr {
 impl From<i32> for RclRetErr {
     fn from(value: i32) -> Self {
         Self(value)
+    }
+}
+
+impl From<rmw_message_info_t> for oxidros_core::message::MessageInfo {
+    fn from(value: rmw_message_info_t) -> Self {
+        Self {
+            sequence_number: value.publication_sequence_number as i64,
+            source_timestamp_ns: value.source_timestamp,
+            publisher_gid: value.publisher_gid.data,
+        }
     }
 }
