@@ -18,6 +18,7 @@
 //!
 //! Total: 33 bytes
 
+use crate::error::{Error, Result};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Size of the attachment in bytes.
@@ -88,24 +89,39 @@ impl Attachment {
     ///
     /// # Errors
     ///
-    /// Returns `None` if the bytes are too short or malformed.
-    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
+    /// Returns `InvalidAttachment` if the bytes are too short or malformed.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() < ATTACHMENT_SIZE {
-            return None;
+            return Err(Error::InvalidAttachment(format!(
+                "attachment too short: expected {} bytes, got {}",
+                ATTACHMENT_SIZE,
+                bytes.len()
+            )));
         }
 
-        let sequence_number = i64::from_le_bytes(bytes[0..8].try_into().ok()?);
-        let timestamp_ns = i64::from_le_bytes(bytes[8..16].try_into().ok()?);
+        let sequence_number = i64::from_le_bytes(
+            bytes[0..8]
+                .try_into()
+                .map_err(|_| Error::InvalidAttachment("invalid sequence number".into()))?,
+        );
+        let timestamp_ns = i64::from_le_bytes(
+            bytes[8..16]
+                .try_into()
+                .map_err(|_| Error::InvalidAttachment("invalid timestamp".into()))?,
+        );
         let gid_len = bytes[16] as usize;
 
         if gid_len != GID_SIZE {
-            return None;
+            return Err(Error::InvalidAttachment(format!(
+                "invalid GID length: expected {}, got {}",
+                GID_SIZE, gid_len
+            )));
         }
 
         let mut gid = [0u8; GID_SIZE];
         gid.copy_from_slice(&bytes[17..33]);
 
-        Some(Self {
+        Ok(Self {
             sequence_number,
             timestamp_ns,
             gid,
@@ -162,6 +178,19 @@ mod tests {
     #[test]
     fn test_attachment_from_short_bytes() {
         let short_bytes = [0u8; 10];
-        assert!(Attachment::from_bytes(&short_bytes).is_none());
+        assert!(matches!(
+            Attachment::from_bytes(&short_bytes),
+            Err(Error::InvalidAttachment(_))
+        ));
+    }
+
+    #[test]
+    fn test_attachment_invalid_gid_length() {
+        let mut bytes = [0u8; ATTACHMENT_SIZE];
+        bytes[16] = 8; // Wrong GID length (should be 16)
+        assert!(matches!(
+            Attachment::from_bytes(&bytes),
+            Err(Error::InvalidAttachment(_))
+        ));
     }
 }

@@ -28,6 +28,7 @@ oxidros-msg = { path = "../oxidros-msg" }
 thiserror.workspace = true
 log.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 parking_lot = "0.12"
 uuid = { version = "1", features = ["v4"] }
 yaml-rust2 = "0.11"

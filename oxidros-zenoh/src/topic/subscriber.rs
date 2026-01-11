@@ -172,7 +172,8 @@ impl<T: TypeSupport> Subscriber<T> {
     ///
     /// # Errors
     ///
-    /// Returns an error if deserialization fails or the channel is closed.
+    /// Returns an error if deserialization fails, the channel is closed,
+    /// or the message has a missing/invalid attachment.
     pub async fn recv(&mut self) -> Result<Message<T>> {
         let sample = self
             .receiver
@@ -180,11 +181,8 @@ impl<T: TypeSupport> Subscriber<T> {
             .await
             .map_err(|_| Error::ChannelClosed)?;
         let data = T::from_bytes(&sample.payload().to_bytes())?;
-        let info = sample
-            .attachment()
-            .and_then(|bytes| Attachment::from_bytes(&bytes.to_bytes()))
-            .unwrap_or_default()
-            .into();
+        let attachment_bytes = sample.attachment().ok_or(Error::MissingAttachment)?;
+        let info = Attachment::from_bytes(&attachment_bytes.to_bytes())?.into();
         Ok(Message::new(data, info))
     }
 
@@ -194,16 +192,14 @@ impl<T: TypeSupport> Subscriber<T> {
     ///
     /// # Errors
     ///
-    /// Returns an error if deserialization fails.
+    /// Returns an error if deserialization fails or the message has a
+    /// missing/invalid attachment.
     pub fn try_recv(&mut self) -> Result<Option<Message<T>>> {
         match self.receiver.try_recv() {
             Ok(sample) => {
                 let data = T::from_bytes(&sample.payload().to_bytes())?;
-                let info = sample
-                    .attachment()
-                    .and_then(|bytes| Attachment::from_bytes(&bytes.to_bytes()))
-                    .unwrap_or_default()
-                    .into();
+                let attachment_bytes = sample.attachment().ok_or(Error::MissingAttachment)?;
+                let info = Attachment::from_bytes(&attachment_bytes.to_bytes())?.into();
                 Ok(Some(Message::new(data, info)))
             }
             Err(flume::TryRecvError::Empty) => Ok(None),
@@ -215,15 +211,13 @@ impl<T: TypeSupport> Subscriber<T> {
     ///
     /// # Errors
     ///
-    /// Returns an error if deserialization fails or the channel is closed.
+    /// Returns an error if deserialization fails, the channel is closed,
+    /// or the message has a missing/invalid attachment.
     pub fn recv_blocking(&self) -> Result<Message<T>> {
         let sample = self.receiver.recv().map_err(|_| Error::ChannelClosed)?;
         let data = T::from_bytes(&sample.payload().to_bytes())?;
-        let info = sample
-            .attachment()
-            .and_then(|bytes| Attachment::from_bytes(&bytes.to_bytes()))
-            .unwrap_or_default()
-            .into();
+        let attachment_bytes = sample.attachment().ok_or(Error::MissingAttachment)?;
+        let info = Attachment::from_bytes(&attachment_bytes.to_bytes())?.into();
         Ok(Message::new(data, info))
     }
 

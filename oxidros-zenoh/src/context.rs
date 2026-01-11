@@ -46,6 +46,8 @@ struct ContextInner {
     graph_cache: Arc<Mutex<GraphCache>>,
     /// Parsed ROS2 command-line arguments.
     ros2_args: Ros2Args,
+    /// Liveliness subscriber for graph discovery (must be kept alive).
+    _liveliness_subscriber: Mutex<Option<zenoh::pubsub::Subscriber<()>>>,
 }
 
 /// ROS2 context wrapping a Zenoh session.
@@ -117,6 +119,12 @@ impl Context {
                 .map_err(|e| Error::InvalidConfig(format!("Failed to set endpoints: {:?}", e)))?;
         }
 
+        // Enable timestamping for AdvancedPublisher with Sequencing::Timestamp
+        config.insert_json5(
+            "timestamping/enabled",
+            &serde_json::json!({"router": true, "peer": true, "client": true}).to_string(),
+        )?;
+
         Self::with_full_config(ros2_args, domain_id, config)
     }
 
@@ -160,6 +168,7 @@ impl Context {
             next_node_id: AtomicU32::new(0),
             graph_cache: Arc::new(Mutex::new(graph_cache)),
             ros2_args,
+            _liveliness_subscriber: Mutex::new(None),
         });
 
         let ctx = Arc::new(Context { inner });
@@ -242,7 +251,7 @@ impl Context {
         let graph_cache = Arc::clone(&self.inner.graph_cache);
 
         // Subscribe to liveliness tokens
-        let _subscriber = self
+        let subscriber = self
             .inner
             .session
             .liveliness()
@@ -253,6 +262,9 @@ impl Context {
                 cache.handle_liveliness_token(key_expr, sample.kind());
             })
             .wait()?;
+
+        // Store the subscriber to keep it alive for the lifetime of the context
+        *self.inner._liveliness_subscriber.lock() = Some(subscriber);
 
         // Query existing liveliness tokens
         let replies = self.inner.session.liveliness().get(&key).wait()?;

@@ -18,8 +18,8 @@ use zenoh::{Wait, bytes::ZBytes, query::Query};
 pub struct ServiceRequest<T: oxidros_core::ServiceMsg> {
     /// Request data.
     pub request: T::Request,
-    /// Request attachment.
-    pub attachment: Option<Attachment>,
+    /// Request attachment (required by rmw_zenoh protocol).
+    pub attachment: Attachment,
     /// Sender for response.
     sender: RequestSender<T>,
 }
@@ -217,6 +217,14 @@ where
     /// Receive a request asynchronously.
     ///
     /// Returns a `ServiceRequest` that can be used to send a response.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Deserialization fails
+    /// - Channel is closed
+    /// - Request is missing attachment (protocol violation)
+    /// - Request attachment is invalid
     pub async fn recv(&mut self) -> Result<ServiceRequest<T>> {
         let (query, payload, attachment_bytes) = self
             .receiver
@@ -227,21 +235,14 @@ where
         // Deserialize request
         let request = T::Request::from_bytes(&payload)?;
 
-        // Parse attachment
-        let attachment = attachment_bytes
-            .as_ref()
-            .and_then(|bytes| Attachment::from_bytes(bytes));
-
-        // Extract client info for response
-        let (sequence_number, client_gid) = attachment
-            .as_ref()
-            .map(|a| (a.sequence_number, a.gid))
-            .unwrap_or((0, [0u8; GID_SIZE]));
+        // Parse attachment (required by protocol)
+        let attachment_bytes = attachment_bytes.ok_or(Error::MissingAttachment)?;
+        let attachment = Attachment::from_bytes(&attachment_bytes)?;
 
         let sender = RequestSender {
             query,
-            client_gid,
-            sequence_number,
+            client_gid: attachment.gid,
+            sequence_number: attachment.sequence_number,
             _phantom: PhantomData,
         };
 
@@ -260,6 +261,13 @@ where
     /// Try to receive a request without blocking.
     ///
     /// Returns `Ok(None)` if no request is currently available.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Deserialization fails
+    /// - Request is missing attachment (protocol violation)
+    /// - Request attachment is invalid
     pub fn try_recv(&mut self) -> Result<Option<ServiceRequest<T>>>
     where
         T::Request: TypeSupport,
@@ -269,21 +277,14 @@ where
                 // Deserialize request
                 let request = T::Request::from_bytes(&payload)?;
 
-                // Parse attachment
-                let attachment = attachment_bytes
-                    .as_ref()
-                    .and_then(|bytes| Attachment::from_bytes(bytes));
-
-                // Extract client info for response
-                let (sequence_number, client_gid) = attachment
-                    .as_ref()
-                    .map(|a| (a.sequence_number, a.gid))
-                    .unwrap_or((0, [0u8; GID_SIZE]));
+                // Parse attachment (required by protocol)
+                let attachment_bytes = attachment_bytes.ok_or(Error::MissingAttachment)?;
+                let attachment = Attachment::from_bytes(&attachment_bytes)?;
 
                 let sender = RequestSender {
                     query,
-                    client_gid,
-                    sequence_number,
+                    client_gid: attachment.gid,
+                    sequence_number: attachment.sequence_number,
                     _phantom: PhantomData,
                 };
 

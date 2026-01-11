@@ -79,6 +79,14 @@ pub enum Error {
     /// Generic error with message.
     #[error("{0}")]
     Other(String),
+
+    /// Message attachment is missing (required by rmw_zenoh protocol).
+    #[error("Missing attachment: message does not contain required metadata")]
+    MissingAttachment,
+
+    /// Message attachment is invalid/malformed.
+    #[error("Invalid attachment: {0}")]
+    InvalidAttachment(String),
 }
 
 /// Result type using the unified Error.

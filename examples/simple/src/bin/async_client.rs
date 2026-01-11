@@ -13,7 +13,8 @@ async fn client_handler(mut client: Client<AddTwoInts>) -> Result<()> {
     // }
     let name = format!("client{client_n}");
     while !client.service_available() {
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        println!("server not yet available for {name}, waiting...");
+        tokio::time::sleep(Duration::from_secs(1)).await;
     }
     let mut req = AddTwoInts_Request::new().unwrap();
     let mut index = client_n as i64 * 1000;

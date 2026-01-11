@@ -11,8 +11,11 @@ use crate::{
     node::Node,
 };
 use oxidros_core::{TypeSupport, qos::Profile};
-use parking_lot::Mutex;
-use std::{marker::PhantomData, sync::Arc, time::Duration};
+use std::{
+    marker::PhantomData,
+    sync::{Arc, atomic::AtomicI64},
+    time::Duration,
+};
 use zenoh::query::QueryTarget;
 use zenoh::{Wait, bytes::ZBytes};
 
@@ -20,8 +23,8 @@ use zenoh::{Wait, bytes::ZBytes};
 pub struct ClientResponse<T> {
     /// Response data.
     pub response: T,
-    /// Response attachment.
-    pub attachment: Option<Attachment>,
+    /// Response attachment (required by rmw_zenoh protocol).
+    pub attachment: Attachment,
 }
 
 /// Service client.
@@ -48,7 +51,7 @@ pub struct Client<T: oxidros_core::ServiceMsg> {
     /// Client GID.
     gid: [u8; GID_SIZE],
     /// Sequence number counter.
-    sequence_number: Mutex<i64>,
+    sequence_number: AtomicI64,
     /// Liveliness token.
     _liveliness_token: zenoh::liveliness::LivelinessToken,
     /// Phantom data for service type.
@@ -119,7 +122,7 @@ where
             fq_service_name: fq_service_name.to_string(),
             key_expr,
             gid,
-            sequence_number: Mutex::new(0),
+            sequence_number: AtomicI64::new(0),
             _liveliness_token: liveliness_token,
             _phantom: PhantomData,
         })
@@ -168,31 +171,15 @@ where
     /// - No response is received
     /// - Deserialization fails
     pub async fn call(&self, request: &T::Request) -> Result<ClientResponse<T::Response>> {
-        self.call_with_timeout(request, Duration::from_secs(10))
-            .await
-    }
-
-    /// Send a request with a custom timeout.
-    pub async fn call_with_timeout(
-        &self,
-        request: &T::Request,
-        timeout: Duration,
-    ) -> Result<ClientResponse<T::Response>> {
         // Serialize request
         let payload = request.to_bytes()?;
-
         // Increment sequence number
-        let seq = {
-            let mut seq = self.sequence_number.lock();
-            let current = *seq;
-            *seq += 1;
-            current
-        };
-
+        let seq = self
+            .sequence_number
+            .fetch_add(1, std::sync::atomic::Ordering::AcqRel);
         // Create attachment
         let attachment = Attachment::new(seq, self.gid);
         let attachment_bytes = attachment.to_bytes();
-
         // Send query
         let replies = self
             .node
@@ -202,33 +189,51 @@ where
             .payload(payload)
             .attachment(ZBytes::from(attachment_bytes.to_vec()))
             .target(QueryTarget::All) // ALL_COMPLETE equivalent
-            .timeout(timeout)
             .await?;
 
-        // Wait for reply
-        while let Ok(reply) = replies.recv_async().await {
-            match reply.result() {
-                Ok(sample) => {
-                    let response_bytes: Vec<u8> = sample.payload().to_bytes().to_vec();
-                    let response = T::Response::from_bytes(&response_bytes)?;
-
-                    let response_attachment = sample
-                        .attachment()
-                        .and_then(|a| Attachment::from_bytes(&a.to_bytes()));
-
-                    return Ok(ClientResponse {
-                        response,
-                        attachment: response_attachment,
-                    });
-                }
-                Err(_err) => {
-                    // Reply error, continue waiting for other replies
-                    continue;
-                }
+        // Wait for reply with matching sequence number
+        loop {
+            let reply = replies.recv_async().await?;
+            let sample = reply.result().map_err(|e| Error::Zenoh(format!("{e}")))?;
+            // Parse response attachment (required by protocol)
+            let attachment_bytes = sample.attachment().ok_or(Error::MissingAttachment)?;
+            let response_attachment = Attachment::from_bytes(&attachment_bytes.to_bytes())?;
+            // Verify sequence number matches our request
+            // (server echoes back the client's sequence number)
+            if response_attachment.sequence_number != seq {
+                // Wrong sequence number, skip this reply and wait for another
+                continue;
             }
-        }
+            let response_bytes: Vec<u8> = sample.payload().to_bytes().to_vec();
+            let response = T::Response::from_bytes(&response_bytes)?;
 
-        Err(Error::Timeout)
+            return Ok(ClientResponse {
+                response,
+                attachment: response_attachment,
+            });
+        }
+    }
+
+    /// Send a request with a custom timeout.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Serialization fails
+    /// - The query fails
+    /// - No response is received (timeout)
+    /// - Response is missing attachment (protocol violation)
+    /// - Response attachment is invalid
+    /// - Deserialization fails
+    pub async fn call_with_timeout(
+        &self,
+        request: &T::Request,
+        timeout: Duration,
+    ) -> Result<ClientResponse<T::Response>> {
+        match tokio::time::timeout(timeout, self.call(request)).await {
+            Ok(v) => v,
+            Err(_) => Err(Error::Timeout),
+        }
     }
 
     /// Get the parent node.
@@ -254,7 +259,7 @@ where
         self.is_service_available()
     }
 
-    async fn call_service(&mut self, request: &T::Request) -> crate::error::Result<T::Response> {
+    async fn call_service(&mut self, request: &T::Request) -> Result<T::Response> {
         let response = self.call(request).await?;
         Ok(response.response)
     }
