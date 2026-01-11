@@ -42,7 +42,7 @@ pub trait ServiceRequest<T: ServiceMsg>: Send {
     /// Send a response back to the client.
     ///
     /// Consumes self to ensure only one response is sent.
-    fn respond(self, response: T::Response) -> Result<()>;
+    fn respond(self, response: &T::Response) -> Result<()>;
 }
 
 // ============================================================================
@@ -214,7 +214,7 @@ pub trait RosSubscriber<T: TypeSupport>: Send {
 /// A ROS2 service client that can send requests and receive responses.
 pub trait RosClient<T: ServiceMsg>: Send {
     /// Get the service name.
-    fn service_name(&self) -> Cow<'_, str>;
+    fn service_name(&self) -> Result<Cow<'_, String>>;
 
     /// Check if the service is available.
     fn service_available(&self) -> bool;
@@ -238,7 +238,7 @@ pub trait RosServer<T: ServiceMsg>: Send {
     type Request: ServiceRequest<T>;
 
     /// Get the service name.
-    fn service_name(&self) -> Cow<'_, str>;
+    fn service_name(&self) -> Result<Cow<'_, String>>;
 
     /// Receive a request asynchronously.
     ///

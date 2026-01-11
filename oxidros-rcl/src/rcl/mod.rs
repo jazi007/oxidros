@@ -893,7 +893,7 @@ impl MTUnsafeFn {
     ) -> Result<String> {
         let name_c = unsafe { self::rcl_publisher_get_topic_name(publisher) };
         if name_c.is_null() {
-            return Err(RclError::NodeInvalid.into());
+            return Err(RclError::TopicNameInvalid.into());
         }
         let name_c = unsafe { CStr::from_ptr(name_c) };
         Ok(name_c
@@ -907,12 +907,34 @@ impl MTUnsafeFn {
     ) -> Result<String> {
         let name_c = unsafe { self::rcl_subscription_get_topic_name(subscriber) };
         if name_c.is_null() {
-            return Err(RclError::NodeInvalid.into());
+            return Err(RclError::TopicNameInvalid.into());
         }
         let name_c = unsafe { CStr::from_ptr(name_c) };
         Ok(name_c
             .to_str()
             .map_err(|_| RclError::TopicNameInvalid)?
+            .to_owned())
+    }
+    pub fn rcl_client_get_service_name(&self, client: *const rcl_client_t) -> Result<String> {
+        let name_c = unsafe { self::rcl_client_get_service_name(client) };
+        if name_c.is_null() {
+            return Err(RclError::ServiceNameInvalid.into());
+        }
+        let name_c = unsafe { CStr::from_ptr(name_c) };
+        Ok(name_c
+            .to_str()
+            .map_err(|_| RclError::ServiceNameInvalid)?
+            .to_owned())
+    }
+    pub fn rcl_service_get_service_name(&self, service: *const rcl_service_t) -> Result<String> {
+        let name_c = unsafe { self::rcl_service_get_service_name(service) };
+        if name_c.is_null() {
+            return Err(RclError::ServiceNameInvalid.into());
+        }
+        let name_c = unsafe { CStr::from_ptr(name_c) };
+        Ok(name_c
+            .to_str()
+            .map_err(|_| RclError::ServiceNameInvalid)?
             .to_owned())
     }
 }

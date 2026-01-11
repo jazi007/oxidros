@@ -163,9 +163,10 @@ impl<T: TypeSupport> Publisher<T> {
     }
 
     /// Get the fully qualified topic name (includes namespace).
-    pub fn fully_qualified_topic_name(&self) -> Result<String> {
+    pub fn fully_qualified_topic_name(&self) -> Result<Cow<'_, String>> {
         let guard = MT_UNSAFE_FN.lock();
-        guard.rcl_publisher_get_topic_name(self.publisher.as_ref())
+        let name = guard.rcl_publisher_get_topic_name(self.publisher.as_ref())?;
+        Ok(Cow::Owned(name))
     }
 
     /// Get the topic name (last segment of the fully qualified name).

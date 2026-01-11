@@ -12,9 +12,9 @@ use crate::{
 };
 use oxidros_core::{Message, TypeSupport, qos::Profile};
 use std::{
+    borrow::Cow,
     marker::PhantomData,
     sync::{Arc, atomic::AtomicI64},
-    time::Duration,
 };
 use zenoh::query::QueryTarget;
 use zenoh::{Wait, bytes::ZBytes};
@@ -127,13 +127,13 @@ where
     T::Response: TypeSupport,
 {
     /// Get the service name.
-    pub fn service_name(&self) -> &str {
-        &self.service_name
+    pub fn service_name(&self) -> Result<Cow<'_, String>> {
+        Ok(Cow::Borrowed(&self.service_name))
     }
 
     /// Get the fully qualified service name.
-    pub fn fq_service_name(&self) -> &str {
-        &self.fq_service_name
+    pub fn fully_qualified_service_name(&self) -> Result<Cow<'_, String>> {
+        Ok(Cow::Borrowed(&self.fq_service_name))
     }
 
     /// Get the client GID.
@@ -162,7 +162,7 @@ where
     /// - The query fails
     /// - No response is received
     /// - Deserialization fails
-    pub async fn call(&self, request: &T::Request) -> Result<Message<T::Response>> {
+    pub async fn call(&mut self, request: &T::Request) -> Result<Message<T::Response>> {
         // Serialize request
         let payload = request.to_bytes()?;
         // Increment sequence number
@@ -202,28 +202,6 @@ where
         }
     }
 
-    /// Send a request with a custom timeout.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if:
-    /// - Serialization fails
-    /// - The query fails
-    /// - No response is received (timeout)
-    /// - Response is missing attachment (protocol violation)
-    /// - Response attachment is invalid
-    /// - Deserialization fails
-    pub async fn call_with_timeout(
-        &self,
-        request: &T::Request,
-        timeout: Duration,
-    ) -> Result<Message<T::Response>> {
-        match tokio::time::timeout(timeout, self.call(request)).await {
-            Ok(v) => v,
-            Err(_) => Err(Error::Timeout),
-        }
-    }
-
     /// Get the parent node.
     pub fn node(&self) -> &Arc<Node> {
         &self.node
@@ -239,8 +217,8 @@ where
     T::Request: TypeSupport,
     T::Response: TypeSupport,
 {
-    fn service_name(&self) -> std::borrow::Cow<'_, str> {
-        std::borrow::Cow::Borrowed(Client::service_name(self))
+    fn service_name(&self) -> Result<Cow<'_, String>> {
+        Client::service_name(self)
     }
     fn service_available(&self) -> bool {
         self.is_service_available()

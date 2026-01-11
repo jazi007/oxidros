@@ -14,6 +14,6 @@ async fn main() -> Result<()> {
         let req = request.request();
         println!("Received {req:?}");
         let response = AddTwoInts_Response { sum: req.a + req.b };
-        request.respond(response)?;
+        request.respond(&response)?;
     }
 }

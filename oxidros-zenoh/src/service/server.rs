@@ -11,7 +11,7 @@ use crate::{
     node::Node,
 };
 use oxidros_core::{Message, TypeSupport, qos::Profile};
-use std::{marker::PhantomData, sync::Arc};
+use std::{borrow::Cow, marker::PhantomData, sync::Arc};
 use zenoh::{Wait, bytes::ZBytes, query::Query};
 
 /// Incoming service request with sender for response.
@@ -27,13 +27,18 @@ where
     T::Response: TypeSupport,
 {
     /// Send a response to this request.
-    pub fn send(self, response: T::Response) -> Result<()> {
+    pub fn send(self, response: &T::Response) -> Result<()> {
         self.sender.send(response)
+    }
+
+    /// Split into sender and request
+    pub fn split(self) -> (RequestSender<T>, Message<T::Request>) {
+        (self.sender, self.request)
     }
 }
 
 /// Sender for service response.
-struct RequestSender<T: oxidros_core::ServiceMsg> {
+pub struct RequestSender<T: oxidros_core::ServiceMsg> {
     query: Query,
     client_gid: [u8; GID_SIZE],
     sequence_number: i64,
@@ -44,14 +49,13 @@ impl<T: oxidros_core::ServiceMsg> RequestSender<T>
 where
     T::Response: TypeSupport,
 {
-    fn send(self, response: T::Response) -> Result<()> {
+    /// Send a response
+    pub fn send(self, response: &T::Response) -> Result<()> {
         // Serialize response
         let payload = response.to_bytes()?;
-
         // Create response attachment (echo back client's seq and gid)
         let attachment = Attachment::new(self.sequence_number, self.client_gid);
         let attachment_bytes = attachment.to_bytes();
-
         // Reply to query
         self.query
             .reply(self.query.key_expr().clone(), payload)
@@ -198,13 +202,13 @@ where
     T::Response: TypeSupport,
 {
     /// Get the service name.
-    pub fn service_name(&self) -> &str {
-        &self.service_name
+    pub fn service_name(&self) -> Result<Cow<'_, String>> {
+        Ok(Cow::Borrowed(&self.service_name))
     }
 
     /// Get the fully qualified service name.
-    pub fn fq_service_name(&self) -> &str {
-        &self.fq_service_name
+    pub fn fully_qualified_service_name(&self) -> Result<Cow<'_, String>> {
+        Ok(Cow::Borrowed(&self.fq_service_name))
     }
 
     /// Get the server GID.
@@ -308,7 +312,7 @@ where
         &self.request
     }
 
-    fn respond(self, response: T::Response) -> Result<()> {
+    fn respond(self, response: &T::Response) -> Result<()> {
         self.send(response)
     }
 }
@@ -324,8 +328,8 @@ where
 {
     type Request = ServiceRequest<T>;
 
-    fn service_name(&self) -> std::borrow::Cow<'_, str> {
-        std::borrow::Cow::Borrowed(Server::service_name(self))
+    fn service_name(&self) -> Result<Cow<'_, String>> {
+        Server::service_name(self)
     }
 
     async fn recv_request(&mut self) -> Result<Self::Request> {

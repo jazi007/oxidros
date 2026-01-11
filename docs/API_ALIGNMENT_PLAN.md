@@ -131,19 +131,21 @@ This document details the public API differences between `oxidros-rcl` and `oxid
 
 | API | `oxidros-rcl` | `oxidros-zenoh` | Status |
 |-----|---------------|-----------------|--------|
-| `is_service_available()` | `fn is_service_available(&self) -> OResult<bool>` | `fn is_service_available(&self) -> bool` | ⚠️ Different return type |
-| `send()` | `fn send(&mut self, data: &Request) -> OResult<ClientRecv<T>>` | ❌ Missing | ⚠️ Different pattern |
-| `send_ret_seq()` | `fn send_ret_seq(&mut self, data: &Request) -> OResult<(ClientRecv<T>, i64)>` | ❌ Missing | 🔧 RCL-specific |
-| `call()` | ❌ Missing | `async fn call(&self, request: &Request) -> Result<ClientResponse<Response>>` | ⚠️ Different pattern |
-| `call_with_timeout()` | ❌ Missing | `async fn call_with_timeout(&self, request, timeout) -> Result<ClientResponse<Response>>` | ❌ Missing in rcl |
-| `service_name()` | ❌ Missing (private field) | `fn service_name(&self) -> &str` | ❌ Missing in rcl |
-| `fq_service_name()` | ❌ Missing | `fn fq_service_name(&self) -> &str` | ❌ Missing in rcl |
-| `gid()` | ❌ Missing | `fn gid(&self) -> &[u8; GID_SIZE]` | ❌ Missing in rcl |
-| `node()` | ❌ Missing | `fn node(&self) -> &Arc<Node>` | ❌ Missing in rcl |
+| `is_service_available()` | `fn is_service_available(&self) -> bool` | `fn is_service_available(&self) -> bool` | ✅ Aligned |
+| `call()` | `async fn call(&mut self, request) -> Result<Message<Response>>` | `async fn call(&mut self, request) -> Result<Message<Response>>` | ✅ Aligned |
+| `service_name()` | `fn service_name(&self) -> Result<Cow<'_, String>>` | `fn service_name(&self) -> Result<Cow<'_, String>>` | ✅ Aligned |
+| `fully_qualified_service_name()` | `fn fully_qualified_service_name(&self) -> Result<Cow<'_, String>>` | `fn fully_qualified_service_name(&self) -> Result<Cow<'_, String>>` | ✅ Aligned |
+| `send()` | `fn send(&mut self, data: &Request) -> Result<ClientRecv<T>>` | ❌ Missing | 🔧 RCL-specific (advanced) |
+| `send_ret_seq()` | `fn send_ret_seq(&mut self, data: &Request) -> Result<(ClientRecv<T>, i64)>` | ❌ Missing | 🔧 RCL-specific (advanced) |
+| `gid()` | ❌ Missing | `fn gid(&self) -> &[u8; GID_SIZE]` | 🔧 Zenoh-specific |
+| `node()` | ❌ Missing | `fn node(&self) -> &Arc<Node>` | 🔧 Zenoh-specific |
 
-**Key Pattern Difference:**
-- **rcl**: Two-step pattern → `send()` returns `ClientRecv` → call `recv()` or `try_recv()` on it
-- **zenoh**: Single-step async pattern → `call()` or `call_with_timeout()`
+**Summary:**
+- ✅ Both backends have unified `call()` returning `Message<T::Response>`
+- ✅ Service name accessors aligned (`service_name()`, `fully_qualified_service_name()`)
+- ✅ `is_service_available()` returns `bool` in both backends
+- rcl keeps `send()` / `send_ret_seq()` for advanced two-step pattern
+- `gid()` and `node()` are zenoh-specific
 
 ---
 
@@ -151,17 +153,24 @@ This document details the public API differences between `oxidros-rcl` and `oxid
 
 | API | `oxidros-rcl` | `oxidros-zenoh` | Status |
 |-----|---------------|-----------------|--------|
-| `try_recv()` | `fn try_recv(&mut self) -> RecvResult<(ServerSend<T>, Request, Header)>` | `fn try_recv(&mut self) -> Result<Option<ServiceRequest<T>>>` | ⚠️ Different return type |
-| `recv()` | `async fn recv(&mut self) -> Result<(ServerSend<T>, Request, Header)>` | `async fn recv(&mut self) -> Result<ServiceRequest<T>>` | ⚠️ Different return type |
-| `configure_introspection()` | `fn configure_introspection(&self, clock, qos, state) -> OResult<()>` (jazzy) | ❌ Missing | 🔧 RCL-specific |
-| `service_name()` | ❌ Missing (private field) | `fn service_name(&self) -> &str` | ❌ Missing in rcl |
-| `fq_service_name()` | ❌ Missing | `fn fq_service_name(&self) -> &str` | ❌ Missing in rcl |
-| `gid()` | ❌ Missing | `fn gid(&self) -> &[u8; GID_SIZE]` | ❌ Missing in rcl |
-| `node()` | ❌ Missing | `fn node(&self) -> &Arc<Node>` | ❌ Missing in rcl |
+| `recv()` | `async fn recv(&mut self) -> Result<ServiceRequest<T>>` | `async fn recv(&mut self) -> Result<ServiceRequest<T>>` | ✅ Aligned |
+| `try_recv()` | `fn try_recv(&mut self) -> Result<Option<ServiceRequest<T>>>` | `fn try_recv(&mut self) -> Result<Option<ServiceRequest<T>>>` | ✅ Aligned |
+| `service_name()` | `fn service_name(&self) -> Result<Cow<'_, String>>` | `fn service_name(&self) -> Result<Cow<'_, String>>` | ✅ Aligned |
+| `fully_qualified_service_name()` | `fn fully_qualified_service_name(&self) -> Result<Cow<'_, String>>` | `fn fully_qualified_service_name(&self) -> Result<Cow<'_, String>>` | ✅ Aligned |
+| `configure_introspection()` | `fn configure_introspection(&self, clock, qos, state) -> Result<()>` (jazzy) | ❌ Missing | 🔧 RCL-specific |
+| `gid()` | ❌ Missing | `fn gid(&self) -> &[u8; GID_SIZE]` | 🔧 Zenoh-specific |
+| `node()` | ❌ Missing | `fn node(&self) -> &Arc<Node>` | 🔧 Zenoh-specific |
 
-**Response Sending Pattern:**
-- **rcl**: `recv()` returns `(ServerSend<T>, Request, Header)` → call `server_send.send(&response)`
-- **zenoh**: `recv()` returns `ServiceRequest<T>` → call `request.send(response)`
+**ServiceRequest<T> (both backends):**
+- `request: Message<T::Request>` - the request data with metadata
+- `send(response)` - send a response
+- `split()` - separate sender and request for advanced use
+
+**Summary:**
+- ✅ Both backends have unified `ServiceRequest<T>` with same interface
+- ✅ `recv()` and `try_recv()` return `ServiceRequest<T>` in both backends
+- ✅ Service name accessors aligned (`service_name()`, `fully_qualified_service_name()`)
+- `gid()` and `node()` are zenoh-specific
 
 ---
 
@@ -169,7 +178,8 @@ This document details the public API differences between `oxidros-rcl` and `oxid
 
 | API | `oxidros-rcl` | `oxidros-zenoh` | Status |
 |-----|---------------|-----------------|--------|
-| `new()` | `pub(crate) fn new(context: Arc<Context>) -> OResult<Self>` | `pub fn new() -> Self` | ⚠️ Different (context param) |
+| `new()` | `pub(crate) fn new(context: Arc<Context>) -> Result<Self>` | `pub(crate) fn new() -> Self` | ✅ Both private |
+| `Context::create_selector()` | `fn create_selector(&Arc<Self>) -> Result<Selector>` | `fn create_selector(&self) -> Selector` | ✅ Aligned |
 | `add_subscriber()` | `fn add_subscriber<T>(&mut self, subscriber, handler) -> bool` | `fn add_subscriber<T>(&mut self, subscriber, handler) -> bool` | ✅ Aligned |
 | `add_server()` | `fn add_server<T>(&mut self, server, handler) -> bool` | ❌ Stub only | ❌ Missing in zenoh |
 | `add_parameter_server()` | `fn add_parameter_server(&mut self, param_server, handler)` | ❌ Stub only | ❌ Missing in zenoh |
@@ -186,7 +196,8 @@ This document details the public API differences between `oxidros-rcl` and `oxid
 | `statistics()` | `fn statistics(&self) -> Statistics` (feature-gated) | ❌ Missing | 🔧 RCL-specific |
 
 **Summary:**
-- rcl Selector requires Context, zenoh is standalone
+- ✅ Both backends create Selector via `Context::create_selector()`
+- ✅ `Selector::new()` is private (`pub(crate)`) in both backends
 - Different timer naming: `delete_wall_timer()` vs `remove_timer()`
 - zenoh is missing server/parameter server/action handlers
 
@@ -382,24 +393,25 @@ The goal is to create a unified API that allows users to write backend-agnostic 
 
 **Goal:** Create a unified service pattern that works across both backends.
 
-#### Step 4.1: Client API
-- [ ] Add `call()` and `call_with_timeout()` async methods to rcl Client
-- [ ] These would internally use `send()` + `recv()` pattern
-- [ ] Add `service_name()` accessor to rcl Client
-- [ ] Add `fq_service_name()` accessor to rcl Client
-- [ ] Add `gid()` to rcl Client
-- [ ] Add `node()` to rcl Client
-- [ ] Change rcl `is_service_available()` to return `bool` (not Result)
-- [ ] Keep two-step pattern available for advanced use cases
+#### Step 4.1: Client API ✅
+- [x] Add `call()` async method to rcl Client (uses `send()` + `recv()` internally)
+- [x] Removed `call_with_timeout()` (not needed, users can use `tokio::time::timeout`)
+- [x] Add `service_name()` accessor to rcl Client (returns `Result<Cow<'_, String>>`)
+- [x] Add `fully_qualified_service_name()` accessor to rcl Client
+- [x] Change rcl `is_service_available()` to return `bool` (not `Result`)
+- [x] Keep `send()` / `send_ret_seq()` pattern available in rcl for advanced use cases
+- Note: `gid()` is zenoh-specific (not available in rcl)
+- Note: `node()` not needed in unified API
 
-#### Step 4.2: Server API
-- [ ] Create unified `ServiceRequest<T>` type in core
-- [ ] Change rcl `recv()` to return `ServiceRequest<T>` wrapper
-- [ ] `ServiceRequest<T>` contains request, header/attachment, and response sender
-- [ ] Add `service_name()` accessor to rcl Server
-- [ ] Add `fq_service_name()` accessor to rcl Server
-- [ ] Add `gid()` to rcl Server
-- [ ] Add `node()` to rcl Server
+#### Step 4.2: Server API ✅
+- [x] Both backends have `ServiceRequest<T>` with same interface (not shared type, but same API)
+- [x] `ServiceRequest<T>` contains: `request: Message<T::Request>`, `send(response)`, `split()`
+- [x] `recv()` returns `Result<ServiceRequest<T>>` in both backends
+- [x] `try_recv()` returns `Result<Option<ServiceRequest<T>>>` in both backends
+- [x] Add `service_name()` accessor to rcl Server (returns `Result<Cow<'_, String>>`)
+- [x] Add `fully_qualified_service_name()` accessor to rcl Server
+- Note: `gid()` is zenoh-specific (not available in rcl)
+- Note: `node()` not needed in unified API
 
 #### Step 4.3: Header/Attachment Unification ✅
 - [x] Reuse unified `Message<T>` type (contains `MessageInfo` with sequence number, timestamp, sender GID)
@@ -416,9 +428,11 @@ The goal is to create a unified API that allows users to write backend-agnostic 
 
 **Goal:** Make Selector creation and timer APIs consistent.
 
-#### Step 5.1: Selector Creation
-- [ ] Add `create_selector()` to zenoh Context
-- [ ] Keep `Selector::new()` available in both for flexibility
+#### Step 5.1: Selector Creation ✅
+- [x] Add `create_selector()` to zenoh Context
+- [x] Add `create_selector()` to rcl Context (already existed)
+- [x] Make `Selector::new()` private (`pub(crate)`) in both backends
+- [x] Both backends create Selector via `Context::create_selector()`
 
 #### Step 5.2: Timer APIs
 - [ ] Add `add_timer()` to rcl Selector (alias for `add_wall_timer()` without name)

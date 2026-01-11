@@ -165,42 +165,42 @@ impl ParameterServer {
             result = self.srv_list.recv() => {
                 if let Ok(req) = result {
                     let response = self.handle_list_parameters(&req.request);
-                    let _ = req.send(response);
+                    let _ = req.send(&response);
                 }
             }
 
             result = self.srv_get.recv() => {
                 if let Ok(req) = result {
                     let response = self.handle_get_parameters(&req.request);
-                    let _ = req.send(response);
+                    let _ = req.send(&response);
                 }
             }
 
             result = self.srv_set.recv() => {
                 if let Ok(req) = result {
                     let response = self.handle_set_parameters(&req.request);
-                    let _ = req.send(response);
+                    let _ = req.send(&response);
                 }
             }
 
             result = self.srv_set_atomic.recv() => {
                 if let Ok(req) = result {
                     let response = self.handle_set_parameters_atomically(&req.request);
-                    let _ = req.send(response);
+                    let _ = req.send(&response);
                 }
             }
 
             result = self.srv_describe.recv() => {
                 if let Ok(req) = result {
                     let response = self.handle_describe_parameters(&req.request);
-                    let _ = req.send(response);
+                    let _ = req.send(&response);
                 }
             }
 
             result = self.srv_get_types.recv() => {
                 if let Ok(req) = result {
                     let response = self.handle_get_parameter_types(&req.request);
-                    let _ = req.send(response);
+                    let _ = req.send(&response);
                 }
             }
         }

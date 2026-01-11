@@ -59,7 +59,7 @@ use crate::{
     msg::ServiceMsg,
     node::Node,
     qos::Profile,
-    rcl,
+    rcl::{self, MT_UNSAFE_FN},
     selector::{
         Selector,
         async_selector::{self, SELECTOR},
@@ -68,8 +68,8 @@ use crate::{
 };
 use oxidros_core::{Error, Message, RclError, selector::CallbackResult};
 use std::{
-    ffi::CString, future::Future, marker::PhantomData, os::raw::c_void, sync::Arc, task::Poll,
-    time::Duration,
+    borrow::Cow, ffi::CString, future::Future, marker::PhantomData, os::raw::c_void, sync::Arc,
+    task::Poll, time::Duration,
 };
 
 pub(crate) struct ClientData {
@@ -90,7 +90,6 @@ unsafe impl Send for ClientData {}
 /// Client.
 pub struct Client<T: ServiceMsg> {
     pub(crate) data: Arc<ClientData>,
-    service_name: String,
     _phantom: PhantomData<T>,
 }
 
@@ -115,20 +114,16 @@ impl<T: ServiceMsg> Client<T> {
 
         Ok(Client {
             data: Arc::new(ClientData { client, node }),
-            service_name: service_name.to_string(),
             _phantom: Default::default(),
         })
     }
 
     /// Check if service is available
-    /// # Errors
-    ///
-    /// - `RCLError::NodeInvalid`  if the node is invalid, or
-    /// - `RCLError::InvalidArgument` if any arguments are invalid, or
-    /// - `RCLError::Error` if an unspecified error occurs.
-    pub fn is_service_available(&self) -> Result<bool> {
+    pub fn is_service_available(&self) -> bool {
         let guard = rcl::MT_UNSAFE_FN.lock();
-        guard.rcl_service_server_is_available(self.data.node.as_ptr(), &self.data.client)
+        guard
+            .rcl_service_server_is_available(self.data.node.as_ptr(), &self.data.client)
+            .unwrap_or_default()
     }
 
     /// Send a request.
@@ -171,6 +166,22 @@ impl<T: ServiceMsg> Client<T> {
     pub fn send(&mut self, data: &<T as ServiceMsg>::Request) -> Result<ClientRecv<'_, T>> {
         let (s, _) = self.send_ret_seq(data)?;
         Ok(s)
+    }
+
+    /// Send a request and wait for a response.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The request message
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - `RCLError::InvalidArgument` if any arguments are invalid, or
+    /// - `RCLError::ClientInvalid` if the client is invalid, or
+    /// - `RCLError::Error` if an unspecified error occurs.
+    pub async fn call(&mut self, request: &T::Request) -> Result<Message<T::Response>> {
+        self.send(request)?.recv().await
     }
 
     /// `send_ret_seq` is equivalent to `send`, but this returns
@@ -224,6 +235,20 @@ impl<T: ServiceMsg> Client<T> {
             &mut seq,
         )?;
         Ok((ClientRecv { data: self, seq }, seq))
+    }
+    /// Get the fully qualified service name (includes namespace).
+    pub fn fully_qualified_service_name(&self) -> Result<Cow<'_, String>> {
+        let guard = MT_UNSAFE_FN.lock();
+        let name = guard.rcl_client_get_service_name(&self.data.client)?;
+        Ok(Cow::Owned(name))
+    }
+
+    /// Get the topic name (last segment of the fully qualified name).
+    pub fn service_name(&self) -> Result<Cow<'_, String>> {
+        let fq_name = self.fully_qualified_service_name()?;
+        // Extract last segment after final '/'
+        let name = fq_name.rsplit('/').next().unwrap_or(&fq_name).to_string();
+        Ok(Cow::Owned(name))
     }
 }
 
@@ -457,12 +482,12 @@ impl<'a, T: ServiceMsg> Drop for AsyncReceiver<'a, T> {
 // ============================================================================
 
 impl<T: ServiceMsg> oxidros_core::api::RosClient<T> for Client<T> {
-    fn service_name(&self) -> std::borrow::Cow<'_, str> {
-        std::borrow::Cow::Borrowed(&self.service_name)
+    fn service_name(&self) -> Result<Cow<'_, String>> {
+        Client::service_name(self)
     }
 
     fn service_available(&self) -> bool {
-        self.is_service_available().unwrap_or(false)
+        self.is_service_available()
     }
 
     async fn call_service(&mut self, request: &T::Request) -> Result<Message<T::Response>> {

@@ -461,9 +461,9 @@ impl Selector {
 
             loop {
                 match server.try_recv() {
-                    Ok(Some((server_send, request))) => {
-                        let result = handler(request);
-                        match server_send.send(&result) {
+                    Ok(Some(service_req)) => {
+                        let result = handler(service_req.request);
+                        match service_req.sender.send(&result) {
                             Ok(()) => {}
                             Err(e) => {
                                 let logger = Logger::new("oxidros");

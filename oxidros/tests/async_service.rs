@@ -33,10 +33,8 @@ async fn test_async_service() -> Result<(), Box<dyn Error + Send + Sync>> {
                 Ok(Ok(request)) => {
                     let req = request.request();
                     println!("Server received: a={}, b={}", req.a, req.b);
-
                     let response = AddTwoInts_Response { sum: req.a + req.b };
-
-                    if let Err(e) = request.respond(response) {
+                    if let Err(e) = request.respond(&response) {
                         eprintln!("Server respond error: {e}");
                     }
                 }

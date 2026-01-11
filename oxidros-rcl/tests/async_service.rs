@@ -51,7 +51,7 @@ async fn test_async_service() -> Result<()> {
 async fn run_server(mut server: Server<AddTwoInts>) -> Result<()> {
     for _ in 0..3 {
         // receive a request
-        let (sender, request) = server.recv().await?;
+        let (sender, request) = server.recv().await?.split();
         println!("Server: request = {:?}", *request);
 
         let response = AddTwoInts_Response {

@@ -14,18 +14,21 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            pub1.fully_qualified_topic_name().unwrap(),
+            pub1.fully_qualified_topic_name().unwrap().as_str(),
             "/my_ns/my_topic"
         );
-        assert_eq!(pub1.topic_name().unwrap().as_ref(), "my_topic");
+        assert_eq!(pub1.topic_name().unwrap().as_str(), "my_topic");
 
         // Test with namespace - absolute topic (should ignore namespace)
         let pub2 = node
             .create_publisher::<std_msgs::msg::String>("/absolute", None)
             .unwrap();
 
-        assert_eq!(pub2.fully_qualified_topic_name().unwrap(), "/absolute");
-        assert_eq!(pub2.topic_name().unwrap().as_ref(), "absolute");
+        assert_eq!(
+            pub2.fully_qualified_topic_name().unwrap().as_str(),
+            "/absolute"
+        );
+        assert_eq!(pub2.topic_name().unwrap().as_str(), "absolute");
 
         // Test without namespace
         let node2 = ctx.create_node("test_node2", None).unwrap();
@@ -33,8 +36,11 @@ mod tests {
             .create_publisher::<std_msgs::msg::String>("simple", None)
             .unwrap();
 
-        assert_eq!(pub3.fully_qualified_topic_name().unwrap(), "/simple");
-        assert_eq!(pub3.topic_name().unwrap().as_ref(), "simple");
+        assert_eq!(
+            pub3.fully_qualified_topic_name().unwrap().as_str(),
+            "/simple"
+        );
+        assert_eq!(pub3.topic_name().unwrap().as_str(), "simple");
     }
 
     #[test]
@@ -48,18 +54,21 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            sub1.fully_qualified_topic_name().unwrap(),
+            sub1.fully_qualified_topic_name().unwrap().as_str(),
             "/my_ns/my_topic"
         );
-        assert_eq!(sub1.topic_name().unwrap().as_ref(), "my_topic");
+        assert_eq!(sub1.topic_name().unwrap().as_str(), "my_topic");
 
         // Test with namespace - absolute topic (should ignore namespace)
         let sub2 = node
             .create_subscriber::<std_msgs::msg::String>("/absolute", None)
             .unwrap();
 
-        assert_eq!(sub2.fully_qualified_topic_name().unwrap(), "/absolute");
-        assert_eq!(sub2.topic_name().unwrap().as_ref(), "absolute");
+        assert_eq!(
+            sub2.fully_qualified_topic_name().unwrap().as_str(),
+            "/absolute"
+        );
+        assert_eq!(sub2.topic_name().unwrap().as_str(), "absolute");
 
         // Test without namespace
         let node2 = ctx.create_node("test_node2_sub", None).unwrap();
@@ -67,7 +76,10 @@ mod tests {
             .create_subscriber::<std_msgs::msg::String>("simple", None)
             .unwrap();
 
-        assert_eq!(sub3.fully_qualified_topic_name().unwrap(), "/simple");
-        assert_eq!(sub3.topic_name().unwrap().as_ref(), "simple");
+        assert_eq!(
+            sub3.fully_qualified_topic_name().unwrap().as_str(),
+            "/simple"
+        );
+        assert_eq!(sub3.topic_name().unwrap().as_str(), "simple");
     }
 }

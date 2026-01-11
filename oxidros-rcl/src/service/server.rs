@@ -69,9 +69,9 @@
 //!         // Receive a request.
 //!         let req = server.recv().await;
 //!         match req {
-//!             Ok((sender, request)) => {
+//!             Ok(service_req) => {
 //!                 let response = std_srvs::srv::Empty_Response::new().unwrap();
-//!                 match sender.send(&response) {
+//!                 match service_req.send(&response) {
 //!                     Ok(()) => {},                  // Get a new server to handle next request.
 //!                     Err(_e) => {}, // Failed to send.
 //!                 }
@@ -100,14 +100,16 @@ use crate::{
     msg::ServiceMsg,
     node::Node,
     qos::Profile,
-    rcl::{self, rmw_request_id_t},
+    rcl::{self, MT_UNSAFE_FN, rmw_request_id_t},
     selector::async_selector::{self, SELECTOR},
     signal_handler::Signaled,
 };
 use oxidros_core::{Error, Message, RclError, selector::CallbackResult};
+use oxidros_msg::TypeSupport;
 use parking_lot::Mutex;
 use std::{
-    ffi::CString, future::Future, marker::PhantomData, os::raw::c_void, sync::Arc, task::Poll,
+    borrow::Cow, ffi::CString, future::Future, marker::PhantomData, os::raw::c_void, sync::Arc,
+    task::Poll,
 };
 
 pub(crate) struct ServerData {
@@ -160,7 +162,6 @@ unsafe impl Send for ServerData {}
 #[must_use]
 pub struct Server<T> {
     pub(crate) data: Arc<Mutex<ServerData>>,
-    service_name: String,
     _phantom: PhantomData<T>,
     _unsync: PhantomUnsync,
 }
@@ -188,7 +189,6 @@ impl<T: ServiceMsg> Server<T> {
 
         Ok(Server {
             data: Arc::new(Mutex::new(ServerData { service, node })),
-            service_name: service_name.to_string(),
             _phantom: Default::default(),
             _unsync: Default::default(),
         })
@@ -232,9 +232,9 @@ impl<T: ServiceMsg> Server<T> {
     /// fn server_fn(mut server: Server<std_srvs::srv::Empty>, logger: Logger) {
     ///     loop {
     ///         match server.try_recv() {
-    ///             Ok(Some((sender, request))) => {
+    ///             Ok(Some(service_req)) => {
     ///                 let msg = std_srvs::srv::Empty_Response::new().unwrap();
-    ///                 match sender.send(&msg) {
+    ///                 match service_req.send(&msg) {
     ///                     Ok(()) => {},                  // Get a new server to handle next request.
     ///                     Err(_e) => {}, // Failed to send.
     ///                 }
@@ -258,9 +258,7 @@ impl<T: ServiceMsg> Server<T> {
     /// - `RCLError::BadAlloc` if allocating memory failed, or
     /// - `RCLError::Error` if an unspecified error occurs.
     #[allow(clippy::type_complexity)]
-    pub fn try_recv(
-        &mut self,
-    ) -> Result<Option<(ServerSend<T>, Message<<T as ServiceMsg>::Request>)>> {
+    pub fn try_recv(&mut self) -> Result<Option<ServiceRequest<T>>> {
         let data = self.data.lock();
         let (request, header) =
             match rcl_take_request_with_info::<<T as ServiceMsg>::Request>(&data.service) {
@@ -273,15 +271,15 @@ impl<T: ServiceMsg> Server<T> {
             };
 
         drop(data);
-        Ok(Some((
-            ServerSend {
+        Ok(Some(ServiceRequest {
+            request: Message::new(request, header.into()),
+            sender: ServerSend {
                 data: self.data.clone(),
                 request_id: header.request_id,
                 _phantom: Default::default(),
                 _unsync: Default::default(),
             },
-            Message::new(request, header.into()),
-        )))
+        }))
     }
 
     /// Receive a request asynchronously.
@@ -298,10 +296,10 @@ impl<T: ServiceMsg> Server<T> {
     ///         // Receive a request.
     ///         let req = server.recv().await;
     ///         match req {
-    ///             Ok((sender, request)) => {
-    ///                 pr_info!(logger, "recv: header = {:?}", request.info);
+    ///             Ok(service_req) => {
+    ///                 pr_info!(logger, "recv: header = {:?}", service_req.request.info);
     ///                 let response = std_srvs::srv::Empty_Response::new().unwrap();
-    ///                 match sender.send(&response) {
+    ///                 match service_req.send(&response) {
     ///                     Ok(()) => {},                  // Get a new server to handle next request.
     ///                     Err(_e) => {}, // Failed to send.
     ///                 }
@@ -321,12 +319,26 @@ impl<T: ServiceMsg> Server<T> {
     /// - `RCLError::ServiceInvalid` if the service is invalid, or
     /// - `RCLError::BadAlloc` if allocating memory failed, or
     /// - `RCLError::Error` if an unspecified error occurs.
-    pub async fn recv(&mut self) -> Result<(ServerSend<T>, Message<<T as ServiceMsg>::Request>)> {
+    pub async fn recv(&mut self) -> Result<ServiceRequest<T>> {
         AsyncReceiver {
             server: self,
             is_waiting: false,
         }
         .await
+    }
+    /// Get the fully qualified service name (includes namespace).
+    pub fn fully_qualified_service_name(&self) -> Result<Cow<'_, String>> {
+        let guard = MT_UNSAFE_FN.lock();
+        let name = guard.rcl_service_get_service_name(&self.data.lock().service)?;
+        Ok(Cow::Owned(name))
+    }
+
+    /// Get the topic name (last segment of the fully qualified name).
+    pub fn service_name(&self) -> Result<Cow<'_, String>> {
+        let fq_name = self.fully_qualified_service_name()?;
+        // Extract last segment after final '/'
+        let name = fq_name.rsplit('/').next().unwrap_or(&fq_name).to_string();
+        Ok(Cow::Owned(name))
     }
 }
 
@@ -362,9 +374,9 @@ impl<T: ServiceMsg> ServerSend<T> {
     ///         // Call recv() by using timeout.
     ///         let req = server.recv().await;
     ///         match req {
-    ///             Ok((sender, request)) => {
+    ///             Ok(service_req) => {
     ///                 let response = std_srvs::srv::Empty_Response::new().unwrap();
-    ///                 match sender.send(&response) {
+    ///                 match service_req.send(&response) {
     ///                     Ok(()) => {},                  // Get a new server to handle next request.
     ///                     Err(_e) => {}, // Failed to send.
     ///                 }
@@ -428,7 +440,7 @@ impl<'a, T> AsyncReceiver<'a, T> {
 }
 
 impl<'a, T: ServiceMsg> Future for AsyncReceiver<'a, T> {
-    type Output = Result<(ServerSend<T>, Message<<T as ServiceMsg>::Request>)>;
+    type Output = Result<ServiceRequest<T>>;
 
     fn poll(
         self: std::pin::Pin<&mut Self>,
@@ -486,40 +498,49 @@ impl<'a, T> Drop for AsyncReceiver<'a, T> {
 // ============================================================================
 
 /// A request wrapper that implements `ServiceRequest` for the API traits.
-pub struct RclServiceRequest<T: ServiceMsg> {
-    sender: ServerSend<T>,
-    request: Message<<T as ServiceMsg>::Request>,
+pub struct ServiceRequest<T: ServiceMsg> {
+    pub request: Message<<T as ServiceMsg>::Request>,
+    pub(crate) sender: ServerSend<T>,
 }
 
-impl<T: ServiceMsg> oxidros_core::api::ServiceRequest<T> for RclServiceRequest<T> {
+impl<T: ServiceMsg> ServiceRequest<T>
+where
+    T::Response: TypeSupport,
+{
+    /// Send a response to this request.
+    pub fn send(self, response: &T::Response) -> Result<()> {
+        self.sender.send(response)
+    }
+
+    /// Split into sender and request
+    pub fn split(self) -> (ServerSend<T>, Message<T::Request>) {
+        (self.sender, self.request)
+    }
+}
+
+impl<T: ServiceMsg> oxidros_core::api::ServiceRequest<T> for ServiceRequest<T> {
     fn request(&self) -> &T::Request {
         &self.request
     }
 
-    fn respond(self, response: T::Response) -> oxidros_core::Result<()> {
+    fn respond(self, response: &T::Response) -> oxidros_core::Result<()> {
         // ServerSend::send returns Result which uses RclError
-        self.sender.send(&response)
+        self.sender.send(response)
     }
 }
 
 impl<T: ServiceMsg> oxidros_core::api::RosServer<T> for Server<T> {
-    type Request = RclServiceRequest<T>;
+    type Request = ServiceRequest<T>;
 
-    fn service_name(&self) -> std::borrow::Cow<'_, str> {
-        std::borrow::Cow::Borrowed(&self.service_name)
+    fn service_name(&self) -> Result<Cow<'_, String>> {
+        Self::service_name(self)
     }
 
     async fn recv_request(&mut self) -> Result<Self::Request> {
-        // Server::recv returns Result which already uses oxidros_core::Error
-        let (sender, request) = self.recv().await?;
-        Ok(RclServiceRequest { sender, request })
+        self.recv().await
     }
 
     fn try_recv_request(&mut self) -> Result<Option<Self::Request>> {
-        match self.try_recv() {
-            Ok(Some((sender, request))) => Ok(Some(RclServiceRequest { sender, request })),
-            Ok(None) => Ok(None),
-            Err(e) => Err(e),
-        }
+        self.try_recv()
     }
 }

@@ -33,17 +33,14 @@ fn test_no_server() -> Result<()> {
 
     std::thread::sleep(Duration::from_millis(500));
 
-    let srv;
-    let request;
-    match server.try_recv() {
-        Ok(Some((s, req))) => {
-            println!("server:recv: seq = {:?}", req.info.sequence_number);
-            srv = s;
-            request = req;
+    let (srv, request) = match server.try_recv() {
+        Ok(Some(s)) => {
+            println!("server:recv: seq = {:?}", s.request.info.sequence_number);
+            s.split()
         }
         Ok(None) => panic!("server:try_recv: retry later"),
         Err(e) => panic!("server:try_recv:error: {e}"),
-    }
+    };
 
     std::thread::sleep(Duration::from_millis(50));
     println!("client: gave up!");

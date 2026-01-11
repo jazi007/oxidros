@@ -25,7 +25,7 @@ where
     ) -> Result<Message<<T as ServiceMsg>::Response>> {
         let client = &mut self.0;
         debug!("Waiting for service availability");
-        while !client.is_service_available()? {
+        while !client.is_service_available() {
             time::sleep(Duration::from_millis(100)).await;
         }
         debug!("Request: {:?}", data);
@@ -70,7 +70,8 @@ where
             // Receive a request.
             let req = server.recv().await;
             match req {
-                Ok((sender, request)) => {
+                Ok(service_req) => {
+                    let (sender, request) = service_req.split();
                     trace!("Header: {:?}", request.info);
                     debug!("Request: {:?}", request.sample);
                     let response = callback(request);

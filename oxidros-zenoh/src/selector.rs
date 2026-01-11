@@ -33,8 +33,10 @@ struct Timer {
 /// # Example
 ///
 /// ```ignore
-/// let mut selector = Selector::new(ctx);
+/// // Create a context.
+/// let ctx = Context::new().unwrap();
 ///
+/// let mut selector = ctx.create_selector().unwrap();
 /// // Add a subscriber
 /// selector.add_subscriber(subscriber, Box::new(|msg| {
 ///     println!("Received: {:?}", msg);
@@ -59,7 +61,7 @@ pub struct Selector {
 
 impl Selector {
     /// Create a new selector.
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             subscriber_handlers: Vec::new(),
             timers: HashMap::new(),
