@@ -183,22 +183,20 @@ This document details the public API differences between `oxidros-rcl` and `oxid
 | `add_subscriber()` | `fn add_subscriber<T>(&mut self, subscriber, handler) -> bool` | `fn add_subscriber<T>(&mut self, subscriber, handler) -> bool` | ✅ Aligned |
 | `add_server()` | `fn add_server<T>(&mut self, server, handler) -> bool` | ❌ Stub only | ❌ Missing in zenoh |
 | `add_parameter_server()` | `fn add_parameter_server(&mut self, param_server, handler)` | ❌ Stub only | ❌ Missing in zenoh |
-| `add_timer()` | ❌ Missing | `fn add_timer(&mut self, period, handler) -> u64` | ❌ Missing in rcl |
+| `add_timer()` | `fn add_timer(&mut self, duration, handler) -> u64` (one-shot) | `fn add_timer(&mut self, duration, handler) -> u64` (one-shot) | ✅ Aligned |
 | `add_wall_timer()` | `fn add_wall_timer(&mut self, name, period, handler) -> u64` | `fn add_wall_timer(&mut self, name, period, handler) -> u64` | ✅ Aligned |
-| `remove_timer()` | ❌ Missing | `fn remove_timer(&mut self, id: u64)` | ⚠️ Naming difference |
-| `delete_wall_timer()` | `fn delete_wall_timer(&mut self, id: u64)` | ❌ Missing | ⚠️ Naming difference |
+| `remove_timer()` | `fn remove_timer(&mut self, id: u64)` | `fn remove_timer(&mut self, id: u64)` | ✅ Aligned |
 | `wait()` | `fn wait(&mut self) -> Result<()>` | `fn wait(&mut self) -> Result<()>` | ✅ Aligned |
 | `wait_timeout()` | `fn wait_timeout(&mut self, timeout) -> Result<bool>` | `fn wait_timeout(&mut self, timeout) -> Result<bool>` | ✅ Aligned |
 | `add_action_server()` | `fn add_action_server<T, GR, A, CR>(...) -> bool` | ❌ Returns error | ❌ Not supported in zenoh |
 | `add_action_client()` | `fn add_action_client(&mut self, client) -> bool` | ❌ Returns error | ❌ Not supported in zenoh |
 | `add_guard_condition()` | `fn add_guard_condition(&mut self, cond, handler, is_once)` | ❌ Missing | 🔧 RCL-specific |
-| `add_oneshot_timer()` | `fn add_oneshot_timer(&mut self, delay, handler) -> u64` | ❌ Missing | ❌ Missing in zenoh |
 | `statistics()` | `fn statistics(&self) -> Statistics` (feature-gated) | ❌ Missing | 🔧 RCL-specific |
 
 **Summary:**
 - ✅ Both backends create Selector via `Context::create_selector()`
 - ✅ `Selector::new()` is private (`pub(crate)`) in both backends
-- Different timer naming: `delete_wall_timer()` vs `remove_timer()`
+- ✅ Timer APIs aligned: `add_timer()` (one-shot), `add_wall_timer()` (periodic), `remove_timer()`
 - zenoh is missing server/parameter server/action handlers
 
 ---
@@ -434,18 +432,24 @@ The goal is to create a unified API that allows users to write backend-agnostic 
 - [x] Make `Selector::new()` private (`pub(crate)`) in both backends
 - [x] Both backends create Selector via `Context::create_selector()`
 
-#### Step 5.2: Timer APIs
-- [ ] Add `add_timer()` to rcl Selector (alias for `add_wall_timer()` without name)
-- [ ] Add `remove_timer()` to rcl Selector (alias for `delete_wall_timer()`)
-- [ ] Add `delete_wall_timer()` to zenoh Selector (alias for `remove_timer()`)
-- [ ] Add `add_oneshot_timer()` to zenoh Selector
+#### Step 5.2: Timer APIs ✅
+- [x] Both backends have `add_timer()` for one-shot timers (fires once)
+- [x] Both backends have `add_wall_timer()` for periodic timers
+- [x] Both backends have `remove_timer()` to remove timers by ID
+- Note: zenoh updated to match rcl semantics (add_timer is one-shot, add_wall_timer is periodic)
 
-#### Step 5.3: Server Handler
-- [ ] Implement `add_server()` properly in zenoh Selector
-- [ ] Use polling pattern similar to subscriber handling
+#### Step 5.3: Server Handler ✅
+- [x] Implement `add_server()` properly in zenoh Selector
+- [x] Use polling pattern similar to subscriber handling
+- Note: zenoh Selector now polls `server_handlers` alongside `subscriber_handlers` in `wait_timeout_internal()`
+- Handler receives `Message<T::Request>` and returns `T::Response` (via `ServerCallback<T>`)
 
-#### Step 5.4: Parameter Server Handler
-- [ ] Implement `add_parameter_server()` properly in zenoh Selector
+#### Step 5.4: Parameter Server Handler ✅
+- [x] Implement `add_parameter_server()` properly in zenoh Selector
+- [x] Added `try_process_once()` to zenoh ParameterServer for non-blocking polling
+- [x] Polls all 6 parameter services using `try_recv()`
+- [x] Calls handler with `(&mut Parameters, BTreeSet<String>)` when params are updated
+- Note: Uses `take_updated()` from core Parameters to get updated parameter names
 
 ---
 
@@ -453,14 +457,20 @@ The goal is to create a unified API that allows users to write backend-agnostic 
 
 **Goal:** Unify parameter server access patterns.
 
-#### Step 6.1: Access Pattern
-- [ ] Add `params()` accessor method to rcl ParameterServer
-- [ ] Make rcl's `params` field private
-- [ ] Add `wait()` to zenoh ParameterServer (returns updated param names)
-- [ ] Add `spin()` to rcl ParameterServer (alias for internal loop)
+#### Step 6.1: Access Pattern ✅
+- [x] Aligned zenoh to match rcl's API
+- [x] Made `params` field public in zenoh (like rcl)
+- [x] Removed `params()` accessor from zenoh (not needed with public field)
+- [x] Removed `spin()` from zenoh (not in rcl API)
+- Both backends now have: `pub params: Arc<RwLock<Parameters>>`
+- Note: zenoh keeps `process_once()` and `try_process_once()` for async/sync processing
 
-#### Step 6.2: Selector Integration
-- [ ] Ensure both parameter servers work with their respective Selectors
+#### Step 6.2: Selector Integration ✅
+- [x] Both parameter servers work with their respective Selectors
+- rcl: Uses guard condition for notification, stores `param_server` in Selector
+- zenoh: Uses polling with `try_process_once()`, stores handler closure
+- Both call handler with `(&mut Parameters, BTreeSet<String>)` when params change
+- Both use `take_updated()` from core Parameters to get updated names
 
 ---
 

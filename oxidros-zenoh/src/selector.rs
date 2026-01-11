@@ -22,7 +22,12 @@ struct Timer {
     period: Duration,
     next_fire: Instant,
     handler: Box<dyn FnMut()>,
+    /// If true, the timer fires once and is removed.
+    one_shot: bool,
 }
+
+/// Callback type for parameter server updates.
+type ParameterServerCallback = Box<dyn FnMut(&mut Parameters, BTreeSet<String>)>;
 
 /// Event selector for Zenoh operations.
 ///
@@ -55,6 +60,10 @@ struct Timer {
 pub struct Selector {
     /// Subscriber handlers that poll and process messages.
     subscriber_handlers: Vec<Box<dyn FnMut() -> bool>>,
+    /// Server handlers that poll and process requests.
+    server_handlers: Vec<Box<dyn FnMut() -> bool>>,
+    /// Parameter server handler (only one per Selector).
+    parameter_server_handler: Option<Box<dyn FnMut() -> bool>>,
     /// Timers with their next fire time.
     timers: HashMap<u64, Timer>,
 }
@@ -64,6 +73,8 @@ impl Selector {
     pub(crate) fn new() -> Self {
         Self {
             subscriber_handlers: Vec::new(),
+            server_handlers: Vec::new(),
+            parameter_server_handler: None,
             timers: HashMap::new(),
         }
     }
@@ -90,28 +101,109 @@ impl Selector {
         true
     }
 
-    /// Add a timer with the given period.
+    /// Add a service server to the selector.
     ///
-    /// Returns a timer ID that can be used to remove the timer.
-    pub fn add_timer(&mut self, period: Duration, handler: Box<dyn FnMut()>) -> u64 {
+    /// The handler receives the request message and returns a response.
+    /// Incoming requests are polled during `wait()` calls.
+    ///
+    /// Returns true if the server was added successfully.
+    pub fn add_server<T: oxidros_core::ServiceMsg + 'static>(
+        &mut self,
+        mut server: crate::service::Server<T>,
+        mut handler: oxidros_core::selector::ServerCallback<T>,
+    ) -> bool
+    where
+        T::Request: oxidros_core::TypeSupport,
+        T::Response: oxidros_core::TypeSupport,
+    {
+        // Create a closure that tries to receive and call the handler
+        let poll_fn = Box::new(move || -> bool {
+            match server.try_recv() {
+                Ok(Some(service_req)) => {
+                    let (sender, request) = service_req.split();
+                    let response = handler(request);
+                    if let Err(e) = sender.send(&response) {
+                        eprintln!("Failed to send service response: {e}");
+                    }
+                    true
+                }
+                Ok(None) => false,
+                Err(e) => {
+                    eprintln!("Failed to receive service request: {e}");
+                    false
+                }
+            }
+        });
+        self.server_handlers.push(poll_fn);
+        true
+    }
+
+    /// Add a parameter server with a callback handler.
+    ///
+    /// The handler will be called whenever parameters are updated, receiving
+    /// a mutable reference to the parameters and the set of updated parameter names.
+    ///
+    /// Only one parameter server can be added per Selector. Calling this again
+    /// will replace the previous parameter server.
+    pub fn add_parameter_server(
+        &mut self,
+        mut param_server: ZenohParameterServer,
+        mut handler: ParameterServerCallback,
+    ) {
+        let params = param_server.params.clone();
+
+        // Create a closure that polls the parameter server and calls handler on updates
+        let poll_fn = Box::new(move || -> bool {
+            let processed = param_server.try_process_once();
+
+            // Check for updated parameters and call handler
+            let mut guard = params.write();
+            let updated = guard.take_updated();
+            if !updated.is_empty() {
+                handler(&mut guard, updated);
+            }
+
+            processed
+        });
+
+        self.parameter_server_handler = Some(poll_fn);
+    }
+
+    /// Add a one-shot timer that fires once after the given duration.
+    ///
+    /// Returns a timer ID that can be used to remove the timer before it fires.
+    pub fn add_timer(&mut self, duration: Duration, handler: Box<dyn FnMut()>) -> u64 {
         let id = TIMER_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
         let timer = Timer {
-            period,
-            next_fire: Instant::now() + period,
+            period: duration,
+            next_fire: Instant::now() + duration,
             handler,
+            one_shot: true,
         };
         self.timers.insert(id, timer);
         id
     }
 
-    /// Add a wall timer (alias for add_timer in Zenoh).
+    /// Add a wall timer that fires periodically.
+    ///
+    /// The timer will fire repeatedly at the given period until removed.
+    ///
+    /// Returns a timer ID that can be used to remove the timer.
     pub fn add_wall_timer(
         &mut self,
         _name: &str,
         period: Duration,
         handler: Box<dyn FnMut()>,
     ) -> u64 {
-        self.add_timer(period, handler)
+        let id = TIMER_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let timer = Timer {
+            period,
+            next_fire: Instant::now() + period,
+            handler,
+            one_shot: false,
+        };
+        self.timers.insert(id, timer);
+        id
     }
 
     /// Remove a timer by ID.
@@ -142,13 +234,34 @@ impl Selector {
                 handler();
             }
 
+            // Poll all service servers
+            for handler in &mut self.server_handlers {
+                handler();
+            }
+
+            // Poll parameter server
+            if let Some(ref mut handler) = self.parameter_server_handler {
+                handler();
+            }
+
             // Process expired timers
             let now = Instant::now();
-            for timer in self.timers.values_mut() {
+            let mut timers_to_remove = Vec::new();
+            for (&id, timer) in self.timers.iter_mut() {
                 if now >= timer.next_fire {
                     (timer.handler)();
-                    timer.next_fire = now + timer.period;
+                    if timer.one_shot {
+                        // One-shot timer: mark for removal
+                        timers_to_remove.push(id);
+                    } else {
+                        // Periodic timer: reschedule
+                        timer.next_fire = now + timer.period;
+                    }
                 }
+            }
+            // Remove fired one-shot timers
+            for id in timers_to_remove {
+                self.timers.remove(&id);
             }
 
             // Check if we've exceeded the timeout
@@ -219,20 +332,22 @@ impl oxidros_core::api::RosSelector for Selector {
 
     fn add_server_handler<T: oxidros_core::ServiceMsg + 'static>(
         &mut self,
-        _server: Self::Server<T>,
-        _handler: Box<dyn FnMut(Message<T::Request>) -> T::Response>,
-    ) -> bool {
-        // Server handling in Zenoh is done via async patterns
-        // For now, just return true
-        true
+        server: Self::Server<T>,
+        handler: Box<dyn FnMut(Message<T::Request>) -> T::Response>,
+    ) -> bool
+    where
+        T::Request: TypeSupport,
+        T::Response: TypeSupport,
+    {
+        self.add_server(server, handler)
     }
 
     fn add_parameter_server_handler(
         &mut self,
-        _param_server: Self::ParameterServer,
-        _handler: Box<dyn FnMut(&mut Parameters, BTreeSet<String>)>,
+        param_server: Self::ParameterServer,
+        handler: Box<dyn FnMut(&mut Parameters, BTreeSet<String>)>,
     ) {
-        // Parameter server handling is different in Zenoh
+        self.add_parameter_server(param_server, handler)
     }
 
     fn add_timer_handler(&mut self, duration: Duration, handler: Box<dyn FnMut()>) -> u64 {

@@ -18,12 +18,12 @@
 //!
 //! // Set some parameters
 //! {
-//!     let mut params = param_server.params().write();
+//!     let mut params = param_server.params.write();
 //!     params.set_parameter("my_param".to_string(), Value::I64(42), false, None)?;
 //! }
 //!
-//! // Run the parameter server (handles service requests)
-//! param_server.spin().await?;
+//! // Process parameter requests in event loop
+//! param_server.process_once().await?;
 //! ```
 
 use crate::{error::Result, node::Node, service::server::Server};
@@ -60,7 +60,7 @@ use oxidros_msg::msg::{RosString, RosStringSeq};
 /// - `~/get_parameter_types`
 pub struct ParameterServer {
     /// Shared parameter storage.
-    params: Arc<RwLock<Parameters>>,
+    pub params: Arc<RwLock<Parameters>>,
     /// Parent node.
     node: Arc<Node>,
     /// Service servers.
@@ -143,11 +143,6 @@ impl ParameterServer {
         })
     }
 
-    /// Get a reference to the parameter storage.
-    pub fn params(&self) -> &Arc<RwLock<Parameters>> {
-        &self.params
-    }
-
     /// Get a reference to the parent node.
     pub fn node(&self) -> &Arc<Node> {
         &self.node
@@ -208,13 +203,58 @@ impl ParameterServer {
         Ok(())
     }
 
-    /// Run the parameter server until shutdown.
+    /// Try to process parameter service requests without blocking.
     ///
-    /// This will continuously process parameter service requests.
-    pub async fn spin(&mut self) -> Result<()> {
-        loop {
-            self.process_once().await?;
+    /// This method polls all parameter services using `try_recv()` and processes
+    /// any pending requests. Returns `true` if any request was processed.
+    ///
+    /// This is useful for integrating with a Selector's event loop.
+    pub fn try_process_once(&mut self) -> bool {
+        let mut processed = false;
+
+        // Try to receive from list_parameters
+        if let Ok(Some(req)) = self.srv_list.try_recv() {
+            let response = self.handle_list_parameters(&req.request);
+            let _ = req.send(&response);
+            processed = true;
         }
+
+        // Try to receive from get_parameters
+        if let Ok(Some(req)) = self.srv_get.try_recv() {
+            let response = self.handle_get_parameters(&req.request);
+            let _ = req.send(&response);
+            processed = true;
+        }
+
+        // Try to receive from set_parameters
+        if let Ok(Some(req)) = self.srv_set.try_recv() {
+            let response = self.handle_set_parameters(&req.request);
+            let _ = req.send(&response);
+            processed = true;
+        }
+
+        // Try to receive from set_parameters_atomically
+        if let Ok(Some(req)) = self.srv_set_atomic.try_recv() {
+            let response = self.handle_set_parameters_atomically(&req.request);
+            let _ = req.send(&response);
+            processed = true;
+        }
+
+        // Try to receive from describe_parameters
+        if let Ok(Some(req)) = self.srv_describe.try_recv() {
+            let response = self.handle_describe_parameters(&req.request);
+            let _ = req.send(&response);
+            processed = true;
+        }
+
+        // Try to receive from get_parameter_types
+        if let Ok(Some(req)) = self.srv_get_types.try_recv() {
+            let response = self.handle_get_parameter_types(&req.request);
+            let _ = req.send(&response);
+            processed = true;
+        }
+
+        processed
     }
 
     // --- Service handlers ---
