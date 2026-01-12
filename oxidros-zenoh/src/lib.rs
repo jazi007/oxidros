@@ -41,6 +41,7 @@ mod node;
 mod qos;
 mod selector;
 
+pub mod logger;
 pub mod service;
 pub mod topic;
 

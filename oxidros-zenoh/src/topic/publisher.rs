@@ -96,13 +96,7 @@ impl<T: TypeSupport> Publisher<T> {
         // For TRANSIENT_LOCAL: cache messages for late-joining subscribers
         // For VOLATILE: no cache (max_samples = 0)
         let cache_depth = if QosMapping::is_transient_local(&qos) {
-            let depth = QosMapping::effective_depth(&qos);
-            log::debug!(
-                "Creating publisher for '{}' with cache depth {}",
-                fq_topic_name,
-                depth
-            );
-            depth
+            QosMapping::effective_depth(&qos)
         } else {
             0
         };

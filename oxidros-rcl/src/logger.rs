@@ -321,6 +321,125 @@ fn init_once() -> std::result::Result<(), RclError> {
     })
 }
 
+// ============================================================================
+// Tracing-based logging (modern API)
+// ============================================================================
+
+use std::sync::OnceLock;
+use tracing::Subscriber;
+use tracing_subscriber::{EnvFilter, Layer, layer::SubscriberExt, util::SubscriberInitExt};
+
+static TRACING_INITIALIZED: OnceLock<()> = OnceLock::new();
+
+/// Initialize ROS2 logging with tracing integration.
+///
+/// This sets up:
+/// 1. A tracing subscriber that routes to ROS2's rcutils logging
+/// 2. A bridge that forwards `log` crate calls to tracing
+///
+/// The `name` parameter is used as the logger name for rcutils.
+///
+/// # Example
+///
+/// ```ignore
+/// use oxidros_rcl::logger::init_ros_logging;
+/// use tracing::{info, warn, error, debug};
+///
+/// init_ros_logging("my_node");
+/// info!("Hello from ROS2!");
+/// debug!("Debug message");
+/// ```
+pub fn init_ros_logging(name: &str) {
+    TRACING_INITIALIZED.get_or_init(|| {
+        // Initialize rcutils logging first
+        let _ = init_once();
+
+        // Set up log -> tracing bridge
+        tracing_log::LogTracer::init().ok();
+
+        // Create the subscriber with our RCL layer
+        let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(RclLayer::new(name))
+            .try_init()
+            .ok();
+    });
+}
+
+/// Custom tracing layer that routes to ROS2's rcutils logging.
+struct RclLayer {
+    logger: Logger,
+}
+
+impl RclLayer {
+    fn new(name: &str) -> Self {
+        Self {
+            logger: Logger::new(name),
+        }
+    }
+}
+
+impl<S> Layer<S> for RclLayer
+where
+    S: Subscriber,
+{
+    fn on_event(
+        &self,
+        event: &tracing::Event<'_>,
+        _ctx: tracing_subscriber::layer::Context<'_, S>,
+    ) {
+        // Extract message from event
+        let mut visitor = MessageVisitor::default();
+        event.record(&mut visitor);
+
+        let metadata = event.metadata();
+        let level = metadata.level();
+
+        // Map tracing level to our Severity
+        let severity = match *level {
+            tracing::Level::TRACE => Severity::Debug,
+            tracing::Level::DEBUG => Severity::Debug,
+            tracing::Level::INFO => Severity::Info,
+            tracing::Level::WARN => Severity::Warn,
+            tracing::Level::ERROR => Severity::Error,
+        };
+
+        // Get location info
+        let file = metadata.file().unwrap_or("<unknown>");
+        let line = metadata.line().unwrap_or(0) as u64;
+        let module = metadata.module_path().unwrap_or("<unknown>");
+
+        let _ = self
+            .logger
+            .write(&visitor.message, severity, module, file, line);
+    }
+}
+
+/// Visitor to extract message from tracing event.
+#[derive(Default)]
+struct MessageVisitor {
+    message: String,
+}
+
+impl tracing::field::Visit for MessageVisitor {
+    fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+        if field.name() == "message" || self.message.is_empty() {
+            self.message = format!("{:?}", value);
+        }
+    }
+
+    fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
+        if field.name() == "message" || self.message.is_empty() {
+            self.message = value.to_string();
+        }
+    }
+}
+
+/// Re-export tracing macros for convenience.
+pub use tracing::{debug, error, info, trace, warn};
+
 #[cfg(test)]
 mod test {
     use super::{Logger, Severity};
@@ -367,5 +486,58 @@ mod test {
                 line!() as u64,
             )
             .unwrap();
+    }
+
+    #[test]
+    fn test_init_ros_logging() {
+        use super::init_ros_logging;
+
+        // Should not panic when called
+        init_ros_logging("test_tracing_node");
+
+        // Should be idempotent - calling again should not panic
+        init_ros_logging("test_tracing_node_2");
+    }
+
+    #[test]
+    fn test_tracing_macros() {
+        use super::init_ros_logging;
+        use tracing::{debug, error, info, trace, warn};
+
+        init_ros_logging("test_tracing_macros");
+
+        // These should not panic and should route to rcutils
+        trace!("trace message");
+        debug!("debug message");
+        info!("info message");
+        warn!("warn message");
+        error!("error message");
+    }
+
+    #[test]
+    fn test_tracing_with_args() {
+        use super::init_ros_logging;
+        use tracing::{debug, info};
+
+        init_ros_logging("test_tracing_args");
+
+        let value = 42;
+        let name = "test";
+
+        info!(value, "message with field");
+        info!("formatted: {} = {}", name, value);
+        debug!(target: "custom_target", "targeted message");
+    }
+
+    #[test]
+    fn test_log_crate_forwarding() {
+        use super::init_ros_logging;
+
+        init_ros_logging("test_log_forward");
+
+        // log crate macros should be forwarded to tracing then to rcutils
+        log::info!("log crate info");
+        log::warn!("log crate warn");
+        log::error!("log crate error");
     }
 }

@@ -1734,6 +1734,7 @@ dependencies = [
  "crossbeam-channel",
  "futures-util",
  "libc",
+ "log",
  "memac",
  "num-derive",
  "num-traits",
@@ -1748,6 +1749,9 @@ dependencies = [
  "serde_json",
  "signal-hook",
  "tokio",
+ "tracing",
+ "tracing-log",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -1778,6 +1782,9 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.17",
  "tokio",
+ "tracing",
+ "tracing-log",
+ "tracing-subscriber",
  "uuid",
  "yaml-rust2",
  "zenoh",

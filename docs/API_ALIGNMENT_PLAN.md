@@ -474,35 +474,60 @@ The goal is to create a unified API that allows users to write backend-agnostic 
 
 ---
 
-### Phase 7: Logger Support for Zenoh
+### Phase 7: Logger Support ✅
 
-**Goal:** Add ROS2 logging capability to zenoh backend.
+**Goal:** Add unified tracing-based logging to both backends.
 
-#### Step 7.1: Logger Implementation
-- [ ] Create `Logger` struct in zenoh crate
-- [ ] Use `tracing` crate or custom implementation
-- [ ] Match log levels with rcl: debug, info, warn, error, fatal
+#### Step 7.1-7.3: Tracing-based Logging ✅
+- [x] Both backends now use `tracing` crate for logging
+- [x] `log` crate calls are forwarded to `tracing` via `tracing-log::LogTracer`
+- [x] Users use standard `tracing::info!()`, `tracing::warn!()`, etc.
+- [x] Tests added for both backends
 
-#### Step 7.2: Logging Macros
-- [ ] Add `pr_debug!`, `pr_info!`, `pr_warn!`, `pr_error!`, `pr_fatal!` macros
+**API (both backends):**
+```rust
+use oxidros_rcl::logger::init_ros_logging;  // or oxidros_zenoh
+use tracing::{info, warn, error, debug};
 
-#### Step 7.3: Alternative
-- [ ] Or: Move Logger to `oxidros-core` as a shared component
-- [ ] Backends provide platform-specific sinks
+init_ros_logging("my_node");
+info!("Hello from ROS2!");
+
+// log crate also works (forwarded to tracing)
+log::info!("This also works!");
+```
+
+**Implementation:**
+- **rcl**: `RclLayer` routes tracing events to `rcutils_log()`
+- **zenoh**: `ZenohLayer` + `fmt` layer outputs to stderr
+- Both re-export `tracing::{debug, error, info, trace, warn}`
+
+**Dependencies added:**
+- `tracing = "0.1"`
+- `tracing-subscriber = { version = "0.3", features = ["env-filter"] }`
+- `tracing-log = "0.2"`
+- `log` (workspace)
+
+**Tests:**
+- `test_init_ros_logging` - verifies idempotent initialization
+- `test_tracing_macros` - verifies all log levels work
+- `test_tracing_with_args` - verifies structured logging and formatting
+- `test_log_crate_forwarding` - verifies `log::*` macros forward to tracing
 
 ---
 
-### Phase 8: Signal Handling for Zenoh
+### Phase 8: Signal Handling for Zenoh ❌ NOT NEEDED
 
-**Goal:** Add graceful shutdown support to zenoh backend.
+**Reason:** Zenoh uses tokio, which has native async signal handling via `tokio::signal::ctrl_c()`. 
+Users can use `tokio::select!` for graceful shutdown:
 
-#### Step 8.1: Signal Handler
-- [ ] Add `is_halt()` function to zenoh
-- [ ] Register SIGINT/SIGTERM handlers
+```rust
+tokio::select! {
+    _ = tokio::signal::ctrl_c() => { /* shutdown */ }
+    _ = node.spin() => { /* continue */ }
+}
+```
 
-#### Step 8.2: Integration
-- [ ] Ensure async operations check halt flag
-- [ ] Selector should exit on signal
+The rcl `is_halt()` pattern is specific to its blocking/callback-based architecture.
 
 ---
 

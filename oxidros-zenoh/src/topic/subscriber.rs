@@ -100,7 +100,7 @@ impl<T: TypeSupport> Subscriber<T> {
         // For TRANSIENT_LOCAL: query history from publishers with cache
         // For VOLATILE: no history query (max_samples = 0)
         let history_depth = if QosMapping::is_transient_local(&qos) {
-            QosMapping::effective_depth(&qos)
+            depth
         } else {
             0
         };

@@ -125,18 +125,18 @@ impl QosMapping {
 
         // Warn about unsupported liveliness
         if matches!(profile.liveliness, LivelinessPolicy::ManualByTopic) {
-            log::warn!(
+            tracing::warn!(
                 "QoS liveliness ManualByTopic is not supported by rmw_zenoh, using Automatic"
             );
         }
 
         // Warn about deadline/lifespan (not implemented)
         if !profile.deadline.is_zero() {
-            log::warn!("QoS deadline is not implemented in rmw_zenoh, ignoring");
+            tracing::warn!("QoS deadline is not implemented in rmw_zenoh, ignoring");
         }
 
         if !profile.lifespan.is_zero() {
-            log::warn!("QoS lifespan is not implemented in rmw_zenoh, ignoring");
+            tracing::warn!("QoS lifespan is not implemented in rmw_zenoh, ignoring");
         }
     }
 }
