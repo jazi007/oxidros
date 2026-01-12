@@ -236,11 +236,11 @@ impl<T: TypeSupport> oxidros_core::api::RosSubscriber<T> for Subscriber<T> {
         Subscriber::topic_name(self)
     }
 
-    async fn recv_msg(&mut self) -> Result<Message<T>> {
+    async fn recv(&mut self) -> Result<Message<T>> {
         self.recv().await
     }
 
-    fn try_recv_msg(&mut self) -> Result<Option<Message<T>>> {
+    fn try_recv(&mut self) -> Result<Option<Message<T>>> {
         self.try_recv()
     }
 }

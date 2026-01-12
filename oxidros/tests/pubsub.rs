@@ -35,7 +35,7 @@ fn test_pubsub() -> Result<(), Box<dyn Error + Send + Sync>> {
     let mut selector = ctx.new_selector()?;
     static COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
-    selector.add_subscriber_handler(
+    selector.add_subscriber(
         subscriber,
         Box::new(move |msg: Message<Int64>| {
             // Message implements Deref, so we can directly access fields
@@ -59,8 +59,8 @@ fn test_pubsub_multiple_messages() -> Result<(), Box<dyn Error + Send + Sync>> {
     let node_pub = ctx.new_node("test_multi_pub_node", None)?;
     let node_sub = ctx.new_node("test_multi_sub_node", None)?;
 
-    let publisher: Publisher<Int64> = node_pub.new_publisher("test_multi_pubsub", None)?;
-    let subscriber: Subscriber<Int64> = node_sub.new_subscriber("test_multi_pubsub", None)?;
+    let publisher: Publisher<Int64> = node_pub.create_publisher("test_multi_pubsub", None)?;
+    let subscriber: Subscriber<Int64> = node_sub.create_subscriber("test_multi_pubsub", None)?;
 
     // Publish multiple messages
     for i in 0..3 {
@@ -71,7 +71,7 @@ fn test_pubsub_multiple_messages() -> Result<(), Box<dyn Error + Send + Sync>> {
     // Receive messages
     let mut selector = ctx.new_selector()?;
     static COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-    selector.add_subscriber_handler(
+    selector.add_subscriber(
         subscriber,
         Box::new(|_msg: Message<Int64>| {
             COUNT.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
@@ -79,7 +79,7 @@ fn test_pubsub_multiple_messages() -> Result<(), Box<dyn Error + Send + Sync>> {
     );
     // Wait a few times to receive all messages
     for _ in 0..3 {
-        let _ = selector.spin_timeout(Duration::from_millis(500));
+        let _ = selector.wait_timeout(Duration::from_millis(500));
     }
     assert_ne!(COUNT.load(std::sync::atomic::Ordering::Relaxed), 0);
     Ok(())

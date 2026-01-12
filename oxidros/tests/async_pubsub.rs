@@ -41,7 +41,7 @@ async fn test_async_pubsub() -> Result<(), Box<dyn Error + Send + Sync>> {
     let sub_handle = tokio::spawn(async move {
         let timeout = Duration::from_millis(500);
         for expected in 0..3i64 {
-            match tokio::time::timeout(timeout, subscriber.recv_msg()).await {
+            match tokio::time::timeout(timeout, subscriber.recv()).await {
                 Ok(Ok(msg)) => {
                     // TakenMsg implements Deref, so we can directly access fields
                     let data = msg.deref().data;

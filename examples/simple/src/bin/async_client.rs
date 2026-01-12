@@ -12,7 +12,7 @@ async fn client_handler(mut client: Client<AddTwoInts>) -> Result<()> {
     //     tokio::time::sleep(Duration::from_secs(3)).await;
     // }
     let name = format!("client{client_n}");
-    while !client.service_available() {
+    while !client.is_service_available() {
         println!("server not yet available for {name}, waiting...");
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
@@ -22,7 +22,7 @@ async fn client_handler(mut client: Client<AddTwoInts>) -> Result<()> {
         req.a = index;
         req.b = index + 1;
         index += 1;
-        let resp = client.call_service(&req).await?;
+        let resp = client.call(&req).await?;
         println!("{name}: REQ {:?}", resp);
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
@@ -34,7 +34,7 @@ async fn main() -> Result<()> {
     let node = ctx.new_node("simple", None)?;
     let mut set = tokio::task::JoinSet::new();
     for _ in 0..2 {
-        let client = node.new_client::<AddTwoInts>("add_two_ints", None)?;
+        let client = node.create_client::<AddTwoInts>("add_two_ints", None)?;
         set.spawn(client_handler(client));
     }
     let ctrl_c = tokio::signal::ctrl_c();

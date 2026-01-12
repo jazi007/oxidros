@@ -572,18 +572,14 @@ fn rcl_take<T>(subscription: &rcl::rcl_subscription_t) -> Result<(T, MessageInfo
 
 impl<T: TypeSupport> oxidros_core::api::RosSubscriber<T> for Subscriber<T> {
     fn topic_name(&self) -> Result<Cow<'_, String>> {
-        Subscriber::topic_name(self)
+        Self::topic_name(self)
     }
 
-    async fn recv_msg(&mut self) -> oxidros_core::Result<Message<T>> {
-        self.recv().await
+    async fn recv(&mut self) -> oxidros_core::Result<Message<T>> {
+        Self::recv(self).await
     }
 
-    fn try_recv_msg(&mut self) -> oxidros_core::Result<Option<Message<T>>> {
-        match self.try_recv() {
-            Ok(Some(msg)) => Ok(Some(msg)),
-            Ok(None) => Ok(None),
-            Err(e) => Err(e),
-        }
+    fn try_recv(&mut self) -> oxidros_core::Result<Option<Message<T>>> {
+        Self::try_recv(self)
     }
 }

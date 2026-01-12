@@ -322,15 +322,15 @@ impl oxidros_core::api::RosSelector for Selector {
     type ActionGoalHandle<T: oxidros_core::ActionMsg> = ActionGoalHandle<T>;
     type ParameterServer = ZenohParameterServer;
 
-    fn add_subscriber_handler<T: TypeSupport + 'static>(
+    fn add_subscriber<T: TypeSupport + 'static>(
         &mut self,
         subscriber: Self::Subscriber<T>,
         handler: Box<dyn FnMut(Message<T>)>,
     ) -> bool {
-        self.add_subscriber(subscriber, handler)
+        Self::add_subscriber(self, subscriber, handler)
     }
 
-    fn add_server_handler<T: oxidros_core::ServiceMsg + 'static>(
+    fn add_server<T: oxidros_core::ServiceMsg + 'static>(
         &mut self,
         server: Self::Server<T>,
         handler: Box<dyn FnMut(Message<T::Request>) -> T::Response>,
@@ -339,35 +339,30 @@ impl oxidros_core::api::RosSelector for Selector {
         T::Request: TypeSupport,
         T::Response: TypeSupport,
     {
-        self.add_server(server, handler)
+        Self::add_server(self, server, handler)
     }
 
-    fn add_parameter_server_handler(
+    fn add_parameter_server(
         &mut self,
         param_server: Self::ParameterServer,
         handler: Box<dyn FnMut(&mut Parameters, BTreeSet<String>)>,
     ) {
-        self.add_parameter_server(param_server, handler)
+        Self::add_parameter_server(self, param_server, handler)
     }
 
-    fn add_timer_handler(&mut self, duration: Duration, handler: Box<dyn FnMut()>) -> u64 {
-        self.add_timer(duration, handler)
+    fn add_timer(&mut self, duration: Duration, handler: Box<dyn FnMut()>) -> u64 {
+        Self::add_timer(self, duration, handler)
     }
 
-    fn add_wall_timer_handler(
-        &mut self,
-        name: &str,
-        period: Duration,
-        handler: Box<dyn FnMut()>,
-    ) -> u64 {
-        self.add_wall_timer(name, period, handler)
+    fn add_wall_timer(&mut self, name: &str, period: Duration, handler: Box<dyn FnMut()>) -> u64 {
+        Self::add_wall_timer(self, name, period, handler)
     }
 
     fn delete_timer(&mut self, id: u64) {
-        self.remove_timer(id)
+        Self::remove_timer(self, id)
     }
 
-    fn add_action_server_handler<T, GR, A, CR>(
+    fn add_action_server<T, GR, A, CR>(
         &mut self,
         _server: Self::ActionServer<T>,
         _goal_handler: GR,
@@ -387,7 +382,7 @@ impl oxidros_core::api::RosSelector for Selector {
         })
     }
 
-    fn add_action_client_handler<T: oxidros_core::ActionMsg + 'static>(
+    fn add_action_client<T: oxidros_core::ActionMsg + 'static>(
         &mut self,
         _client: Self::ActionClient<T>,
     ) -> oxidros_core::Result<bool> {
@@ -397,11 +392,11 @@ impl oxidros_core::api::RosSelector for Selector {
         })
     }
 
-    fn spin_once(&mut self) -> oxidros_core::Result<()> {
-        self.wait()
+    fn wait(&mut self) -> oxidros_core::Result<()> {
+        Self::wait(self)
     }
 
-    fn spin_timeout(&mut self, timeout: Duration) -> oxidros_core::Result<bool> {
-        self.wait_timeout(timeout)
+    fn wait_timeout(&mut self, timeout: Duration) -> oxidros_core::Result<bool> {
+        Self::wait_timeout(self, timeout)
     }
 }

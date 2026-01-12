@@ -332,11 +332,11 @@ where
         Server::service_name(self)
     }
 
-    async fn recv_request(&mut self) -> Result<Self::Request> {
-        self.recv().await
+    async fn recv(&mut self) -> Result<Self::Request> {
+        Self::recv(self).await
     }
 
-    fn try_recv_request(&mut self) -> Result<Option<Self::Request>> {
-        self.try_recv()
+    fn try_recv(&mut self) -> Result<Option<Self::Request>> {
+        Self::try_recv(self)
     }
 }

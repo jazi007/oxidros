@@ -218,12 +218,12 @@ where
     T::Response: TypeSupport,
 {
     fn service_name(&self) -> Result<Cow<'_, String>> {
-        Client::service_name(self)
+        Self::service_name(self)
     }
-    fn service_available(&self) -> bool {
-        self.is_service_available()
+    fn is_service_available(&self) -> bool {
+        Self::is_service_available(self)
     }
-    async fn call_service(&mut self, request: &T::Request) -> Result<Message<T::Response>> {
-        self.call(request).await
+    async fn call(&mut self, request: &T::Request) -> Result<Message<T::Response>> {
+        Self::call(self, request).await
     }
 }

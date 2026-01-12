@@ -198,7 +198,7 @@ impl<T: TypeSupport> oxidros_core::api::RosPublisher<T> for Publisher<T> {
         Publisher::topic_name(self)
     }
 
-    fn publish(&self, msg: &T) -> crate::error::Result<()> {
+    fn send(&self, msg: &T) -> crate::error::Result<()> {
         self.send(msg)
     }
 }

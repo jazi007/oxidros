@@ -29,7 +29,7 @@ async fn test_async_service() -> Result<(), Box<dyn Error + Send + Sync>> {
     let server_handle = tokio::spawn(async move {
         let timeout = Duration::from_secs(3);
         for _ in 0..3 {
-            match tokio::time::timeout(timeout, server.recv_request()).await {
+            match tokio::time::timeout(timeout, server.recv()).await {
                 Ok(Ok(request)) => {
                     let req = request.request();
                     println!("Server received: a={}, b={}", req.a, req.b);
@@ -59,8 +59,7 @@ async fn test_async_service() -> Result<(), Box<dyn Error + Send + Sync>> {
             let request = AddTwoInts_Request { a: n, b: n * 10 };
             println!("Client sending: a={}, b={}", request.a, request.b);
 
-            match tokio::time::timeout(Duration::from_secs(2), client.call_service(&request)).await
-            {
+            match tokio::time::timeout(Duration::from_secs(2), client.call(&request)).await {
                 Ok(Ok(response)) => {
                     println!("Client received: sum={}", response.sum);
                     assert_eq!(response.sum, n + n * 10);

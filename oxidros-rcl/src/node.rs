@@ -315,7 +315,7 @@ impl oxidros_core::api::RosNode for Node {
         Node::fully_qualified_name(self)
     }
 
-    fn new_publisher<T: TypeSupport>(
+    fn create_publisher<T: TypeSupport>(
         self: &Arc<Self>,
         topic_name: &str,
         qos: Option<qos::Profile>,
@@ -323,7 +323,7 @@ impl oxidros_core::api::RosNode for Node {
         self.create_publisher(topic_name, qos)
     }
 
-    fn new_subscriber<T: TypeSupport>(
+    fn create_subscriber<T: TypeSupport>(
         self: &Arc<Self>,
         topic_name: &str,
         qos: Option<qos::Profile>,
@@ -331,7 +331,7 @@ impl oxidros_core::api::RosNode for Node {
         self.create_subscriber(topic_name, qos)
     }
 
-    fn new_client<T: ServiceMsg>(
+    fn create_client<T: ServiceMsg>(
         self: &Arc<Self>,
         service_name: &str,
         qos: Option<qos::Profile>,
@@ -339,7 +339,7 @@ impl oxidros_core::api::RosNode for Node {
         self.create_client(service_name, qos)
     }
 
-    fn new_server<T: ServiceMsg>(
+    fn create_server<T: ServiceMsg>(
         self: &Arc<Self>,
         service_name: &str,
         qos: Option<qos::Profile>,

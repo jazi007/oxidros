@@ -480,47 +480,47 @@ impl oxidros_core::api::RosNode for Node {
     type Server<T: oxidros_core::ServiceMsg> = Server<T>;
 
     fn name(&self) -> Result<String> {
-        Node::name(self)
+        Self::name(self)
     }
 
     fn namespace(&self) -> Result<String> {
-        Node::namespace(self)
+        Self::namespace(self)
     }
 
     fn fully_qualified_name(&self) -> Result<String> {
-        Node::fully_qualified_name(self)
+        Self::fully_qualified_name(self)
     }
 
-    fn new_publisher<T: TypeSupport>(
+    fn create_publisher<T: TypeSupport>(
         self: &Arc<Self>,
         topic_name: &str,
         qos: Option<Profile>,
     ) -> Result<Self::Publisher<T>> {
-        self.create_publisher(topic_name, qos)
+        Self::create_publisher(self, topic_name, qos)
     }
 
-    fn new_subscriber<T: TypeSupport>(
+    fn create_subscriber<T: TypeSupport>(
         self: &Arc<Self>,
         topic_name: &str,
         qos: Option<Profile>,
     ) -> Result<Self::Subscriber<T>> {
-        self.create_subscriber(topic_name, qos)
+        Self::create_subscriber(self, topic_name, qos)
     }
 
-    fn new_client<T: oxidros_core::ServiceMsg>(
+    fn create_client<T: oxidros_core::ServiceMsg>(
         self: &Arc<Self>,
         service_name: &str,
         qos: Option<Profile>,
     ) -> Result<Self::Client<T>> {
-        self.create_client(service_name, qos)
+        Self::create_client(self, service_name, qos)
     }
 
-    fn new_server<T: oxidros_core::ServiceMsg>(
+    fn create_server<T: oxidros_core::ServiceMsg>(
         self: &Arc<Self>,
         service_name: &str,
         qos: Option<Profile>,
     ) -> Result<Self::Server<T>> {
-        self.create_server(service_name, qos)
+        Self::create_server(self, service_name, qos)
     }
 }
 

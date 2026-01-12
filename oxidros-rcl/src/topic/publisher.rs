@@ -338,11 +338,10 @@ unsafe impl<T> Send for Publisher<T> {}
 
 impl<T: TypeSupport> oxidros_core::api::RosPublisher<T> for Publisher<T> {
     fn topic_name(&self) -> Result<Cow<'_, String>> {
-        self.topic_name()
+        Self::topic_name(self)
     }
 
-    fn publish(&self, msg: &T) -> oxidros_core::Result<()> {
-        // Publisher::send already returns oxidros_core::Result
-        self.send(msg)
+    fn send(&self, msg: &T) -> oxidros_core::Result<()> {
+        Self::send(self, msg)
     }
 }

@@ -523,8 +523,7 @@ impl<T: ServiceMsg> oxidros_core::api::ServiceRequest<T> for ServiceRequest<T> {
         &self.request
     }
 
-    fn respond(self, response: &T::Response) -> oxidros_core::Result<()> {
-        // ServerSend::send returns Result which uses RclError
+    fn respond(self, response: &T::Response) -> Result<()> {
         self.sender.send(response)
     }
 }
@@ -536,11 +535,11 @@ impl<T: ServiceMsg> oxidros_core::api::RosServer<T> for Server<T> {
         Self::service_name(self)
     }
 
-    async fn recv_request(&mut self) -> Result<Self::Request> {
-        self.recv().await
+    async fn recv(&mut self) -> Result<Self::Request> {
+        Self::recv(self).await
     }
 
-    fn try_recv_request(&mut self) -> Result<Option<Self::Request>> {
-        self.try_recv()
+    fn try_recv(&mut self) -> Result<Option<Self::Request>> {
+        Self::try_recv(self)
     }
 }
