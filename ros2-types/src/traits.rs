@@ -62,7 +62,7 @@ pub trait TypeSupport: 'static + Send + Sync {
     ///
     /// The hash format is: `RIHS01_<64_character_hex_sha256>`
     fn type_hash() -> Result<::std::string::String> {
-        Ok(::std::string::String::new())
+        Ok("RIHS01_00".to_string())
     }
 }
 
@@ -104,7 +104,7 @@ pub trait ServiceMsg: 'static + Send + Sync {
     ///
     /// The hash format is: `RIHS01_<64_character_hex_sha256>`
     fn type_hash() -> Result<::std::string::String> {
-        Ok(::std::string::String::new())
+        Ok("RIHS01_00".to_string())
     }
 }
 
@@ -166,7 +166,7 @@ pub trait ActionMsg: 'static + Send + Sync {
     ///
     /// The hash format is: `RIHS01_<64_character_hex_sha256>`
     fn type_hash() -> Result<::std::string::String> {
-        Ok(::std::string::String::new())
+        Ok("RIHS01_00".to_string())
     }
 }
 

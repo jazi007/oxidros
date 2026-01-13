@@ -28,13 +28,13 @@ fn test_timer() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     // Wait for several timer firings
     let start = std::time::Instant::now();
-    while start.elapsed() < Duration::from_millis(200) {
-        selector.wait_timeout(Duration::from_millis(100))?;
+    while start.elapsed() < Duration::from_millis(100) {
+        selector.wait_timeout(Duration::from_millis(50))?;
     }
 
     // Timer should have fired at least 3 times
     let count = counter.load(Ordering::SeqCst);
-    println!("Timer fired {} times", count);
+    println!("Timer fired {} times in {:?}", count, start.elapsed());
     assert!(
         count >= 2,
         "Timer should have fired at least 2 times, got {}",

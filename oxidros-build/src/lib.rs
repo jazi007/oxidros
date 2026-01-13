@@ -385,6 +385,7 @@ pub fn link_rcl_ros2_libs() {
     println!("cargo:rustc-link-lib=rcl_action");
     println!("cargo:rustc-link-lib=rcutils");
     println!("cargo:rustc-link-lib=rmw");
+    println!("cargo:rustc-link-lib=rmw_implementation");
     println!("cargo:rustc-link-lib=rcl_yaml_param_parser");
 
     // Add library search paths from AMENT_PREFIX_PATH
@@ -473,6 +474,7 @@ pub fn generate_runtime_c(out_dir: &Path) {
 #include <rosidl_runtime_c/u16string_functions.h>
 #include <rosidl_runtime_c/visibility_control.h>
 #include <builtin_interfaces/msg/time.h>
+#include <rmw/rmw.h>
 "#;
 
     let wrapper_path = out_dir.join("msg_wrapper.h");
@@ -493,9 +495,16 @@ pub fn generate_runtime_c(out_dir: &Path) {
             "-I{}",
             ros_include.join("rosidl_typesupport_interface").display()
         ))
+        .clang_arg(format!("-I{}", ros_include.join("rmw").display()))
+        .clang_arg(format!(
+            "-I{}",
+            ros_include.join("rosidl_dynamic_typesupport").display()
+        ))
         .clang_arg(format!("-I{}", ros_include.join("rcutils").display()))
         .allowlist_type("rosidl_.*")
         .allowlist_function("rosidl_.*")
+        .allowlist_function("rmw_deserialize")
+        .allowlist_function("rmw_serialize")
         .allowlist_var("rosidl_.*")
         .allowlist_type("builtin_interfaces__msg__Time")
         .blocklist_function("atexit")

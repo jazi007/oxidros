@@ -2,6 +2,7 @@
 
 use oxidros_core::parameter::Value;
 use oxidros_zenoh::Context;
+use std::f64;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -33,7 +34,12 @@ fn test_parameter_storage_direct() {
             )
             .expect("Failed to set string parameter");
         params
-            .set_parameter("test_float".to_string(), Value::F64(3.14), false, None)
+            .set_parameter(
+                "test_float".to_string(),
+                Value::F64(f64::consts::PI),
+                false,
+                None,
+            )
             .expect("Failed to set float parameter");
         params
             .set_parameter("test_bool".to_string(), Value::Bool(true), false, None)
@@ -54,7 +60,7 @@ fn test_parameter_storage_direct() {
 
         let float_param = params.get_parameter("test_float").expect("float not found");
         if let Value::F64(v) = float_param.value {
-            assert!((v - 3.14).abs() < 0.001);
+            assert!((v - f64::consts::PI).abs() < 0.001);
         } else {
             panic!("Expected F64");
         }

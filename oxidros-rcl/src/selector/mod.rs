@@ -1232,7 +1232,7 @@ impl Selector {
 
     fn notify_timer(&mut self) {
         let now_time = SystemTime::now();
-        let mut reload = Vec::new(); // wall timer to be reloaded
+        let mut reload = Vec::new(); // wall timer to be reloaded: (name, delay, original_period, handler)
 
         while let Some(head) = self.timer.front() {
             if let Some(head_time) = self.base_time.checked_add(*head.0) {
@@ -1250,14 +1250,13 @@ impl Selector {
                         handler(); // invoke the callback function
 
                         // register the wall timer again.
-                        if let TimerType::WallTimer(name, dur) = &head.1.0.event {
+                        if let TimerType::WallTimer(name, period) = &head.1.0.event {
                             let elapsed = now_time.elapsed().unwrap();
 
-                            if let Some(dur) = dur.checked_sub(elapsed) {
-                                reload.push((name.clone(), dur, handler));
-                            } else {
-                                reload.push((name.clone(), Duration::ZERO, handler));
-                            }
+                            // Calculate the delay until next fire, compensating for elapsed time
+                            let delay = period.saturating_sub(elapsed);
+                            // Store (name, delay, original_period, handler)
+                            reload.push((name.clone(), delay, *period, handler));
 
                             #[cfg(feature = "statistics")]
                             if let Ok(elapsed) = start.elapsed() {
@@ -1276,8 +1275,8 @@ impl Selector {
         }
 
         // reload wall timers
-        for (name, dur, handler) in reload {
-            self.add_timer_inner(dur, handler, TimerType::WallTimer(name, dur));
+        for (name, delay, period, handler) in reload {
+            self.add_timer_inner(delay, handler, TimerType::WallTimer(name, period));
         }
     }
 

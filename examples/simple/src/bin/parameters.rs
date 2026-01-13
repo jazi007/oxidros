@@ -89,7 +89,6 @@ fn main() -> Result<()> {
     );
 
     // Add timer to periodically check and use parameters
-    /*
     selector.add_wall_timer(
         "param_check",
         Duration::from_secs(5),
@@ -114,7 +113,6 @@ fn main() -> Result<()> {
             tracing::info!("Parameters: {:?}", names);
         }),
     );
-    */
 
     tracing::info!("Parameter server demo started");
     tracing::info!("Node: /param_demo");
