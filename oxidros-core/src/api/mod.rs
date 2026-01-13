@@ -70,10 +70,14 @@ pub trait RosContext: Send + Sync + Sized {
     /// # Errors
     ///
     /// Returns an error if the name is invalid or node creation fails.
-    fn new_node(self: &Arc<Self>, name: &str, namespace: Option<&str>) -> Result<Arc<Self::Node>>;
+    fn create_node(
+        self: &Arc<Self>,
+        name: &str,
+        namespace: Option<&str>,
+    ) -> Result<Arc<Self::Node>>;
 
     /// Create a new selector for event-driven execution.
-    fn new_selector(self: &Arc<Self>) -> Result<Self::Selector>;
+    fn create_selector(self: &Arc<Self>) -> Result<Self::Selector>;
 
     /// Get the domain ID.
     fn ros_domain_id(&self) -> u32;

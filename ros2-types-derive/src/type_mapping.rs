@@ -121,9 +121,37 @@ pub fn collect_referenced_types(field_opts: &[Ros2FieldOpts]) -> Vec<TokenStream
                             extract_nested_type(inner_ty)
                         } else {
                             // No type generic found - this is likely a wrapper like GoalStatusSeq<0>
-                            // with a const generic. We can't directly get the inner type.
-                            // Skip this field - the base type should already be collected elsewhere.
-                            None
+                            // with a const generic. Check if it's a primitive sequence type.
+                            let type_name = segment.ident.to_string();
+                            if type_name.ends_with("Seq") {
+                                let base_type_name = &type_name[..type_name.len() - 3];
+                                // Check if this is a primitive sequence type - skip those
+                                let is_primitive = matches!(
+                                    base_type_name,
+                                    "Bool"
+                                        | "I8"
+                                        | "U8"
+                                        | "I16"
+                                        | "U16"
+                                        | "I32"
+                                        | "U32"
+                                        | "I64"
+                                        | "U64"
+                                        | "F32"
+                                        | "F64"
+                                        | "RosString"
+                                        | "RosWString"
+                                );
+                                if is_primitive {
+                                    None
+                                } else {
+                                    // The XxxSeq<N> types implement TypeDescription
+                                    // and delegate to the element type, so use the whole type directly.
+                                    Some(&field_opt.ty)
+                                }
+                            } else {
+                                None
+                            }
                         }
                     } else {
                         None
@@ -187,7 +215,31 @@ pub fn map_rust_type_to_field_type(
         }
     }
 
-    // Handle explicit string/wstring attributes
+    // If the field is explicitly marked as a sequence, handle it first
+    // BEFORE checking for string/wstring, because sequence+string should
+    // generate a string sequence, not a plain string
+    if field_opts.sequence {
+        // Handle sequence of strings (e.g., RosStringSeq<N, M> with #[ros2(sequence, string)])
+        if field_opts.string {
+            let type_id = quote! { ros2_types::FIELD_TYPE_STRING };
+            if let Some(cap) = field_opts.capacity {
+                return quote! { ros2_types::types::FieldType::bounded_sequence(#type_id, #cap) };
+            } else {
+                return quote! { ros2_types::types::FieldType::sequence(#type_id) };
+            }
+        }
+        // Handle sequence of wstrings (e.g., RosWStringSeq<N, M> with #[ros2(sequence, wstring)])
+        if field_opts.wstring {
+            let type_id = quote! { ros2_types::FIELD_TYPE_WSTRING };
+            if let Some(cap) = field_opts.capacity {
+                return quote! { ros2_types::types::FieldType::bounded_sequence(#type_id, #cap) };
+            } else {
+                return quote! { ros2_types::types::FieldType::sequence(#type_id) };
+            }
+        }
+    }
+
+    // Handle explicit string/wstring attributes (non-sequence)
     // This allows custom string types (like RosString<N>) to be properly mapped
     if field_opts.string {
         if let Some(cap) = field_opts.capacity {
@@ -205,11 +257,7 @@ pub fn map_rust_type_to_field_type(
         }
     }
 
-    // If the field is explicitly marked as a sequence, try to extract
-    // a generic inner type (works for Vec<T>, Sequence<T>, or other
-    // wrapper types with angle-bracketed generic args). This makes the
-    // derive attribute-driven instead of relying on the outer type
-    // being literally `Vec`.
+    // Handle other sequence types (non-string)
     if field_opts.sequence
         && let Type::Path(type_path) = ty
         && let Some(PathSegment {
@@ -255,10 +303,26 @@ pub fn map_rust_type_to_field_type(
             let base_type_name = &type_name[..type_name.len() - 3]; // Strip "Seq"
 
             // Check if this is a primitive sequence type
+            // Note: U8 can be either uint8 (type 3) or byte/octet (type 16) depending on ros2_type attribute
             let primitive_type_id = match base_type_name {
                 "Bool" => Some(quote! { ros2_types::FIELD_TYPE_BOOLEAN }),
-                "I8" => Some(quote! { ros2_types::FIELD_TYPE_INT8 }),
-                "U8" => Some(quote! { ros2_types::FIELD_TYPE_UINT8 }),
+                "I8" => {
+                    if matches!(field_opts.ros2_type.as_deref(), Some("char")) {
+                        Some(quote! { ros2_types::FIELD_TYPE_CHAR })
+                    } else {
+                        Some(quote! { ros2_types::FIELD_TYPE_INT8 })
+                    }
+                }
+                "U8" => {
+                    if matches!(
+                        field_opts.ros2_type.as_deref(),
+                        Some("byte") | Some("octet")
+                    ) {
+                        Some(quote! { ros2_types::FIELD_TYPE_BYTE })
+                    } else {
+                        Some(quote! { ros2_types::FIELD_TYPE_UINT8 })
+                    }
+                }
                 "I16" => Some(quote! { ros2_types::FIELD_TYPE_INT16 }),
                 "U16" => Some(quote! { ros2_types::FIELD_TYPE_UINT16 }),
                 "I32" => Some(quote! { ros2_types::FIELD_TYPE_INT32 }),

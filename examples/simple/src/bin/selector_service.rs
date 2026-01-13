@@ -1,18 +1,15 @@
-//! Sync service server example
+//! Selector-based service server example
 //!
-//! Demonstrates a synchronous service server using a selector-based loop.
-//! For a simpler async version, see `async_server.rs`.
+//! Demonstrates callback-based service handling using the Selector pattern.
 //!
 //! Run with:
 //! ```bash
-//! cargo run -p simple --bin server --features jazzy
+//! cargo run -p simple --bin selector_service --features jazzy
 //! ```
 //!
 //! Test with (in another terminal):
 //! ```bash
 //! ros2 service call /add_two_ints example_interfaces/srv/AddTwoInts "{a: 5, b: 3}"
-//! # Or run the client:
-//! cargo run -p simple --bin client --features jazzy
 //! ```
 
 use oxidros::error::Result;
@@ -26,10 +23,10 @@ type AddTwoInts = example_interfaces::srv::AddTwoInts;
 
 fn main() -> Result<()> {
     // Initialize logging
-    init_ros_logging("server");
+    init_ros_logging("selector_service");
 
     let ctx = Context::new()?;
-    let node = ctx.create_node("sync_server_demo", None)?;
+    let node = ctx.create_node("selector_service_demo", None)?;
 
     // Create service server
     let server = node.create_server::<AddTwoInts>("add_two_ints", None)?;
@@ -41,7 +38,7 @@ fn main() -> Result<()> {
     // Create selector
     let mut selector = ctx.create_selector()?;
 
-    // Add server with request handler callback
+    // Add server callback
     selector.add_server(
         server,
         Box::new(move |request| {
@@ -49,10 +46,9 @@ fn main() -> Result<()> {
             let a = request.sample.a;
             let b = request.sample.b;
             let sum = a + b;
-
             tracing::info!("Request #{}: {} + {} = {}", count, a, b, sum);
 
-            // Build response
+            // Create response
             let mut response = example_interfaces::srv::AddTwoInts_Response::new().unwrap();
             response.sum = sum;
             response
@@ -63,15 +59,15 @@ fn main() -> Result<()> {
     let request_count_timer = Arc::clone(&request_count);
     selector.add_wall_timer(
         "status_timer",
-        Duration::from_secs(30),
+        Duration::from_secs(10),
         Box::new(move || {
             let count = request_count_timer.load(Ordering::SeqCst);
-            tracing::info!("Status: {} total requests processed", count);
+            tracing::info!("Status: {} requests processed", count);
         }),
     );
 
-    tracing::info!("Sync server demo started");
-    tracing::info!("Service: /add_two_ints");
+    tracing::info!("Selector-based service demo started");
+    tracing::info!("Serving 'add_two_ints' service");
     tracing::info!(
         "Test with: ros2 service call /add_two_ints example_interfaces/srv/AddTwoInts \"{{a: 5, b: 3}}\""
     );

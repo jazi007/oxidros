@@ -1,3 +1,4 @@
+#![cfg(feature = "rcl")]
 #[cfg(test)]
 mod tests {
     use oxidros_rcl::context::Context;

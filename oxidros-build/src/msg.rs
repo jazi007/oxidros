@@ -126,8 +126,13 @@ impl ParseCallbacks for RosCallbacks {
         // 4. Rust field type contains "Seq<" (custom sequence types like BoolSeq<0>, GoalStatusSeq<0>)
         let ros_type_name = field_info.ros_type_name();
         let rust_type = field_info.field_type();
+
+        // Check if this is a string type (bounded strings have capacity but are NOT sequences)
+        let is_string_type = rust_type.contains("RosString") || rust_type.contains("RosWString");
+
         let is_sequence = ros_type_name.starts_with("sequence")
-            || (field_info.capacity().is_some() && field_info.array_size().is_none())
+            // capacity + no array_size = sequence, BUT NOT for bounded strings (they use capacity for string length)
+            || (field_info.capacity().is_some() && field_info.array_size().is_none() && !is_string_type)
             || (rust_type.starts_with("Vec<") && field_info.array_size().is_none())
             || rust_type.contains("Seq<");
 
@@ -135,9 +140,9 @@ impl ParseCallbacks for RosCallbacks {
             ros2_parts.push("sequence".to_string());
         }
 
-        // Detect string types (RosString<N>, RosWString<N>)
-        let is_string = rust_type.contains("RosString<");
-        let is_wstring = rust_type.contains("RosWString<");
+        // Add string/wstring attribute for string types
+        let is_string = is_string_type && !rust_type.contains("RosWString");
+        let is_wstring = rust_type.contains("RosWString");
 
         if is_string {
             ros2_parts.push("string".to_string());

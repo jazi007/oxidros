@@ -1,8 +1,10 @@
 use std::{sync::atomic::AtomicUsize, time::Duration};
 
-use oxidros::oxidros_msg::common_interfaces::example_interfaces::srv::AddTwoInts_Request;
+use oxidros::error::Result;
+use oxidros::oxidros_msg::common_interfaces::example_interfaces::srv::{
+    AddTwoInts, AddTwoInts_Request,
+};
 use oxidros::prelude::*;
-use oxidros::{error::Result, oxidros_msg::common_interfaces::example_interfaces::srv::AddTwoInts};
 
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -31,7 +33,7 @@ async fn client_handler(mut client: Client<AddTwoInts>) -> Result<()> {
 #[tokio::main]
 async fn main() -> Result<()> {
     let ctx = Context::new()?;
-    let node = ctx.new_node("simple", None)?;
+    let node = ctx.create_node("simple", None)?;
     let mut set = tokio::task::JoinSet::new();
     for _ in 0..2 {
         let client = node.create_client::<AddTwoInts>("add_two_ints", None)?;

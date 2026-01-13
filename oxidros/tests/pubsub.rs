@@ -19,8 +19,8 @@ fn test_pubsub() -> Result<(), Box<dyn Error + Send + Sync>> {
     let ctx = Context::new()?;
 
     // Create nodes
-    let node_pub = ctx.new_node("test_unified_pub_node", None)?;
-    let node_sub = ctx.new_node("test_unified_sub_node", None)?;
+    let node_pub = ctx.create_node("test_unified_pub_node", None)?;
+    let node_sub = ctx.create_node("test_unified_sub_node", None)?;
 
     // Create publisher and subscriber
     let publisher = common::create_publisher(node_pub.clone(), TOPIC_NAME)?;
@@ -32,7 +32,7 @@ fn test_pubsub() -> Result<(), Box<dyn Error + Send + Sync>> {
     publisher.send(&msg)?;
 
     // Wait for message using selector
-    let mut selector = ctx.new_selector()?;
+    let mut selector = ctx.create_selector()?;
     static COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
     selector.add_subscriber(
@@ -56,8 +56,8 @@ fn test_pubsub() -> Result<(), Box<dyn Error + Send + Sync>> {
 fn test_pubsub_multiple_messages() -> Result<(), Box<dyn Error + Send + Sync>> {
     let ctx = Context::new()?;
 
-    let node_pub = ctx.new_node("test_multi_pub_node", None)?;
-    let node_sub = ctx.new_node("test_multi_sub_node", None)?;
+    let node_pub = ctx.create_node("test_multi_pub_node", None)?;
+    let node_sub = ctx.create_node("test_multi_sub_node", None)?;
 
     let publisher: Publisher<Int64> = node_pub.create_publisher("test_multi_pubsub", None)?;
     let subscriber: Subscriber<Int64> = node_sub.create_subscriber("test_multi_pubsub", None)?;
@@ -69,7 +69,7 @@ fn test_pubsub_multiple_messages() -> Result<(), Box<dyn Error + Send + Sync>> {
     }
 
     // Receive messages
-    let mut selector = ctx.new_selector()?;
+    let mut selector = ctx.create_selector()?;
     static COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
     selector.add_subscriber(
         subscriber,

@@ -12,6 +12,7 @@
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::too_many_arguments)]
 #![allow(clashing_extern_declarations)]
+#![allow(clippy::enum_variant_names)]
 
 use oxidros_core::RclError;
 use regex::Regex;

@@ -12,7 +12,7 @@ use std::time::Duration;
 #[test]
 fn test_timer() -> Result<(), Box<dyn Error + Send + Sync>> {
     let ctx = Context::new()?;
-    let mut selector = ctx.new_selector()?;
+    let mut selector = ctx.create_selector()?;
 
     let counter = Arc::new(AtomicUsize::new(0));
     let counter_clone = counter.clone();
@@ -47,7 +47,7 @@ fn test_timer() -> Result<(), Box<dyn Error + Send + Sync>> {
 #[test]
 fn test_timer_remove() -> Result<(), Box<dyn Error + Send + Sync>> {
     let ctx = Context::new()?;
-    let mut selector = ctx.new_selector()?;
+    let mut selector = ctx.create_selector()?;
 
     let counter = Arc::new(AtomicUsize::new(0));
     let counter_clone = counter.clone();

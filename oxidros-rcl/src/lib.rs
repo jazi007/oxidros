@@ -235,7 +235,7 @@ pub mod logger;
 pub mod msg;
 pub mod node;
 pub mod parameter;
-pub mod rcl;
+pub(crate) mod rcl;
 pub mod selector;
 pub mod service;
 pub mod topic;

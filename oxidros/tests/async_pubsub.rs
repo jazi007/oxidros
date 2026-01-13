@@ -17,8 +17,8 @@ const TOPIC_NAME: &str = "test_async_unified_pubsub";
 async fn test_async_pubsub() -> Result<(), Box<dyn Error + Send + Sync>> {
     // Create context and nodes
     let ctx = Context::new()?;
-    let node_pub = ctx.new_node("test_async_unified_pub", None)?;
-    let node_sub = ctx.new_node("test_async_unified_sub", None)?;
+    let node_pub = ctx.create_node("test_async_unified_pub", None)?;
+    let node_sub = ctx.create_node("test_async_unified_sub", None)?;
 
     // Create publisher and subscriber
     let publisher = common::create_publisher(node_pub.clone(), TOPIC_NAME)?;

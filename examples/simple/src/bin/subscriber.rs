@@ -4,7 +4,7 @@ use oxidros::{error::Result, prelude::*};
 #[tokio::main]
 async fn main() -> Result<()> {
     let ctx = Context::new()?;
-    let node = ctx.new_node("simple", None)?;
+    let node = ctx.create_node("simple", None)?;
     let mut sub1 = node.create_subscriber::<String>("chatter", None)?;
     let mut sub2 = node.create_subscriber::<String>("chatter", None)?;
     loop {

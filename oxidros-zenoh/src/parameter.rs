@@ -158,6 +158,7 @@ impl ParameterServer {
             biased;
 
             result = self.srv_list.recv() => {
+                tracing::info!("Received list_parameters request");
                 if let Ok(req) = result {
                     let response = self.handle_list_parameters(&req.request);
                     let _ = req.send(&response);
@@ -165,6 +166,7 @@ impl ParameterServer {
             }
 
             result = self.srv_get.recv() => {
+                tracing::info!("Received get_parameters request");
                 if let Ok(req) = result {
                     let response = self.handle_get_parameters(&req.request);
                     let _ = req.send(&response);
@@ -179,6 +181,7 @@ impl ParameterServer {
             }
 
             result = self.srv_set_atomic.recv() => {
+                tracing::info!("Received set_parameters_atomically request");
                 if let Ok(req) = result {
                     let response = self.handle_set_parameters_atomically(&req.request);
                     let _ = req.send(&response);
@@ -214,6 +217,7 @@ impl ParameterServer {
 
         // Try to receive from list_parameters
         if let Ok(Some(req)) = self.srv_list.try_recv() {
+            tracing::info!("Received list_parameters request");
             let response = self.handle_list_parameters(&req.request);
             let _ = req.send(&response);
             processed = true;
@@ -221,6 +225,7 @@ impl ParameterServer {
 
         // Try to receive from get_parameters
         if let Ok(Some(req)) = self.srv_get.try_recv() {
+            tracing::info!("Received get_parameters request");
             let response = self.handle_get_parameters(&req.request);
             let _ = req.send(&response);
             processed = true;
@@ -585,5 +590,149 @@ fn value_type_id(value: &Value) -> u8 {
         Value::VecI64(_) => 7,
         Value::VecF64(_) => 8,
         Value::VecString(_) => 9,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use oxidros_core::ServiceTypeDescription;
+
+    /// Expected type hashes from ROS2 Jazzy (validated against ros2 CLI)
+    /// These hashes must match exactly for interoperability with ros2 param commands
+    const EXPECTED_HASHES: &[(&str, &str)] = &[
+        (
+            "rcl_interfaces/srv/ListParameters",
+            "RIHS01_3e6062bfbb27bfb8730d4cef2558221f51a11646d78e7bb30a1e83afac3aad9d",
+        ),
+        (
+            "rcl_interfaces/srv/GetParameters",
+            "RIHS01_bf9803d5c74cf989a5de3e0c2e99444599a627c7ff75f97b8c05b01003675cbc",
+        ),
+        (
+            "rcl_interfaces/srv/SetParameters",
+            "RIHS01_56eed9a67e169f9cb6c1f987bc88f868c14a8fc9f743a263bc734c154015d7e0",
+        ),
+        (
+            "rcl_interfaces/srv/SetParametersAtomically",
+            "RIHS01_0e192ef259c07fc3c07a13191d27002222e65e00ccec653ca05e856f79285fcd",
+        ),
+        (
+            "rcl_interfaces/srv/DescribeParameters",
+            "RIHS01_845b484d71eb0673dae682f2e3ba3c4851a65a3dcfb97bddd82c5b57e91e4cff",
+        ),
+        (
+            "rcl_interfaces/srv/GetParameterTypes",
+            "RIHS01_da199c878688b3e530bdfe3ca8f74cb9fa0c303101e980a9e8f260e25e1c80ca",
+        ),
+    ];
+
+    #[test]
+    fn test_list_parameters_type_hash() {
+        use super::ListParameters;
+        let hash = ListParameters::compute_hash().expect("failed to compute hash");
+        assert_eq!(
+            hash, EXPECTED_HASHES[0].1,
+            "ListParameters type hash mismatch - interop with ros2 param will fail"
+        );
+    }
+
+    #[test]
+    fn test_get_parameters_type_hash() {
+        use super::GetParameters;
+        let hash = GetParameters::compute_hash().expect("failed to compute hash");
+        assert_eq!(
+            hash, EXPECTED_HASHES[1].1,
+            "GetParameters type hash mismatch - interop with ros2 param will fail"
+        );
+    }
+
+    #[test]
+    fn test_set_parameters_type_hash() {
+        use super::SetParameters;
+        let hash = SetParameters::compute_hash().expect("failed to compute hash");
+        assert_eq!(
+            hash, EXPECTED_HASHES[2].1,
+            "SetParameters type hash mismatch - interop with ros2 param will fail"
+        );
+    }
+
+    #[test]
+    fn test_set_parameters_atomically_type_hash() {
+        use super::SetParametersAtomically;
+        let hash = SetParametersAtomically::compute_hash().expect("failed to compute hash");
+        assert_eq!(
+            hash, EXPECTED_HASHES[3].1,
+            "SetParametersAtomically type hash mismatch - interop with ros2 param will fail"
+        );
+    }
+
+    #[test]
+    fn test_describe_parameters_type_hash() {
+        use super::DescribeParameters;
+        let hash = DescribeParameters::compute_hash().expect("failed to compute hash");
+        assert_eq!(
+            hash, EXPECTED_HASHES[4].1,
+            "DescribeParameters type hash mismatch - interop with ros2 param will fail"
+        );
+    }
+
+    #[test]
+    fn test_get_parameter_types_type_hash() {
+        use super::GetParameterTypes;
+        let hash = GetParameterTypes::compute_hash().expect("failed to compute hash");
+        assert_eq!(
+            hash, EXPECTED_HASHES[5].1,
+            "GetParameterTypes type hash mismatch - interop with ros2 param will fail"
+        );
+    }
+
+    #[test]
+    fn test_all_parameter_service_hashes() {
+        // Test all parameter service hashes in one place for easy validation
+        use super::{
+            DescribeParameters, GetParameterTypes, GetParameters, ListParameters, SetParameters,
+            SetParametersAtomically,
+        };
+
+        let services: Vec<(&str, String)> = vec![
+            (
+                "ListParameters",
+                ListParameters::compute_hash().expect("hash"),
+            ),
+            (
+                "GetParameters",
+                GetParameters::compute_hash().expect("hash"),
+            ),
+            (
+                "SetParameters",
+                SetParameters::compute_hash().expect("hash"),
+            ),
+            (
+                "SetParametersAtomically",
+                SetParametersAtomically::compute_hash().expect("hash"),
+            ),
+            (
+                "DescribeParameters",
+                DescribeParameters::compute_hash().expect("hash"),
+            ),
+            (
+                "GetParameterTypes",
+                GetParameterTypes::compute_hash().expect("hash"),
+            ),
+        ];
+
+        let mut all_match = true;
+        for (i, (name, hash)) in services.iter().enumerate() {
+            let expected = EXPECTED_HASHES[i].1;
+            if hash != expected {
+                eprintln!("MISMATCH: {} - got {} expected {}", name, hash, expected);
+                all_match = false;
+            }
+        }
+
+        assert!(
+            all_match,
+            "One or more parameter service type hashes do not match ROS2 expectations"
+        );
     }
 }

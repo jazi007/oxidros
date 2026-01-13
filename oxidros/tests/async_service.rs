@@ -18,8 +18,8 @@ const SERVICE_NAME: &str = "test_async_unified_service";
 async fn test_async_service() -> Result<(), Box<dyn Error + Send + Sync>> {
     // Create context and nodes
     let ctx = Context::new()?;
-    let node_server = ctx.new_node("test_async_server", None)?;
-    let node_client = ctx.new_node("test_async_client", None)?;
+    let node_server = ctx.create_node("test_async_server", None)?;
+    let node_client = ctx.create_node("test_async_client", None)?;
 
     // Create server and client
     let mut server = common::create_server(node_server.clone(), SERVICE_NAME)?;

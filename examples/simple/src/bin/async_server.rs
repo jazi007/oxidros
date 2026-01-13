@@ -7,7 +7,7 @@ use oxidros::{
 #[tokio::main]
 async fn main() -> Result<()> {
     let ctx = Context::new()?;
-    let node = ctx.new_node("simple", None)?;
+    let node = ctx.create_node("simple", None)?;
     let mut server = node.create_server::<AddTwoInts>("add_two_ints", None)?;
     loop {
         let request = server.recv().await?;

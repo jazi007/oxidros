@@ -253,16 +253,16 @@ impl oxidros_core::api::RosContext for Context {
     type Node = Node;
     type Selector = Selector;
 
-    fn new_node(
+    fn create_node(
         self: &Arc<Self>,
         name: &str,
         namespace: Option<&str>,
     ) -> oxidros_core::Result<Arc<Self::Node>> {
-        self.create_node(name, namespace)
+        Self::create_node(self, name, namespace)
     }
 
-    fn new_selector(self: &Arc<Self>) -> oxidros_core::Result<Self::Selector> {
-        self.create_selector()
+    fn create_selector(self: &Arc<Self>) -> oxidros_core::Result<Self::Selector> {
+        Self::create_selector(self)
     }
 
     fn ros_domain_id(&self) -> u32 {

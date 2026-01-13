@@ -18,7 +18,6 @@ use oxidros_rcl::{
     error::Result,
     msg::{ServiceMsg, TypeSupport},
     node::Node,
-    rcl,
     service::{client::Client, server::Server},
     topic::{publisher::Publisher, subscriber::Subscriber},
 };

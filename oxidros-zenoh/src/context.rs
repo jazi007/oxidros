@@ -288,15 +288,15 @@ impl oxidros_core::api::RosContext for Context {
     type Node = Node;
     type Selector = crate::selector::Selector;
 
-    fn new_node(
+    fn create_node(
         self: &Arc<Self>,
         name: &str,
         namespace: Option<&str>,
     ) -> crate::error::Result<Arc<Self::Node>> {
-        self.create_node(name, namespace)
+        Self::create_node(self, name, namespace)
     }
 
-    fn new_selector(self: &Arc<Self>) -> crate::error::Result<Self::Selector> {
+    fn create_selector(self: &Arc<Self>) -> crate::error::Result<Self::Selector> {
         Ok(crate::selector::Selector::new())
     }
 

@@ -280,6 +280,7 @@ impl Parameters {
             let msg: String = format!("{} is already declared", name);
             Err(msg.into())
         } else if parameter.check_range(&parameter.value) {
+            self.updated.insert(name.clone());
             self.params.insert(name, parameter);
             Ok(())
         } else {
@@ -315,6 +316,7 @@ impl Parameters {
 
             if param.value.type_check(&value) {
                 param.value = value;
+                self.updated.insert(name);
                 Ok(())
             } else {
                 let msg = format!(
@@ -331,6 +333,7 @@ impl Parameters {
                 false,
                 description.unwrap_or_else(|| name.clone()),
             );
+            self.updated.insert(name.clone());
             self.params.insert(name, param);
             Ok(())
         }
@@ -360,6 +363,7 @@ impl Parameters {
             }
 
             param.value = value;
+            self.updated.insert(name);
         } else {
             let param = Parameter::new(
                 value,
@@ -367,6 +371,7 @@ impl Parameters {
                 true,
                 description.unwrap_or_else(|| name.clone()),
             );
+            self.updated.insert(name.clone());
             self.params.insert(name, param);
         }
         Ok(())

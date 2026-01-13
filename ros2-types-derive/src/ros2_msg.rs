@@ -247,6 +247,18 @@ fn generate_common_impl(opts: &Ros2TypeOpts) -> TokenStream {
 
         unsafe impl<const N: usize> Send for #seq_type<N> {}
         unsafe impl<const N: usize> Sync for #seq_type<N> {}
+
+        /// TypeDescription for sequence types delegates to the element type.
+        /// This enables proper type hash computation when XxxSeq<N> is used in fields.
+        impl<const N: usize> ros2_types::TypeDescription for #seq_type<N> {
+            fn type_description() -> ros2_types::types::TypeDescriptionMsg {
+                <#name as ros2_types::TypeDescription>::type_description()
+            }
+
+            fn message_type_name() -> ros2_types::MessageTypeName {
+                <#name as ros2_types::TypeDescription>::message_type_name()
+            }
+        }
     }
 }
 
