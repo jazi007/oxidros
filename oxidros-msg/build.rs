@@ -5,7 +5,7 @@
 use std::env;
 use std::path::Path;
 
-use oxidros_build::msg::get_base_generator;
+use oxidros_build::msg::{Config, get_base_generator};
 
 fn main() {
     let out_dir = env::var("OUT_DIR").unwrap();
@@ -45,12 +45,12 @@ fn main() {
 
     // Generate common_interfaces
     let common_interfaces_dir = out_path.join("common_interfaces");
-    let generator = get_base_generator(
-        &common_interfaces_deps,
-        Some("crate::ros2msg".to_string()),
-        Some("crate".to_string()),
-    )
-    .unwrap();
+    let config = Config::builder()
+        .packages(&common_interfaces_deps)
+        .uuid_path("crate::ros2msg")
+        .primitive_path("crate")
+        .build();
+    let generator = get_base_generator(&config).unwrap();
     std::fs::create_dir_all(&common_interfaces_dir).unwrap();
 
     generator
@@ -61,12 +61,12 @@ fn main() {
     // Generate interfaces
     let interfaces_dir = out_path.join("interfaces");
     std::fs::create_dir_all(&interfaces_dir).unwrap();
-    let generator = get_base_generator(
-        &interface_deps,
-        Some("crate::ros2msg".to_string()),
-        Some("crate".to_string()),
-    )
-    .unwrap();
+    let config = Config::builder()
+        .packages(&interface_deps)
+        .uuid_path("crate::ros2msg")
+        .primitive_path("crate")
+        .build();
+    let generator = get_base_generator(&config).unwrap();
     generator
         .output_dir(&interfaces_dir)
         .generate()
@@ -75,12 +75,12 @@ fn main() {
     // Generate ros2msg
     let ros2msg_dir = out_path.join("ros2msg");
     std::fs::create_dir_all(&ros2msg_dir).unwrap();
-    let generator = get_base_generator(
-        &ros2msg_deps,
-        Some("crate::ros2msg".to_string()),
-        Some("crate".to_string()),
-    )
-    .unwrap();
+    let config = Config::builder()
+        .packages(&ros2msg_deps)
+        .uuid_path("crate::ros2msg")
+        .primitive_path("crate")
+        .build();
+    let generator = get_base_generator(&config).unwrap();
     generator
         .output_dir(&ros2msg_dir)
         .generate()

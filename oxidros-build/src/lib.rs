@@ -53,11 +53,6 @@ pub mod msg;
 
 // use bindgen::callbacks::ParseCallbacks;
 
-#[cfg(target_os = "windows")]
-pub const SEPARATOR: char = ';';
-#[cfg(not(target_os = "windows"))]
-pub const SEPARATOR: char = ':';
-
 // #[derive(Debug)]
 // struct CustomCallbacks;
 //
@@ -184,10 +179,9 @@ pub fn generate_rcl_bindings(out_dir: &Path) {
     let ament_prefix_path = env::var("AMENT_PREFIX_PATH")
         .expect("AMENT_PREFIX_PATH not set. Please source your ROS2 installation.");
 
-    let ros_include = ament_prefix_path
-        .split(SEPARATOR)
+    let ros_include = env::split_paths(&ament_prefix_path)
         .find_map(|path| {
-            let include_path = Path::new(path).join("include");
+            let include_path = path.join("include");
             if include_path.exists() {
                 Some(include_path)
             } else {
