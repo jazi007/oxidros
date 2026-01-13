@@ -158,13 +158,17 @@ fn scan_ros_interfaces(
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-env-changed=ROS_PATH");
+    let ros_path = match env::var("AMENT_PREFIX_PATH") {
+        Ok(path) => env::split_paths(&path).next().unwrap(),
+        Err(_) => PathBuf::from("/opt/ros/jazzy"),
+    };
 
-    let ros_path = env::var("ROS_PATH").unwrap_or_else(|_| "/opt/ros/jazzy".to_string());
     let out_dir = PathBuf::from(env::var("OUT_DIR")?);
-
-    println!("cargo:info=Scanning ROS2 interfaces from: {}", ros_path);
-
-    let share_dir = PathBuf::from(&ros_path).join("share");
+    println!(
+        "cargo:info=Scanning ROS2 interfaces from: {}",
+        ros_path.display()
+    );
+    let share_dir = ros_path.join("share");
 
     // Discover all interface files
     let mut discovered = scan_ros_interfaces(&share_dir)?;

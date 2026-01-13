@@ -71,69 +71,65 @@ fn main() {
     }
 
     // Test service type hashes
-    if !test_registry::ALL_SERVICE_TYPES.is_empty() {
-        println!("\n=== Testing Service Type Hashes ===\n");
-        current_package = "";
+    println!("\n=== Testing Service Type Hashes ===\n");
+    current_package = "";
 
-        for entry in test_registry::ALL_SERVICE_TYPES {
-            if entry.package != current_package {
-                if !current_package.is_empty() {
-                    println!();
-                }
-                println!("--- Testing {} services ---", entry.package);
-                current_package = entry.package;
+    for entry in test_registry::ALL_SERVICE_TYPES {
+        if entry.package != current_package {
+            if !current_package.is_empty() {
+                println!();
             }
+            println!("--- Testing {} services ---", entry.package);
+            current_package = entry.package;
+        }
 
-            match test_registry::test_service_type_by_name(entry.ros2_name) {
-                TestResult::Match => {
-                    total += 1;
-                    matches += 1;
-                }
-                TestResult::Mismatch => {
-                    total += 1;
-                    mismatches += 1;
-                }
-                TestResult::Error => {
-                    total += 1;
-                    errors += 1;
-                }
-                TestResult::Skipped => {
-                    skipped += 1;
-                }
+        match test_registry::test_service_type_by_name(entry.ros2_name) {
+            TestResult::Match => {
+                total += 1;
+                matches += 1;
+            }
+            TestResult::Mismatch => {
+                total += 1;
+                mismatches += 1;
+            }
+            TestResult::Error => {
+                total += 1;
+                errors += 1;
+            }
+            TestResult::Skipped => {
+                skipped += 1;
             }
         }
     }
 
     // Test action type hashes
-    if !test_registry::ALL_ACTION_TYPES.is_empty() {
-        println!("\n=== Testing Action Type Hashes ===\n");
-        current_package = "";
+    println!("\n=== Testing Action Type Hashes ===\n");
+    current_package = "";
 
-        for entry in test_registry::ALL_ACTION_TYPES {
-            if entry.package != current_package {
-                if !current_package.is_empty() {
-                    println!();
-                }
-                println!("--- Testing {} actions ---", entry.package);
-                current_package = entry.package;
+    for entry in test_registry::ALL_ACTION_TYPES {
+        if entry.package != current_package {
+            if !current_package.is_empty() {
+                println!();
             }
+            println!("--- Testing {} actions ---", entry.package);
+            current_package = entry.package;
+        }
 
-            match test_registry::test_action_type_by_name(entry.ros2_name) {
-                TestResult::Match => {
-                    total += 1;
-                    matches += 1;
-                }
-                TestResult::Mismatch => {
-                    total += 1;
-                    mismatches += 1;
-                }
-                TestResult::Error => {
-                    total += 1;
-                    errors += 1;
-                }
-                TestResult::Skipped => {
-                    skipped += 1;
-                }
+        match test_registry::test_action_type_by_name(entry.ros2_name) {
+            TestResult::Match => {
+                total += 1;
+                matches += 1;
+            }
+            TestResult::Mismatch => {
+                total += 1;
+                mismatches += 1;
+            }
+            TestResult::Error => {
+                total += 1;
+                errors += 1;
+            }
+            TestResult::Skipped => {
+                skipped += 1;
             }
         }
     }

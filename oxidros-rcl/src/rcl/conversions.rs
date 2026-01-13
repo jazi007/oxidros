@@ -381,21 +381,47 @@ impl From<i32> for RclRetErr {
 }
 
 impl From<rmw_message_info_t> for oxidros_core::message::MessageInfo {
+    #[cfg(feature = "humble")]
+    fn from(value: rmw_message_info_t) -> Self {
+        let mut publisher_gid = [0; 16];
+        for (o, i) in publisher_gid.iter_mut().zip(value.publisher_gid.data) {
+            *o = i;
+        }
+        Self {
+            sequence_number: value.publication_sequence_number as i64,
+            source_timestamp_ns: value.source_timestamp,
+            publisher_gid,
+        }
+    }
+    #[cfg(not(feature = "humble"))]
     fn from(value: rmw_message_info_t) -> Self {
         Self {
             sequence_number: value.publication_sequence_number as i64,
             source_timestamp_ns: value.source_timestamp,
-            publisher_gid: value.publisher_gid.data,
+            publisher_gid: to_gid(value.publisher_gid.data),
         }
     }
 }
 
 impl From<rmw_service_info_t> for oxidros_core::message::MessageInfo {
+    #[cfg(feature = "humble")]
+    fn from(value: rmw_service_info_t) -> Self {
+        let mut publisher_gid = [0; 16];
+        for (o, i) in publisher_gid.iter_mut().zip(value.request_id.writer_guid) {
+            *o = i.try_into().unwrap_or_default();
+        }
+        Self {
+            sequence_number: value.request_id.sequence_number,
+            source_timestamp_ns: value.source_timestamp,
+            publisher_gid,
+        }
+    }
+    #[cfg(not(feature = "humble"))]
     fn from(value: rmw_service_info_t) -> Self {
         Self {
             sequence_number: value.request_id.sequence_number,
             source_timestamp_ns: value.source_timestamp,
-            publisher_gid: value.request_id.writer_guid,
+            publisher_gid: to_gid(value.request_id.writer_guid),
         }
     }
 }
