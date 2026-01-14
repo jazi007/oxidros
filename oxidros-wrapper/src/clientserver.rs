@@ -21,18 +21,17 @@ where
     /// Send a request
     pub async fn send(
         &mut self,
-        data: &<T as ServiceMsg>::Request,
+        request: &<T as ServiceMsg>::Request,
     ) -> Result<Message<<T as ServiceMsg>::Response>> {
         let client = &mut self.0;
         debug!("Waiting for service availability");
         while !client.is_service_available() {
             time::sleep(Duration::from_millis(100)).await;
         }
-        debug!("Request: {:?}", data);
+        debug!("Request: {:?}", request);
         loop {
-            let receiver = client.send(data)?.recv();
             // Send a request.
-            match time::timeout(Duration::from_secs(1), receiver).await {
+            match time::timeout(Duration::from_secs(1), client.call(request)).await {
                 Ok(Ok(response)) => {
                     trace!("Header: {:?}", response.info);
                     debug!("Response: {:?}", response.sample);
@@ -51,7 +50,7 @@ where
 
 /// RPC Server
 #[allow(missing_debug_implementations)]
-pub struct Server<T>(pub(crate) Option<SdServer<T>>);
+pub struct Server<T: ServiceMsg>(pub(crate) Option<SdServer<T>>);
 pub(crate) type ServerCallback<T> =
     Box<dyn FnMut(Message<<T as ServiceMsg>::Request>) -> <T as ServiceMsg>::Response + Send>;
 

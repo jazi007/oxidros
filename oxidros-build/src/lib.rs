@@ -176,9 +176,9 @@ pub fn builder_base() -> bindgen::Builder {
 /// ```
 pub fn generate_rcl_bindings(out_dir: &Path) {
     // Get ROS include paths from AMENT_PREFIX_PATH
-    let ament_prefix_path = env::var("AMENT_PREFIX_PATH")
-        .expect("AMENT_PREFIX_PATH not set. Please source your ROS2 installation.");
-
+    let Ok(ament_prefix_path) = env::var("AMENT_PREFIX_PATH") else {
+        return;
+    };
     let ros_include = env::split_paths(&ament_prefix_path)
         .find_map(|path| {
             let include_path = path.join("include");
@@ -440,18 +440,19 @@ pub fn link_rcl_ros2_libs() {
 /// ```
 pub fn generate_runtime_c(out_dir: &Path) {
     // Get ROS include paths from AMENT_PREFIX_PATH
-    let ros_include = get_paths_from_env("AMENT_PREFIX_PATH")
-        .expect("AMENT_PREFIX_PATH not set")
-        .iter()
-        .find_map(|path| {
-            let include_path = Path::new(path).join("include");
-            if include_path.exists() {
-                Some(include_path)
-            } else {
-                None
-            }
-        })
-        .expect("Could not find ROS2 include directory in AMENT_PREFIX_PATH");
+    let Ok(ros_include) = get_paths_from_env("AMENT_PREFIX_PATH") else {
+        return;
+    };
+    let Some(ros_include) = ros_include.iter().find_map(|path| {
+        let include_path = Path::new(path).join("include");
+        if include_path.exists() {
+            Some(include_path)
+        } else {
+            None
+        }
+    }) else {
+        return;
+    };
 
     // Create a simple C header to bind
     let msg_c_content = r#"

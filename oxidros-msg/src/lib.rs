@@ -244,7 +244,8 @@ impl From<&Value> for ParameterValue {
     }
 }
 
-#[cfg_attr(not(feature = "rcl"), test)]
+#[cfg(not(feature = "rcl"))]
+#[cfg(test)]
 mod tests {
     use oxidros_core::ServiceTypeDescription;
 

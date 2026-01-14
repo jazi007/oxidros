@@ -11,7 +11,7 @@ use crate::{
     node::Node,
     qos::QosMapping,
 };
-use oxidros_core::{Message, TypeSupport, qos::Profile};
+pub use oxidros_core::{Message, TypeSupport, qos::Profile};
 use std::{borrow::Cow, marker::PhantomData, sync::Arc};
 use zenoh::Wait;
 use zenoh_ext::AdvancedSubscriberBuilderExt;
@@ -194,7 +194,7 @@ impl<T: TypeSupport> Subscriber<T> {
     ///
     /// Returns an error if deserialization fails or the message has a
     /// missing/invalid attachment.
-    pub fn try_recv(&mut self) -> Result<Option<Message<T>>> {
+    pub fn try_recv(&self) -> Result<Option<Message<T>>> {
         match self.receiver.try_recv() {
             Ok(sample) => {
                 let data = T::from_bytes(&sample.payload().to_bytes())?;
@@ -237,10 +237,10 @@ impl<T: TypeSupport> oxidros_core::api::RosSubscriber<T> for Subscriber<T> {
     }
 
     async fn recv(&mut self) -> Result<Message<T>> {
-        self.recv().await
+        Self::recv(self).await
     }
 
     fn try_recv(&mut self) -> Result<Option<Message<T>>> {
-        self.try_recv()
+        Self::try_recv(self)
     }
 }

@@ -84,7 +84,7 @@ impl Selector {
     /// The handler will be called whenever a message arrives on the topic.
     pub fn add_subscriber<T: TypeSupport + 'static>(
         &mut self,
-        mut subscriber: Subscriber<T>,
+        subscriber: Subscriber<T>,
         mut handler: Box<dyn FnMut(Message<T>)>,
     ) -> bool {
         // Create a closure that tries to receive and call the handler

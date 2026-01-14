@@ -204,8 +204,9 @@ pub mod prelude;
 #[cfg(all(feature = "rcl", not(feature = "zenoh")))]
 pub use oxidros_rcl::{self, action, clock, logger, service, topic};
 
+// Re-export the selected backend
 #[cfg(all(feature = "zenoh", not(feature = "rcl")))]
-pub use oxidros_zenoh;
+pub use oxidros_zenoh::{self, logger, service, topic};
 
 // Always re-export core types and traits
 pub use oxidros_core::{self, error};
