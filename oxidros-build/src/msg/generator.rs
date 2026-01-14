@@ -8,6 +8,8 @@ use std::collections::HashSet;
 use std::env;
 use std::path::{Path, PathBuf};
 
+use crate::msg::is_ros2_env;
+
 use super::callbacks::RosCallbacks;
 use super::config::Config;
 
@@ -208,7 +210,9 @@ pub fn get_base_generator(config: &Config) -> Option<Generator> {
                     let files = collect_interface_files(path);
                     if !files.is_empty() {
                         // Only emit link directives for packages that have interface files
-                        emit_ros_idl(&pkg_name);
+                        if is_ros2_env() {
+                            emit_ros_idl(&pkg_name);
+                        }
                         packages_found.push(pkg_name.to_string());
                         all_files.extend(files);
                     }
@@ -221,7 +225,9 @@ pub fn get_base_generator(config: &Config) -> Option<Generator> {
         println!("cargo:warning=No interface files found in search paths");
         return None;
     }
-    config.print_packages_search_pathes();
+    if is_ros2_env() {
+        config.print_packages_search_pathes();
+    }
     println!(
         "cargo:info=Found {} interface files from {} packages",
         all_files.len(),

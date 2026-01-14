@@ -431,47 +431,17 @@ fn generate_pure_impl(opts: &Ros2TypeOpts, field_opts: &[Ros2FieldOpts]) -> Toke
     let name = &opts.ident;
 
     // Generate Default implementation
+    // Note: The `#[ros2(default = "...")]` attribute is for TypeDescription metadata only,
+    // not for generating Default impl. This matches the rcl behavior where Default calls
+    // the C library's init function (which handles defaults internally).
+    // For pure Rust, we just use Default::default() for all fields.
     let default_fields: Vec<_> = field_opts
         .iter()
         .map(|f| {
             let field_name = f.ident.as_ref().unwrap();
-            if let Some(ref default_val) = f.default {
-                // Check if this is a string/wstring field - these need special handling
-                // because the default value is the raw string content, not Rust syntax
-                if f.string || f.wstring {
-                    // For string types, create a proper string literal and call .into()
-                    let default_expr = quote! { #default_val.into() };
-                    return quote! { #field_name: #default_expr };
-                }
-
-                // Parse the default value - handle type coercion for floats
-                let ty = &f.ty;
-                let is_float = if let syn::Type::Path(tp) = ty {
-                    tp.path
-                        .segments
-                        .last()
-                        .map(|s| s.ident == "f32" || s.ident == "f64")
-                        .unwrap_or(false)
-                } else {
-                    false
-                };
-
-                // For floats, ensure the literal has a decimal point
-                let coerced_val = if is_float && !default_val.contains('.') {
-                    format!("{}.0", default_val)
-                } else {
-                    default_val.clone()
-                };
-
-                let default_expr: TokenStream = coerced_val.parse().unwrap_or_else(|_| {
-                    quote! { Default::default() }
-                });
-                quote! { #field_name: #default_expr }
-            } else {
-                // Check if the type is a large array (size > 32) which doesn't impl Default
-                let default_expr = get_default_expr_for_type(&f.ty);
-                quote! { #field_name: #default_expr }
-            }
+            // Check if the type is a large array (size > 32) which doesn't impl Default
+            let default_expr = get_default_expr_for_type(&f.ty);
+            quote! { #field_name: #default_expr }
         })
         .collect();
 

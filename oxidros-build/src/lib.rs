@@ -49,6 +49,8 @@ use std::{
     env::{self, VarError},
     path::{Path, PathBuf},
 };
+
+use crate::msg::is_ros2_env;
 pub mod msg;
 
 // use bindgen::callbacks::ParseCallbacks;
@@ -374,6 +376,9 @@ pub fn get_paths_from_env(key: &str) -> Result<Vec<PathBuf>, VarError> {
 /// oxidros_build::link_rcl_ros2_libs();
 /// ```
 pub fn link_rcl_ros2_libs() {
+    if !is_ros2_env() {
+        return;
+    }
     // Link only RCL core libraries (not message libraries - those are in oxidros-msg)
     println!("cargo:rustc-link-lib=rcl");
     println!("cargo:rustc-link-lib=rcl_action");
@@ -551,6 +556,9 @@ pub fn generate_runtime_c(out_dir: &Path) {
 /// oxidros_build::link_msg_ros2_libs(); // Links message libraries
 /// ```
 pub fn link_msg_ros2_libs() {
+    if !is_ros2_env() {
+        return;
+    }
     // Note: Core RCL libraries and library search paths are handled by oxidros-rcl
     // This only links rosidl_runtime_c and message-specific libraries
     println!("cargo:rustc-link-lib=rosidl_runtime_c");

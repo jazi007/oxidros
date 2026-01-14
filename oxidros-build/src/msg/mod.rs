@@ -72,6 +72,10 @@ mod callbacks;
 mod config;
 mod generator;
 
+pub(crate) fn is_ros2_env() -> bool {
+    std::env::var("ROS_DISTRO").is_ok()
+}
+
 // Re-export public API
 pub use config::{Config, ConfigBuilder};
 pub use generator::{generate_msgs, generate_msgs_with_config, get_base_generator};
