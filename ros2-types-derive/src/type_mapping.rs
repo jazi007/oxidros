@@ -62,14 +62,9 @@ pub fn is_nested_type(ty: &Type) -> bool {
                     return false;
                 }
 
-                // If it's a complex path (like std_msgs::msg::string::String)
-                // it's definitely a nested type, not a primitive
-                if type_path.path.segments.len() > 1 {
-                    return true;
-                }
-
-                // Check if it's NOT a primitive or standard type
-                !matches!(
+                // Check if it's a primitive or standard type by name FIRST
+                // (before checking path length, since oxidros_msg::msg::RosString is still a primitive)
+                if matches!(
                     type_name.as_str(),
                     "i8" | "u8"
                         | "i16"
@@ -86,7 +81,20 @@ pub fn is_nested_type(ty: &Type) -> bool {
                         | "c_char"
                         | "c_schar"
                         | "c_uchar"
-                )
+                        | "RosString"
+                        | "RosWString"
+                ) {
+                    return false;
+                }
+
+                // If it's a complex path (like std_msgs::msg::string::String)
+                // it's a nested type
+                if type_path.path.segments.len() > 1 {
+                    return true;
+                }
+
+                // Single-segment type that's not in the primitive list - it's nested
+                true
             } else {
                 false
             }

@@ -175,13 +175,9 @@ impl Config {
     pub fn get_share_paths(&self) -> Vec<PathBuf> {
         self.get_search_paths()
             .into_iter()
-            .filter_map(|p| {
+            .map(|p| {
                 let share_path = p.join("share");
-                if share_path.exists() {
-                    Some(share_path)
-                } else {
-                    None
-                }
+                if share_path.exists() { share_path } else { p }
             })
             .collect()
     }

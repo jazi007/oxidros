@@ -436,6 +436,14 @@ fn generate_pure_impl(opts: &Ros2TypeOpts, field_opts: &[Ros2FieldOpts]) -> Toke
         .map(|f| {
             let field_name = f.ident.as_ref().unwrap();
             if let Some(ref default_val) = f.default {
+                // Check if this is a string/wstring field - these need special handling
+                // because the default value is the raw string content, not Rust syntax
+                if f.string || f.wstring {
+                    // For string types, create a proper string literal and call .into()
+                    let default_expr = quote! { #default_val.into() };
+                    return quote! { #field_name: #default_expr };
+                }
+
                 // Parse the default value - handle type coercion for floats
                 let ty = &f.ty;
                 let is_float = if let syn::Type::Path(tp) = ty {

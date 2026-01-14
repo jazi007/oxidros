@@ -661,7 +661,14 @@ impl Generator {
                     .map_or(super::InterfaceKind::Message, |c| c.interface_kind);
 
                 let mut module_names = Vec::new();
+                let mut seen_modules: std::collections::HashSet<String> =
+                    std::collections::HashSet::new();
                 for code in type_codes {
+                    // Deduplicate: skip if we've already processed a module with this name
+                    // This can happen when the same package exists in multiple search paths
+                    if !seen_modules.insert(code.module_name.clone()) {
+                        continue;
+                    }
                     let output_path = type_dir.join(format!("{}.rs", code.module_name));
                     code.write_to_file(output_path)?;
                     module_names.push(code.module_name.clone());

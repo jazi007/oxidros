@@ -140,15 +140,19 @@ fn scan_ros_interfaces(
                     let file_path = file_entry.path();
 
                     if let Some(ext) = file_path.extension()
-                        && ext == *interface_type
                         && let Some(file_name) = file_path.file_stem().and_then(|n| n.to_str())
                     {
-                        discovered.push(DiscoveredType {
-                            file_path: file_path.to_string_lossy().to_string(),
-                            package: package_name.clone(),
-                            interface_type: interface_type.to_string(),
-                            name: file_name.to_string(),
-                        });
+                        // Accept files with extension matching the interface type (e.g., .msg in msg/)
+                        // or .idl files in any interface directory
+                        let ext_str = ext.to_str().unwrap_or("");
+                        if ext_str == *interface_type || ext_str == "idl" {
+                            discovered.push(DiscoveredType {
+                                file_path: file_path.to_string_lossy().to_string(),
+                                package: package_name.clone(),
+                                interface_type: interface_type.to_string(),
+                                name: file_name.to_string(),
+                            });
+                        }
                     }
                 }
             }
@@ -174,9 +178,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Discover all interface files
     let mut discovered = scan_ros_interfaces(&share_dir)?;
-    if let Ok(paths) = scan_ros_interfaces(&PathBuf::from("/home/renault/github/ros2-msg")) {
+    if let Ok(paths) = scan_ros_interfaces(&PathBuf::from("~/github/ros2-msg")) {
         discovered.extend(paths);
     }
+
+    // Deduplicate by package/interface_type/name key, preferring entries from ros2-msg over ROS share
+    let mut seen_keys: std::collections::HashSet<String> = std::collections::HashSet::new();
+    // Reverse to prefer ros2-msg (appended last) over share_dir entries
+    discovered.reverse();
+    discovered.retain(|d| {
+        let key = format!("{}/{}/{}", d.package, d.interface_type, d.name);
+        seen_keys.insert(key)
+    });
+    // Restore original order
+    discovered.reverse();
 
     if discovered.is_empty() {
         println!(

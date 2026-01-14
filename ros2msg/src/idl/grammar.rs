@@ -71,6 +71,23 @@ fn collect_typedefs(definitions: &[parser_pest::IdlDefinition]) -> HashMap<Strin
         }
     }
 
+    // Resolve chained typedefs: if typedef A points to typedef B, resolve A to B's target
+    // Repeat until no more changes to handle multi-level chains
+    let mut changed = true;
+    while changed {
+        changed = false;
+        let keys: Vec<_> = typedefs.keys().cloned().collect();
+        for key in keys {
+            let mut resolved = typedefs.get(&key).cloned().unwrap();
+            let original = resolved.clone();
+            resolve_typedef(&mut resolved, &typedefs);
+            if resolved != original {
+                typedefs.insert(key, resolved);
+                changed = true;
+            }
+        }
+    }
+
     typedefs
 }
 

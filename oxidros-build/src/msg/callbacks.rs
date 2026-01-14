@@ -129,7 +129,9 @@ impl ParseCallbacks for RosCallbacks {
 
         // Add default value if present
         if let Some(default_value) = field_info.default_value() {
-            ros2_parts.push(format!("default = \"{}\"", default_value));
+            // Escape quotes and backslashes in the default value
+            let escaped = default_value.replace('\\', "\\\\").replace('"', "\\\"");
+            ros2_parts.push(format!("default = \"{}\"", escaped));
         }
 
         if !ros2_parts.is_empty() {
