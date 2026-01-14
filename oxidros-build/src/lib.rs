@@ -287,13 +287,13 @@ fn print_all_libs(path: std::path::PathBuf) {
                 .map(|e| e.unwrap().path())
                 .filter(|p| p.is_file() && p.extension().is_some())
             {
-                if let Some(p) = pp.to_str() {
-                    if p.ends_with("_c.lib") {
-                        println!(
-                            "cargo:rustc-link-lib={}",
-                            pp.file_stem().unwrap().to_str().unwrap()
-                        );
-                    }
+                if let Some(p) = pp.to_str()
+                    && p.ends_with("_c.lib")
+                {
+                    println!(
+                        "cargo:rustc-link-lib={}",
+                        pp.file_stem().unwrap().to_str().unwrap()
+                    );
                 }
             }
         }

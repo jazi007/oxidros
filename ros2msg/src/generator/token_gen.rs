@@ -18,8 +18,10 @@ use std::str::FromStr;
 /// - `libc::c_char`
 /// - `super::super::pkg::msg::Type`
 pub(super) fn parse_type(type_str: &str) -> TokenStream {
-    // Handle comments in type strings (e.g., "Vec<u8> /* max_size: 10 */")
-    let type_str = type_str.split("/*").next().unwrap_or(type_str).trim();
+    // Remove comments from type strings (e.g., "Vec<u8> /* max_size: 10 */")
+    // Handle multiple comments and comments embedded in array types
+    let type_str = remove_comments(type_str);
+    let type_str = type_str.trim();
 
     // Try to parse directly - this handles most cases
     if let Ok(tokens) = TokenStream::from_str(type_str) {
@@ -29,6 +31,29 @@ pub(super) fn parse_type(type_str: &str) -> TokenStream {
     // Fallback: create as identifier (shouldn't happen with valid types)
     let ident = Ident::new(type_str, Span::call_site());
     quote! { #ident }
+}
+
+/// Remove all /* */ comments from a string, preserving the rest
+fn remove_comments(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        if c == '/' && chars.peek() == Some(&'*') {
+            // Skip the '*' and everything until '*/'
+            chars.next(); // consume '*'
+            while let Some(c2) = chars.next() {
+                if c2 == '*' && chars.peek() == Some(&'/') {
+                    chars.next(); // consume '/'
+                    break;
+                }
+            }
+        } else {
+            result.push(c);
+        }
+    }
+
+    result
 }
 
 /// Parse a derive name into an identifier

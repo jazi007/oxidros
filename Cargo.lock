@@ -2326,18 +2326,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ros2-types-example"
-version = "0.1.0"
-dependencies = [
- "heck",
- "ros2-types",
- "ros2msg",
- "serde",
- "serde-big-array",
- "serde_json",
-]
-
-[[package]]
 name = "ros2args"
 version = "0.1.0"
 dependencies = [
@@ -3370,6 +3358,18 @@ name = "twox-hash"
 version = "2.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ea3136b675547379c4bd395ca6b938e5ad3c3d20fad76e7fe85f9e0d011419c"
+
+[[package]]
+name = "type_hash_validation"
+version = "0.1.0"
+dependencies = [
+ "heck",
+ "ros2-types",
+ "ros2msg",
+ "serde",
+ "serde-big-array",
+ "serde_json",
+]
 
 [[package]]
 name = "typeid"

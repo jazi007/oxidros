@@ -398,7 +398,7 @@ impl From<rmw_message_info_t> for oxidros_core::message::MessageInfo {
         Self {
             sequence_number: value.publication_sequence_number as i64,
             source_timestamp_ns: value.source_timestamp,
-            publisher_gid: to_gid(value.publisher_gid.data),
+            publisher_gid: value.publisher_gid.data,
         }
     }
 }
@@ -421,7 +421,7 @@ impl From<rmw_service_info_t> for oxidros_core::message::MessageInfo {
         Self {
             sequence_number: value.request_id.sequence_number,
             source_timestamp_ns: value.source_timestamp,
-            publisher_gid: to_gid(value.request_id.writer_guid),
+            publisher_gid: value.request_id.writer_guid,
         }
     }
 }

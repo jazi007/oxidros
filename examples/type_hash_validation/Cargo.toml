@@ -1,5 +1,5 @@
 [package]
-name = "ros2-types-example"
+name = "type_hash_validation"
 version = "0.1.0"
 edition = "2024"
 publish = false

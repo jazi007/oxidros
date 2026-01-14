@@ -69,7 +69,9 @@ impl ParseCallbacks for TypeDescCallbacks {
 
         // Add default value if present
         if let Some(default_value) = field_info.default_value() {
-            ros2_parts.push(format!("default = \"{}\"", default_value));
+            // Escape quotes and backslashes in the default value
+            let escaped = default_value.replace('\\', "\\\\").replace('"', "\\\"");
+            ros2_parts.push(format!("default = \"{}\"", escaped));
         }
 
         if !ros2_parts.is_empty() {
@@ -96,7 +98,7 @@ struct DiscoveredType {
 
 /// Recursively scan a directory for .msg, .srv, and .action files
 fn scan_ros_interfaces(
-    share_dir: &Path,
+    share_dir: &PathBuf,
 ) -> Result<Vec<DiscoveredType>, Box<dyn std::error::Error>> {
     let mut discovered = Vec::new();
 
@@ -172,6 +174,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Discover all interface files
     let mut discovered = scan_ros_interfaces(&share_dir)?;
+    if let Ok(paths) = scan_ros_interfaces(&PathBuf::from("/home/renault/github/ros2-msg")) {
+        discovered.extend(paths);
+    }
 
     if discovered.is_empty() {
         println!(
