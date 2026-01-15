@@ -113,15 +113,20 @@ impl Config {
     /// Parses the AMENT_PREFIX_PATH environment variable.
     ///
     /// Returns `None` if the variable is not set or is empty.
+    /// Preserves the original order from AMENT_PREFIX_PATH (overlay workspaces first).
     fn get_ament_prefix_paths() -> Option<Vec<PathBuf>> {
         let path = env::var("AMENT_PREFIX_PATH").ok()?;
         if path.is_empty() {
             return None;
         }
 
-        let mut paths: Vec<PathBuf> = env::split_paths(&path).filter(|p| p.exists()).collect();
-        paths.sort();
-        paths.dedup();
+        // Preserve order from AMENT_PREFIX_PATH - overlay workspaces come first
+        let mut paths: Vec<PathBuf> = Vec::new();
+        for p in env::split_paths(&path) {
+            if p.exists() && !paths.contains(&p) {
+                paths.push(p);
+            }
+        }
 
         if paths.is_empty() { None } else { Some(paths) }
     }
@@ -260,15 +265,20 @@ impl Config {
     /// Parses the CMAKE_PREFIX_PATH environment variable (Windows only).
     ///
     /// Returns `None` if the variable is not set or is empty.
+    /// Preserves the original order from CMAKE_PREFIX_PATH.
     fn get_cmake_prefix_paths() -> Option<Vec<PathBuf>> {
         let path = env::var("CMAKE_PREFIX_PATH").ok()?;
         if path.is_empty() {
             return None;
         }
 
-        let mut paths: Vec<PathBuf> = env::split_paths(&path).filter(|p| p.exists()).collect();
-        paths.sort();
-        paths.dedup();
+        // Preserve order from CMAKE_PREFIX_PATH
+        let mut paths: Vec<PathBuf> = Vec::new();
+        for p in env::split_paths(&path) {
+            if p.exists() && !paths.contains(&p) {
+                paths.push(p);
+            }
+        }
 
         if paths.is_empty() { None } else { Some(paths) }
     }

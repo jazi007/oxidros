@@ -53,6 +53,73 @@ use std::{
 use crate::msg::is_ros2_env;
 pub mod msg;
 
+/// Required ROS2 packages for RCL bindings generation.
+const RCL_REQUIRED_PACKAGES: &[&str] = &[
+    "rcl",
+    "rcutils",
+    "rmw",
+    "rcl_yaml_param_parser",
+    "rosidl_runtime_c",
+    "rosidl_typesupport_interface",
+    "rcl_action",
+    "action_msgs",
+    "unique_identifier_msgs",
+    "builtin_interfaces",
+    "rosidl_dynamic_typesupport",
+    "service_msgs",
+    "type_description_interfaces",
+];
+
+/// Required ROS2 packages for message bindings generation.
+const MSG_REQUIRED_PACKAGES: &[&str] = &[
+    "rosidl_runtime_c",
+    "builtin_interfaces",
+    "rosidl_typesupport_interface",
+    "rmw",
+    "rosidl_dynamic_typesupport",
+    "rcutils",
+];
+
+/// Collects all include paths for specific ROS2 packages from AMENT_PREFIX_PATH.
+///
+/// This function searches through all paths in AMENT_PREFIX_PATH and collects
+/// include paths for the specified packages. This handles overlay workspaces
+/// where custom packages may shadow system packages.
+///
+/// # Arguments
+///
+/// * `packages` - A slice of package names to find include paths for
+///
+/// # Returns
+///
+/// A vector of include paths (e.g., `/opt/ros/jazzy/include/rcl`) for each
+/// package found. Paths are returned in AMENT_PREFIX_PATH order (overlay first).
+fn collect_include_paths(packages: &[&str]) -> Vec<PathBuf> {
+    let Ok(ament_prefix_path) = env::var("AMENT_PREFIX_PATH") else {
+        return Vec::new();
+    };
+
+    let mut include_paths = Vec::new();
+
+    // Iterate through all paths in AMENT_PREFIX_PATH
+    for prefix_path in env::split_paths(&ament_prefix_path) {
+        let include_dir = prefix_path.join("include");
+        if !include_dir.exists() {
+            continue;
+        }
+
+        // For each required package, check if it exists in this include directory
+        for pkg in packages {
+            let pkg_include = include_dir.join(pkg);
+            if pkg_include.exists() && !include_paths.contains(&pkg_include) {
+                include_paths.push(pkg_include);
+            }
+        }
+    }
+
+    include_paths
+}
+
 // use bindgen::callbacks::ParseCallbacks;
 
 // #[derive(Debug)]
@@ -177,20 +244,12 @@ pub fn builder_base() -> bindgen::Builder {
 /// // include!(concat!(env!("OUT_DIR"), "/rcl.rs"));
 /// ```
 pub fn generate_rcl_bindings(out_dir: &Path) {
-    // Get ROS include paths from AMENT_PREFIX_PATH
-    let Ok(ament_prefix_path) = env::var("AMENT_PREFIX_PATH") else {
+    // Collect all include paths for required RCL packages from AMENT_PREFIX_PATH
+    let include_paths = collect_include_paths(RCL_REQUIRED_PACKAGES);
+    if include_paths.is_empty() {
+        // No ROS2 environment, skip binding generation
         return;
-    };
-    let ros_include = env::split_paths(&ament_prefix_path)
-        .find_map(|path| {
-            let include_path = path.join("include");
-            if include_path.exists() {
-                Some(include_path)
-            } else {
-                None
-            }
-        })
-        .expect("Could not find ROS2 include directory in AMENT_PREFIX_PATH");
+    }
 
     // Create a C header that includes all RCL headers
     let rcl_c_content = r#"
@@ -206,42 +265,15 @@ pub fn generate_rcl_bindings(out_dir: &Path) {
     let wrapper_path = out_dir.join("rcl_wrapper.h");
     std::fs::write(&wrapper_path, rcl_c_content).expect("Failed to write RCL wrapper header");
 
-    let bindings = builder_base()
-        .header(wrapper_path.to_str().unwrap())
-        .clang_arg(format!("-I{}", ros_include.join("rcl").display()))
-        .clang_arg(format!("-I{}", ros_include.join("rcutils").display()))
-        .clang_arg(format!("-I{}", ros_include.join("rmw").display()))
-        .clang_arg(format!(
-            "-I{}",
-            ros_include.join("rcl_yaml_param_parser").display()
-        ))
-        .clang_arg(format!(
-            "-I{}",
-            ros_include.join("rosidl_runtime_c").display()
-        ))
-        .clang_arg(format!(
-            "-I{}",
-            ros_include.join("rosidl_typesupport_interface").display()
-        ))
-        .clang_arg(format!("-I{}", ros_include.join("rcl_action").display()))
-        .clang_arg(format!("-I{}", ros_include.join("action_msgs").display()))
-        .clang_arg(format!(
-            "-I{}",
-            ros_include.join("unique_identifier_msgs").display()
-        ))
-        .clang_arg(format!(
-            "-I{}",
-            ros_include.join("builtin_interfaces").display()
-        ))
-        .clang_arg(format!(
-            "-I{}",
-            ros_include.join("rosidl_dynamic_typesupport").display()
-        ))
-        .clang_arg(format!("-I{}", ros_include.join("service_msgs").display()))
-        .clang_arg(format!(
-            "-I{}",
-            ros_include.join("type_description_interfaces").display()
-        ))
+    // Start building bindings with the header
+    let mut builder = builder_base().header(wrapper_path.to_str().unwrap());
+
+    // Add all collected include paths
+    for include_path in &include_paths {
+        builder = builder.clang_arg(format!("-I{}", include_path.display()));
+    }
+
+    let bindings = builder
         .allowlist_type("rcl_.*")
         .allowlist_function("rcl_.*")
         .allowlist_var("rcl_.*")
@@ -340,9 +372,13 @@ fn print_all_libs(_path: std::path::PathBuf) {}
 /// ```
 pub fn get_paths_from_env(key: &str) -> Result<Vec<PathBuf>, VarError> {
     let path = env::var(key)?;
-    let mut paths: Vec<_> = env::split_paths(&path).collect();
-    paths.sort();
-    paths.dedup();
+    // Preserve order from environment variable - overlay workspaces come first
+    let mut paths: Vec<PathBuf> = Vec::new();
+    for p in env::split_paths(&path) {
+        if !paths.contains(&p) {
+            paths.push(p);
+        }
+    }
     Ok(paths)
 }
 
@@ -444,20 +480,12 @@ pub fn link_rcl_ros2_libs() {
 /// // include!(concat!(env!("OUT_DIR"), "/runtime_c.rs"));
 /// ```
 pub fn generate_runtime_c(out_dir: &Path) {
-    // Get ROS include paths from AMENT_PREFIX_PATH
-    let Ok(ros_include) = get_paths_from_env("AMENT_PREFIX_PATH") else {
+    // Collect all include paths for required message packages from AMENT_PREFIX_PATH
+    let include_paths = collect_include_paths(MSG_REQUIRED_PACKAGES);
+    if include_paths.is_empty() {
+        // No ROS2 environment, skip binding generation
         return;
-    };
-    let Some(ros_include) = ros_include.iter().find_map(|path| {
-        let include_path = Path::new(path).join("include");
-        if include_path.exists() {
-            Some(include_path)
-        } else {
-            None
-        }
-    }) else {
-        return;
-    };
+    }
 
     // Create a simple C header to bind
     let msg_c_content = r#"
@@ -480,27 +508,17 @@ pub fn generate_runtime_c(out_dir: &Path) {
     let wrapper_path = out_dir.join("msg_wrapper.h");
     std::fs::write(&wrapper_path, msg_c_content).expect("Failed to write wrapper header");
 
-    let bindings = builder_base()
+    // Start building bindings with the header
+    let mut builder = builder_base()
         .header(wrapper_path.to_str().unwrap())
-        .derive_copy(false)
-        .clang_arg(format!(
-            "-I{}",
-            ros_include.join("rosidl_runtime_c").display()
-        ))
-        .clang_arg(format!(
-            "-I{}",
-            ros_include.join("builtin_interfaces").display()
-        ))
-        .clang_arg(format!(
-            "-I{}",
-            ros_include.join("rosidl_typesupport_interface").display()
-        ))
-        .clang_arg(format!("-I{}", ros_include.join("rmw").display()))
-        .clang_arg(format!(
-            "-I{}",
-            ros_include.join("rosidl_dynamic_typesupport").display()
-        ))
-        .clang_arg(format!("-I{}", ros_include.join("rcutils").display()))
+        .derive_copy(false);
+
+    // Add all collected include paths
+    for include_path in &include_paths {
+        builder = builder.clang_arg(format!("-I{}", include_path.display()));
+    }
+
+    let bindings = builder
         .allowlist_type("rosidl_.*")
         .allowlist_function("rosidl_.*")
         .allowlist_function("rmw_deserialize")
