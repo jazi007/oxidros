@@ -403,16 +403,32 @@ fn test_generator_ctypes_prefix() {
     let temp_dir = TempDir::new().unwrap();
     let output_dir = temp_dir.path().join("generated");
 
-    let msg_file = create_test_msg_file(&temp_dir, "test_msgs", "WithChar", "char c\n");
+    // Create an IDL file with actual IDL 'char' type (not .msg 'char' which is uint8)
+    // IDL 'char' is a signed 8-bit character type that maps to c_char
+    let idl_dir = temp_dir.path().join("test_msgs").join("msg");
+    fs::create_dir_all(&idl_dir).unwrap();
+    let idl_file = idl_dir.join("WithChar.idl");
+    fs::write(
+        &idl_file,
+        r#"module test_msgs {
+  module msg {
+    struct WithChar {
+      char c;
+    };
+  };
+};
+"#,
+    )
+    .unwrap();
 
     let result = Generator::new()
         .derive_debug(true)
         .ctypes_prefix("libc")
-        .include(msg_file.to_str().unwrap())
+        .include(idl_file.to_str().unwrap())
         .output_dir(output_dir.to_str().unwrap())
         .generate();
 
-    assert!(result.is_ok());
+    assert!(result.is_ok(), "Failed to generate: {:?}", result.err());
 
     let generated_file = output_dir
         .join("test_msgs")
@@ -420,7 +436,11 @@ fn test_generator_ctypes_prefix() {
         .join("with_char.rs");
     let content = fs::read_to_string(&generated_file).unwrap();
 
-    assert!(content.contains("libc::c_char"));
+    assert!(
+        content.contains("libc::c_char"),
+        "Expected libc::c_char but got:\n{}",
+        content
+    );
 }
 
 #[test]

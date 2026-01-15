@@ -114,6 +114,7 @@ impl GeneratorConfig {
                 array_size,
                 None, // ros2_type_override not available in this context
                 None, // capacity not available in this context
+                None, // string_capacity not available in this context
                 None, // default_value not available in this context
             );
             if let Some(transformed) = cb.field_name(&info) {

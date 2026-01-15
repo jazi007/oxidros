@@ -881,3 +881,64 @@ pub use rcl_impl::*;
 
 #[cfg(not(feature = "rcl"))]
 pub use non_rcl_impl::*;
+
+// ============================================================================
+// RosFieldType implementations for string types
+// ============================================================================
+
+use ros2_types::RosFieldType;
+use ros2_types::types::FieldType;
+
+impl<const N: usize> RosFieldType for RosString<N> {
+    fn ros_field_type() -> FieldType {
+        if N == 0 {
+            FieldType::primitive(ros2_types::FIELD_TYPE_STRING)
+        } else {
+            FieldType::bounded_string(N as u64)
+        }
+    }
+}
+
+impl<const N: usize> RosFieldType for RosWString<N> {
+    fn ros_field_type() -> FieldType {
+        if N == 0 {
+            FieldType::primitive(ros2_types::FIELD_TYPE_WSTRING)
+        } else {
+            FieldType::bounded_wstring(N as u64)
+        }
+    }
+}
+
+impl<const STRLEN: usize, const SEQLEN: usize> RosFieldType for RosStringSeq<STRLEN, SEQLEN> {
+    fn ros_field_type() -> FieldType {
+        // STRLEN=0 means unbounded string, STRLEN>0 means bounded string
+        // SEQLEN=0 means unbounded sequence, SEQLEN>0 means bounded sequence
+        let type_id = if STRLEN == 0 {
+            ros2_types::FIELD_TYPE_STRING
+        } else {
+            ros2_types::FIELD_TYPE_BOUNDED_STRING
+        };
+
+        if SEQLEN == 0 {
+            FieldType::sequence_with_string_capacity(type_id, STRLEN as u64)
+        } else {
+            FieldType::bounded_sequence_with_string_capacity(type_id, SEQLEN as u64, STRLEN as u64)
+        }
+    }
+}
+
+impl<const STRLEN: usize, const SEQLEN: usize> RosFieldType for RosWStringSeq<STRLEN, SEQLEN> {
+    fn ros_field_type() -> FieldType {
+        let type_id = if STRLEN == 0 {
+            ros2_types::FIELD_TYPE_WSTRING
+        } else {
+            ros2_types::FIELD_TYPE_BOUNDED_WSTRING
+        };
+
+        if SEQLEN == 0 {
+            FieldType::sequence_with_string_capacity(type_id, STRLEN as u64)
+        } else {
+            FieldType::bounded_sequence_with_string_capacity(type_id, SEQLEN as u64, STRLEN as u64)
+        }
+    }
+}

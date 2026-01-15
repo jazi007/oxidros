@@ -158,6 +158,18 @@ mod rcl_impl {
         rosidl_runtime_c__uint8__Sequence__copy
     );
 
+    // ByteSeq uses ROS2 byte/octet FFI - distinct from U8Seq for type hash purposes
+    // ROS2 byte (type_id 16) vs uint8 (type_id 7) have different type hashes
+    def_sequence!(
+        ByteSeq,
+        u8,
+        rosidl_runtime_c__octet__Sequence,
+        rosidl_runtime_c__octet__Sequence__init,
+        rosidl_runtime_c__octet__Sequence__fini,
+        rosidl_runtime_c__octet__Sequence__are_equal,
+        rosidl_runtime_c__octet__Sequence__copy
+    );
+
     def_sequence!(
         I8Seq,
         i8,
@@ -167,7 +179,6 @@ mod rcl_impl {
         rosidl_runtime_c__int8__Sequence__are_equal,
         rosidl_runtime_c__int8__Sequence__copy
     );
-
     def_sequence!(
         U16Seq,
         u16,
@@ -341,6 +352,7 @@ mod non_rcl_impl {
     def_sequence!(F32Seq, f32);
     def_sequence!(F64Seq, f64);
     def_sequence!(U8Seq, u8);
+    def_sequence!(ByteSeq, u8); // Distinct from U8Seq for ROS2 type hash (byte vs uint8)
     def_sequence!(I8Seq, i8);
     def_sequence!(U16Seq, u16);
     def_sequence!(I16Seq, i16);
@@ -417,3 +429,37 @@ mod tests {
         assert_eq!(v1, v2);
     }
 }
+
+// ============================================================================
+// RosFieldType implementations for primitive sequences
+// ============================================================================
+
+use ros2_types::RosFieldType;
+use ros2_types::types::FieldType;
+
+macro_rules! impl_ros_field_type_seq {
+    ($ty:ident, $type_id:ident) => {
+        impl<const N: usize> RosFieldType for $ty<N> {
+            fn ros_field_type() -> FieldType {
+                if N == 0 {
+                    FieldType::sequence(ros2_types::$type_id)
+                } else {
+                    FieldType::bounded_sequence(ros2_types::$type_id, N as u64)
+                }
+            }
+        }
+    };
+}
+
+impl_ros_field_type_seq!(BoolSeq, FIELD_TYPE_BOOLEAN);
+impl_ros_field_type_seq!(I8Seq, FIELD_TYPE_INT8);
+impl_ros_field_type_seq!(U8Seq, FIELD_TYPE_UINT8);
+impl_ros_field_type_seq!(ByteSeq, FIELD_TYPE_BYTE);
+impl_ros_field_type_seq!(I16Seq, FIELD_TYPE_INT16);
+impl_ros_field_type_seq!(U16Seq, FIELD_TYPE_UINT16);
+impl_ros_field_type_seq!(I32Seq, FIELD_TYPE_INT32);
+impl_ros_field_type_seq!(U32Seq, FIELD_TYPE_UINT32);
+impl_ros_field_type_seq!(I64Seq, FIELD_TYPE_INT64);
+impl_ros_field_type_seq!(U64Seq, FIELD_TYPE_UINT64);
+impl_ros_field_type_seq!(F32Seq, FIELD_TYPE_FLOAT);
+impl_ros_field_type_seq!(F64Seq, FIELD_TYPE_DOUBLE);

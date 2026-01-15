@@ -259,6 +259,26 @@ fn generate_common_impl(opts: &Ros2TypeOpts) -> TokenStream {
                 <#name as ros2_types::TypeDescription>::message_type_name()
             }
         }
+
+        /// RosFieldType for sequence types - enables using XxxSeq<N> as fields in other messages.
+        /// N=0 means unbounded sequence, N>0 means bounded sequence with capacity N.
+        impl<const N: usize> ros2_types::RosFieldType for #seq_type<N> {
+            fn ros_field_type() -> ros2_types::types::FieldType {
+                let nested_name = <#name as ros2_types::TypeDescription>::message_type_name();
+                let type_name = format!("{}/{}/{}", nested_name.package, nested_name.message_type, nested_name.type_name);
+                if N == 0 {
+                    // Unbounded sequence
+                    ros2_types::types::FieldType::nested_sequence(&type_name)
+                } else {
+                    // Bounded sequence with capacity N
+                    ros2_types::types::FieldType::nested_bounded_sequence(&type_name, N as u64)
+                }
+            }
+
+            fn referenced_types() -> Vec<ros2_types::types::IndividualTypeDescription> {
+                <#name as ros2_types::RosFieldType>::referenced_types()
+            }
+        }
     }
 }
 

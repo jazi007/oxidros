@@ -77,56 +77,21 @@ impl ParseCallbacks for RosCallbacks {
     /// we use `serde_big_array::BigArray` which is re-exported as `ros2_types::BigArray`.
     fn add_field_attributes(&self, field_info: &FieldInfo) -> Vec<String> {
         let mut attrs = Vec::new();
+        let rust_type = field_info.field_type();
+
+        // Types that implement RosFieldType don't need ros2_type annotations
+        // because they already know their ROS2 type (ByteSeq, Seq<, RosString<, RosWString<)
+        let has_ros_field_type = rust_type.contains("Seq<")
+            || rust_type.contains("RosString<")
+            || rust_type.contains("RosWString<");
 
         // Build #[ros2(...)] attributes for type hash metadata
         let mut ros2_parts = Vec::new();
 
-        // Add type override if present
-        if let Some(type_override) = field_info.ros2_type_override() {
+        // Add type override if present (but not for types with RosFieldType)
+        if !has_ros_field_type && let Some(type_override) = field_info.ros2_type_override() {
             ros2_parts.push(format!("ros2_type = \"{}\"", type_override));
         }
-
-        // If the field is a sequence (not a fixed-size array), mark it explicitly
-        // so derives know. Fixed-size arrays have `array_size()` set and are
-        // represented as arrays in ROS2, not sequences.
-        //
-        // Detection methods:
-        // 1. ROS type name starts with "sequence" (explicit IDL sequence)
-        // 2. Has capacity but no array_size (bounded sequence)
-        // 3. Rust field type is Vec<...> without array_size (unbounded sequence)
-        // 4. Rust field type contains "Seq<" (custom sequence types like BoolSeq<0>, GoalStatusSeq<0>)
-        let ros_type_name = field_info.ros_type_name();
-        let rust_type = field_info.field_type();
-
-        // Check if this is a string type (bounded strings have capacity but are NOT sequences)
-        let is_string_type = rust_type.contains("RosString") || rust_type.contains("RosWString");
-
-        let is_sequence = ros_type_name.starts_with("sequence")
-            // capacity + no array_size = sequence, BUT NOT for bounded strings (they use capacity for string length)
-            || (field_info.capacity().is_some() && field_info.array_size().is_none() && !is_string_type)
-            || (rust_type.starts_with("Vec<") && field_info.array_size().is_none())
-            || rust_type.contains("Seq<");
-
-        if is_sequence {
-            ros2_parts.push("sequence".to_string());
-        }
-
-        // Add string/wstring attribute for string types
-        let is_string = is_string_type && !rust_type.contains("RosWString");
-        let is_wstring = rust_type.contains("RosWString");
-
-        if is_string {
-            ros2_parts.push("string".to_string());
-        }
-        if is_wstring {
-            ros2_parts.push("wstring".to_string());
-        }
-
-        // Add capacity if present
-        if let Some(capacity) = field_info.capacity() {
-            ros2_parts.push(format!("capacity = {}", capacity));
-        }
-
         // Add default value if present
         if let Some(default_value) = field_info.default_value() {
             // Escape quotes and backslashes in the default value
@@ -177,9 +142,20 @@ impl ParseCallbacks for RosCallbacks {
     }
 
     /// Custom type mapping for sequences.
-    fn sequence_type(&self, element_type: &str, max_size: Option<u32>) -> Option<String> {
+    fn sequence_type(
+        &self,
+        element_type: &str,
+        max_size: Option<u32>,
+        ros2_type: &str,
+    ) -> Option<String> {
         let size = max_size.unwrap_or(0);
         let path = self.primitive_path();
+
+        // Check for byte/octet type first - uses ByteSeq (type_id 160) not U8Seq (type_id 147)
+        if ros2_type == "byte" || ros2_type == "octet" {
+            return Some(format!("{path}::msg::ByteSeq<{size}>"));
+        }
+
         match element_type {
             "bool" => Some(format!("{path}::msg::BoolSeq<{size}>")),
             "u8" => Some(format!("{path}::msg::U8Seq<{size}>")),

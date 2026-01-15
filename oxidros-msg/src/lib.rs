@@ -40,7 +40,8 @@ pub use runtime_c::*;
 // Re-export msg module utilities for generated code
 pub mod msg {
     pub use crate::primitives::{
-        BoolSeq, F32Seq, F64Seq, I8Seq, I16Seq, I32Seq, I64Seq, U8Seq, U16Seq, U32Seq, U64Seq,
+        BoolSeq, ByteSeq, F32Seq, F64Seq, I8Seq, I16Seq, I32Seq, I64Seq, U8Seq, U16Seq, U32Seq,
+        U64Seq,
     };
     pub use crate::strings::{RosString, RosStringSeq, RosWString, RosWStringSeq};
     pub use oxidros_core::TypeSupport;
@@ -87,7 +88,7 @@ pub use oxidros_core::{
 pub use oxidros_core::{UnsafeDuration, UnsafeTime};
 
 use crate::interfaces::rcl_interfaces::msg::ParameterValue;
-use crate::msg::{BoolSeq, F64Seq, I64Seq, RosString, RosStringSeq, U8Seq};
+use crate::msg::{BoolSeq, ByteSeq, F64Seq, I64Seq, RosString, RosStringSeq};
 use oxidros_core::Value;
 
 impl From<&oxidros_core::parameter::IntegerRange>
@@ -179,9 +180,9 @@ impl From<&Value> for ParameterValue {
             }
             Value::VecU8(val) => {
                 result.r#type = 5;
-                result.byte_array_value = U8Seq::new(val.len()).unwrap_or_else(|| {
+                result.byte_array_value = ByteSeq::new(val.len()).unwrap_or_else(|| {
                     log::error!("{}:{}: failed allocation", file!(), line!());
-                    U8Seq::null()
+                    ByteSeq::null()
                 });
                 result
                     .byte_array_value
@@ -291,6 +292,8 @@ mod tests {
     #[test]
     fn test_get_parameters_type_hash() {
         use super::interfaces::rcl_interfaces::srv::GetParameters;
+        let td = GetParameters::type_description();
+        println!("GetParameters type description: {:?}", td);
         let hash = GetParameters::compute_hash().expect("failed to compute hash");
         assert_eq!(
             hash, EXPECTED_HASHES[1].1,

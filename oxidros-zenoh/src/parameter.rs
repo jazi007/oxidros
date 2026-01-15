@@ -514,7 +514,7 @@ fn value_to_parameter_value(value: &Value) -> ParameterValue {
         }
         Value::VecU8(bytes) => {
             pv.r#type = 5;
-            if let Some(mut seq) = oxidros_msg::msg::U8Seq::<0>::new(bytes.len()) {
+            if let Some(mut seq) = oxidros_msg::msg::ByteSeq::<0>::new(bytes.len()) {
                 seq.as_mut_slice().copy_from_slice(bytes);
                 pv.byte_array_value = seq;
             }

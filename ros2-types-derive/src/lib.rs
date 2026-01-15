@@ -95,7 +95,6 @@ mod attrs;
 mod ros2_msg;
 mod service_action_type_description;
 mod type_description;
-mod type_mapping;
 
 use proc_macro::TokenStream;
 use syn::{DeriveInput, parse_macro_input};

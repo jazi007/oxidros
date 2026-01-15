@@ -295,6 +295,26 @@ impl FieldType {
         }
     }
 
+    /// Create a bounded sequence with string_capacity for bounded string elements
+    /// Used for sequence<string<M>, N> where M is string_capacity and N is capacity
+    pub fn bounded_sequence_with_string_capacity(
+        base_type_id: u8,
+        capacity: u64,
+        string_capacity: u64,
+    ) -> Self {
+        let mut ft = Self::bounded_sequence(base_type_id, capacity);
+        ft.string_capacity = string_capacity;
+        ft
+    }
+
+    /// Create an unbounded sequence with string_capacity for bounded string elements
+    /// Used for sequence<string<M>> where M is string_capacity
+    pub fn sequence_with_string_capacity(base_type_id: u8, string_capacity: u64) -> Self {
+        let mut ft = Self::sequence(base_type_id);
+        ft.string_capacity = string_capacity;
+        ft
+    }
+
     /// Create a bounded sequence of nested types
     pub fn nested_bounded_sequence(type_name: impl Into<String>, capacity: u64) -> Self {
         Self {

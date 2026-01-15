@@ -132,6 +132,7 @@ impl TypeMapper {
         callbacks: Option<&dyn ParseCallbacks>,
     ) -> String {
         let base_rust_type = self.map_base_type_with_callbacks(&ros_type.base_type, callbacks);
+        let ros_type_name = ros_type.base_type.type_name.as_str();
 
         if ros_type.is_array {
             if let Some(size) = ros_type.array_size {
@@ -139,7 +140,8 @@ impl TypeMapper {
                     // Bounded sequence (dynamic array with max size)
                     // Check for callback override
                     if let Some(cb) = callbacks
-                        && let Some(custom_type) = cb.sequence_type(&base_rust_type, Some(size))
+                        && let Some(custom_type) =
+                            cb.sequence_type(&base_rust_type, Some(size), ros_type_name)
                     {
                         return custom_type;
                     }
@@ -152,7 +154,8 @@ impl TypeMapper {
                 // Unbounded sequence (dynamic array)
                 // Check for callback override
                 if let Some(cb) = callbacks
-                    && let Some(custom_type) = cb.sequence_type(&base_rust_type, None)
+                    && let Some(custom_type) =
+                        cb.sequence_type(&base_rust_type, None, ros_type_name)
                 {
                     return custom_type;
                 }

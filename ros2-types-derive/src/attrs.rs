@@ -60,9 +60,14 @@ pub struct Ros2FieldOpts {
     #[darling(default)]
     pub ros2_type: Option<String>,
 
-    /// Capacity for bounded strings/sequences
+    /// Capacity for bounded sequences (number of elements)
     #[darling(default)]
     pub capacity: Option<u64>,
+
+    /// Capacity for bounded strings/wstrings (max string length)
+    /// Used when you have a bounded sequence of bounded strings
+    #[darling(default)]
+    pub string_capacity: Option<u64>,
 
     /// Explicitly mark this field as a sequence.
     /// Use `#[ros2(sequence)]` on the field (flag-style).

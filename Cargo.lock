@@ -2360,9 +2360,12 @@ dependencies = [
 name = "ros2msg_example"
 version = "0.1.0"
 dependencies = [
+ "heck",
  "oxidros-build",
  "oxidros-msg",
  "ros2-types",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

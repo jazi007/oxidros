@@ -158,11 +158,16 @@ pub trait ParseCallbacks: Send + Sync {
     ///
     /// * `element_type` - The Rust type of the sequence elements (e.g., "u8", "f64", "`MyMessage`")
     /// * `max_size` - `Some(n)` for bounded sequences with max size n, `None` for unbounded
+    /// * `ros2_type` - The original ROS2/IDL type name (e.g., "byte", "uint8", "octet")
     ///
     /// # Example
     ///
     /// ```ignore
-    /// fn sequence_type(&self, element_type: &str, max_size: Option<u32>) -> Option<String> {
+    /// fn sequence_type(&self, element_type: &str, max_size: Option<u32>, ros2_type: &str) -> Option<String> {
+    ///     // Use ByteSeq for byte sequences to preserve type hash distinction
+    ///     if ros2_type == "byte" || ros2_type == "octet" {
+    ///         return Some(format!("ByteSeq<{}>", max_size.unwrap_or(0)));
+    ///     }
     ///     // Use a custom bounded vector type for bounded sequences
     ///     if let Some(size) = max_size {
     ///         Some(format!("BoundedVec<{}, {}>", element_type, size))
@@ -171,7 +176,12 @@ pub trait ParseCallbacks: Send + Sync {
     ///     }
     /// }
     /// ```
-    fn sequence_type(&self, _element_type: &str, _max_size: Option<u32>) -> Option<String> {
+    fn sequence_type(
+        &self,
+        _element_type: &str,
+        _max_size: Option<u32>,
+        _ros2_type: &str,
+    ) -> Option<String> {
         None
     }
 
@@ -458,8 +468,10 @@ pub struct FieldInfo {
     array_size: Option<u32>,
     /// ROS2 type override (e.g., "byte", "char", "wstring")
     ros2_type_override: Option<String>,
-    /// Capacity for bounded strings/sequences
+    /// Capacity for bounded sequences (number of elements)
     capacity: Option<u32>,
+    /// Capacity for bounded strings within sequences (max string length)
+    string_capacity: Option<u32>,
     /// Default value for the field
     default_value: Option<String>,
 }
@@ -477,6 +489,7 @@ impl FieldInfo {
         array_size: Option<u32>,
         ros2_type_override: Option<String>,
         capacity: Option<u32>,
+        string_capacity: Option<u32>,
         default_value: Option<String>,
     ) -> Self {
         Self {
@@ -488,6 +501,7 @@ impl FieldInfo {
             array_size,
             ros2_type_override,
             capacity,
+            string_capacity,
             default_value,
         }
     }
@@ -534,10 +548,16 @@ impl FieldInfo {
         self.ros2_type_override.as_deref()
     }
 
-    /// Get the capacity for bounded strings/sequences
+    /// Get the capacity for bounded sequences (number of elements)
     #[must_use]
     pub fn capacity(&self) -> Option<u32> {
         self.capacity
+    }
+
+    /// Get the string capacity for bounded strings within sequences
+    #[must_use]
+    pub fn string_capacity(&self) -> Option<u32> {
+        self.string_capacity
     }
 
     /// Get the default value for the field

@@ -65,16 +65,12 @@ impl CodeGenerator {
             }
         })?;
 
-        // Convert source file to IDL string (and optionally get original field types)
-        let (idl_string, original_field_types) =
-            self.convert_to_idl(path, &package_name, file_type)?;
+        // Convert source file to IDL string
+        let idl_string = self.convert_to_idl(path, &package_name, file_type)?;
 
         // Parse IDL and generate code, detecting the interface kind from content
-        let (code, dependencies, interface_kind) = self.generate_from_idl_string(
-            &idl_string,
-            &package_name,
-            original_field_types.as_ref(),
-        )?;
+        let (code, dependencies, interface_kind) =
+            self.generate_from_idl_string(&idl_string, &package_name)?;
 
         Ok(GeneratedCode {
             code,
@@ -132,49 +128,22 @@ impl CodeGenerator {
     ///
     /// Returns a map of field name -> original type name for fields that need
     /// special handling (like char types which get converted to uint8 in IDL)
-    fn extract_original_field_types(
-        msg_spec: &crate::msg::MessageSpecification,
-    ) -> HashMap<String, String> {
-        let mut original_types = HashMap::new();
-        for field in &msg_spec.fields {
-            // Store the original type name for char fields
-            // (char is converted to uint8 in IDL but we need to preserve this info)
-            let type_name = &field.field_type.base_type.type_name;
-            if type_name == "char" {
-                original_types.insert(field.name.clone(), type_name.clone());
-            }
-        }
-        original_types
-    }
-
     /// Convert a source file (.msg, .srv, .action, .idl) to IDL string
-    ///
-    /// Returns the IDL string and optionally a map of original field types
-    /// (needed for preserving char type information)
     fn convert_to_idl(
         &self,
         path: &Path,
         package_name: &str,
         file_type: FileType,
-    ) -> GeneratorResult<(String, Option<HashMap<String, String>>)> {
+    ) -> GeneratorResult<String> {
         match file_type {
             FileType::Message => {
                 let msg_spec = parse_message_file(package_name, path)?;
-                let original_types = Self::extract_original_field_types(&msg_spec);
                 let file_name = path
                     .file_name()
                     .and_then(|n| n.to_str())
                     .unwrap_or("unknown.msg");
                 let input_file = format!("msg/{file_name}");
-                let original_types_opt = if original_types.is_empty() {
-                    None
-                } else {
-                    Some(original_types)
-                };
-                Ok((
-                    message_to_idl(&msg_spec, package_name, &input_file),
-                    original_types_opt,
-                ))
+                Ok(message_to_idl(&msg_spec, package_name, &input_file))
             }
             FileType::Service => {
                 let srv_spec = parse_service_file(package_name, path)?;
@@ -183,8 +152,7 @@ impl CodeGenerator {
                     .and_then(|n| n.to_str())
                     .unwrap_or("unknown.srv");
                 let input_file = format!("srv/{file_name}");
-                // TODO: Extract original field types from service request/response
-                Ok((service_to_idl(&srv_spec, package_name, &input_file), None))
+                Ok(service_to_idl(&srv_spec, package_name, &input_file))
             }
             FileType::Action => {
                 let action_spec = parse_action_file(package_name, path)?;
@@ -193,10 +161,9 @@ impl CodeGenerator {
                     .and_then(|n| n.to_str())
                     .unwrap_or("unknown.action");
                 let input_file = format!("action/{file_name}");
-                // TODO: Extract original field types from action goal/result/feedback
-                Ok((action_to_idl(&action_spec, package_name, &input_file), None))
+                Ok(action_to_idl(&action_spec, package_name, &input_file))
             }
-            FileType::Idl => Ok((std::fs::read_to_string(path)?, None)),
+            FileType::Idl => Ok(std::fs::read_to_string(path)?),
         }
     }
 
@@ -205,15 +172,11 @@ impl CodeGenerator {
     /// This is the unified generation entry point. It parses the IDL and generates
     /// appropriate code based on the content (messages, services, or actions).
     ///
-    /// The `original_field_types` parameter allows preserving type information that
-    /// gets lost during MSG->IDL conversion (e.g., char types become uint8).
-    ///
     /// Returns a tuple of (code, dependencies, `interface_kind`).
     fn generate_from_idl_string(
         &self,
         idl_string: &str,
         package_name: &str,
-        original_field_types: Option<&HashMap<String, String>>,
     ) -> GeneratorResult<(String, Vec<String>, InterfaceKind)> {
         // Extract typedefs from the IDL
         let typedef_map = Self::extract_typedefs_from_idl(idl_string);
@@ -230,7 +193,6 @@ impl CodeGenerator {
             &idl_file.content,
             package_name,
             &typedef_map,
-            original_field_types,
             &mut dependencies,
         )?;
 
@@ -253,7 +215,6 @@ impl CodeGenerator {
         content: &IdlContent,
         package_name: &str,
         typedef_map: &HashMap<String, Type>,
-        original_field_types: Option<&HashMap<String, String>>,
         dependencies: &mut HashSet<(String, String, String)>,
     ) -> GeneratorResult<(String, InterfaceKind)> {
         let mut output = String::new();
@@ -291,7 +252,6 @@ impl CodeGenerator {
                     package_name,
                     InterfaceKind::Service,
                     typedef_map,
-                    original_field_types,
                     dependencies,
                 ));
                 output.push('\n');
@@ -300,7 +260,6 @@ impl CodeGenerator {
                     package_name,
                     InterfaceKind::Service,
                     typedef_map,
-                    original_field_types,
                     dependencies,
                 ));
             }
@@ -333,7 +292,6 @@ impl CodeGenerator {
                     package_name,
                     InterfaceKind::Action,
                     typedef_map,
-                    original_field_types,
                     dependencies,
                 ));
                 output.push('\n');
@@ -342,7 +300,6 @@ impl CodeGenerator {
                     package_name,
                     InterfaceKind::Action,
                     typedef_map,
-                    original_field_types,
                     dependencies,
                 ));
                 output.push('\n');
@@ -351,7 +308,6 @@ impl CodeGenerator {
                     package_name,
                     InterfaceKind::Action,
                     typedef_map,
-                    original_field_types,
                     dependencies,
                 ));
             }
@@ -375,7 +331,6 @@ impl CodeGenerator {
                 package_name,
                 InterfaceKind::Message,
                 typedef_map,
-                original_field_types,
                 dependencies,
             ));
             if messages.len() > 1 {
@@ -703,7 +658,6 @@ impl CodeGenerator {
         package_name: &str,
         interface_kind: InterfaceKind,
         typedef_map: &HashMap<String, Type>,
-        original_field_types: Option<&HashMap<String, String>>,
         dependencies: &HashSet<(String, String, String)>,
     ) -> String {
         let struct_name = self.config.transform_item_name(
@@ -749,22 +703,17 @@ impl CodeGenerator {
                 dependencies,
             );
 
-            // Check if this field was originally a char type
-            // (char types are converted to uint8 in IDL, so we need to restore them)
-            if let Some(orig_types) = original_field_types
-                && let Some(orig_type) = orig_types.get(&member.name)
-                && orig_type == "char"
-                && field_type == "u8"
-            {
-                // Override u8 with the proper char type based on ctypes_prefix
-                field_type = format!("{}::c_char", self.type_mapper.get_ctypes_prefix());
-            }
+            // Note: ROS2 .msg 'char' type is actually uint8, NOT the IDL char type.
+            // The IDL char type (type_id 13) is only used for IDL files with explicit 'char'.
+            // For .msg files, 'char' is converted to uint8 in IDL and should remain as u8 in Rust.
+            // We no longer need special handling for char from .msg files.
 
             // Determine if this is an array and get the size (needed for both callbacks and field name transform)
             let array_size = Self::get_array_info(&member.member_type, typedef_map);
             let ros_type_name = Self::get_ros_type_name(&member.member_type);
 
             // Determine ROS2 type override for byte/char/wstring
+            // Note: "char" here refers to IDL char type, not .msg char (which is uint8)
             let ros2_type_override = match ros_type_name.as_str() {
                 "octet" | "octet[]" => Some("byte".to_string()),
                 "char" | "char[]" => Some("char".to_string()),
@@ -772,8 +721,11 @@ impl CodeGenerator {
                 _ => None,
             };
 
-            // Get capacity for bounded types
+            // Get capacity for bounded types (sequence capacity)
             let capacity = Self::get_capacity(&member.member_type);
+
+            // Get string capacity for bounded strings within sequences
+            let string_capacity = Self::get_string_capacity(&member.member_type);
 
             // Get default value
             let default_value_annotation = member.annotations.get_default_value().clone();
@@ -801,6 +753,7 @@ impl CodeGenerator {
                     array_size,
                     ros2_type_override,
                     capacity,
+                    string_capacity,
                     default_value_annotation.clone(),
                 );
                 field_attrs = cb.add_field_attributes(&field_info);
@@ -1096,6 +1049,24 @@ impl CodeGenerator {
             IdlType::String(s) => s.maximum_size(),
             IdlType::WString(w) => w.maximum_size(),
             IdlType::BoundedSequence(seq) => Some(seq.maximum_size),
+            _ => None,
+        }
+    }
+
+    /// Get the string capacity for bounded strings within sequences
+    /// Returns the string's maximum size if the sequence element is a bounded string
+    fn get_string_capacity(idl_type: &IdlType) -> Option<u32> {
+        match idl_type {
+            IdlType::BoundedSequence(seq) => match seq.value_type.as_ref() {
+                IdlType::String(s) => s.maximum_size(),
+                IdlType::WString(w) => w.maximum_size(),
+                _ => None,
+            },
+            IdlType::UnboundedSequence(seq) => match seq.value_type.as_ref() {
+                IdlType::String(s) => s.maximum_size(),
+                IdlType::WString(w) => w.maximum_size(),
+                _ => None,
+            },
             _ => None,
         }
     }

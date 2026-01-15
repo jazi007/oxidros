@@ -169,7 +169,12 @@ fn test_noop_callbacks() {
 struct TypeMappingCallbacks;
 
 impl ParseCallbacks for TypeMappingCallbacks {
-    fn sequence_type(&self, element_type: &str, max_size: Option<u32>) -> Option<String> {
+    fn sequence_type(
+        &self,
+        element_type: &str,
+        max_size: Option<u32>,
+        _ros2_type: &str,
+    ) -> Option<String> {
         // Use custom BoundedVec for bounded sequences, regular Vec for unbounded
         if let Some(size) = max_size {
             Some(format!("BoundedVec<{}, {}>", element_type, size))

@@ -44,27 +44,49 @@ impl ParseCallbacks for TypeDescCallbacks {
             ros2_parts.push(format!("ros2_type = \"{}\"", type_override));
         }
 
-        // If the field is a sequence (not a fixed-size array), mark it explicitly
-        // so derives know. Fixed-size arrays have `array_size()` set and are
-        // represented as arrays in ROS2, not sequences.
-        //
-        // Detection methods:
-        // 1. ROS type name starts with "sequence" (explicit IDL sequence)
-        // 2. Has capacity but no array_size (bounded sequence)
-        // 3. Rust field type is Vec<...> without array_size (unbounded sequence)
+        // Distinguish between:
+        // 1. Bounded strings (string<=N) - use `string, capacity = N`
+        // 2. Bounded wstrings (wstring<=N) - use `wstring, capacity = N`
+        // 3. Bounded sequences (T[<=N]) - use `sequence, capacity = N`
+        // 4. Unbounded sequences (T[]) - use `sequence`
         let ros_type_name = field_info.ros_type_name();
         let rust_type = field_info.field_type();
+
+        // Check if it's a bounded/unbounded string type
+        let is_string_type = ros_type_name == "string";
+        let is_wstring_type = ros_type_name == "wstring";
+
+        // Sequence detection: either explicit sequence in ROS type name (ends with [])
+        // or it's a Vec<...> in Rust without being a fixed-size array
         let is_sequence = ros_type_name.starts_with("sequence")
-            || (field_info.capacity().is_some() && field_info.array_size().is_none())
-            || (rust_type.starts_with("Vec<") && field_info.array_size().is_none());
+            || (ros_type_name.ends_with("[]") && field_info.array_size().is_none())
+            || (rust_type.starts_with("Vec<")
+                && field_info.array_size().is_none()
+                && !is_string_type
+                && !is_wstring_type);
+
+        // Add string attribute for bounded strings
+        if is_string_type && field_info.capacity().is_some() {
+            ros2_parts.push("string".to_string());
+        }
+
+        // Add wstring attribute for bounded wstrings
+        if is_wstring_type && field_info.capacity().is_some() {
+            ros2_parts.push("wstring".to_string());
+        }
 
         if is_sequence {
             ros2_parts.push("sequence".to_string());
         }
 
-        // Add capacity if present
+        // Add capacity if present (for sequences)
         if let Some(capacity) = field_info.capacity() {
             ros2_parts.push(format!("capacity = {}", capacity));
+        }
+
+        // Add string_capacity if present (for bounded strings in sequences)
+        if let Some(string_capacity) = field_info.string_capacity() {
+            ros2_parts.push(format!("string_capacity = {}", string_capacity));
         }
 
         // Add default value if present
