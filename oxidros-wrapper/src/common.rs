@@ -90,7 +90,6 @@ impl<T: 'static + Send + TypeSupport> Stream for SubscriberStream<T> {
 
 /// Get ROS Time
 pub fn get_time_now() -> Result<Duration> {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|e| oxidros::error::Error::Other(format!("{e}")))
+    let mut time = oxidros::clock::Clock::new()?;
+    time.get_now()
 }

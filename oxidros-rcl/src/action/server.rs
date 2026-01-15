@@ -887,10 +887,9 @@ fn rcl_action_take_result_request<T: ActionMsg>(
 }
 
 fn get_timestamp(clock: &mut Clock) -> UnsafeTime {
-    let now_nanosec = clock.get_now().unwrap();
-    let now_sec = now_nanosec / 10_i64.pow(9);
+    let now = clock.get_now().unwrap_or_default();
     UnsafeTime {
-        sec: now_sec as i32,
-        nanosec: (now_nanosec - now_sec * 10_i64.pow(9)) as u32,
+        sec: now.as_secs() as i32,
+        nanosec: now.subsec_nanos(),
     }
 }

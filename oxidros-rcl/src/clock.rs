@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::{error::Result, get_allocator, rcl};
 
 /// A clock. For now only SystemTime/ROSTime is implemented.
@@ -24,10 +26,10 @@ impl Clock {
         self.clock
     }
 
-    pub fn get_now(&mut self) -> Result<rcl::rcl_time_point_value_t> {
+    pub fn get_now(&mut self) -> Result<Duration> {
         let mut now = unsafe { std::mem::zeroed() };
         rcl::MTSafeFn::rcl_clock_get_now(self.clock, &mut now)?;
-        Ok(now)
+        Ok(Duration::from_nanos(now as u64))
     }
 }
 
