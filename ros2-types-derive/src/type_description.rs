@@ -35,7 +35,13 @@ fn generate_field_type_expr(field_type: &syn::Type, field_opts: &Ros2FieldOpts) 
             }
         }
 
-        // Not a sequence - return primitive or bounded type
+        // Check if the field type is a fixed-size array [T; N]
+        if let syn::Type::Array(array) = field_type {
+            let len = &array.len;
+            return quote! { ros2_types::types::FieldType::array(#type_id, #len as u64) };
+        }
+
+        // Not a sequence or array - return primitive or bounded type
         return match ros2_type.as_str() {
             "byte" | "octet" => {
                 quote! { ros2_types::types::FieldType::primitive(ros2_types::FIELD_TYPE_BYTE) }
