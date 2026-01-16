@@ -20,10 +20,7 @@ use crate::{
     node::Node,
     qos::Profile,
     rcl,
-    selector::{
-        Selector,
-        async_selector::{self, SELECTOR},
-    },
+    selector::{Selector, async_selector},
     signal_handler::Signaled,
 };
 
@@ -348,8 +345,7 @@ impl<'a, T: ActionMsg> AsyncGoalReceiver<'a, T> {
 impl<'a, T: ActionMsg> Drop for AsyncGoalReceiver<'a, T> {
     fn drop(&mut self) {
         if self.is_waiting {
-            let mut guard = SELECTOR.lock();
-            let _ = guard.send_command(
+            let _ = async_selector::send_command(
                 &self.client.inner.client.data.node.context,
                 async_selector::Command::RemoveActionClient(self.client.inner.client.data.clone()),
             );
@@ -372,8 +368,7 @@ impl<'a, T: ActionMsg> Future for AsyncGoalReceiver<'a, T> {
             Err(e) => Poll::Ready(Err(e)),
             Ok(None) => {
                 let mut waker = Some(cx.waker().clone());
-                let mut guard = SELECTOR.lock();
-                match guard.send_command(
+                match async_selector::send_command(
                     &client.inner.client.data.node.context,
                     async_selector::Command::ActionClient {
                         data: client.inner.client.data.clone(),
@@ -459,8 +454,7 @@ impl<'a, T: ActionMsg> AsyncCancelReceiver<'a, T> {
 impl<'a, T: ActionMsg> Drop for AsyncCancelReceiver<'a, T> {
     fn drop(&mut self) {
         if self.is_waiting {
-            let mut guard = SELECTOR.lock();
-            let _ = guard.send_command(
+            let _ = async_selector::send_command(
                 &self.client.inner.client.data.node.context,
                 async_selector::Command::RemoveActionClient(self.client.inner.client.data.clone()),
             );
@@ -483,9 +477,8 @@ impl<'a, T: ActionMsg> Future for AsyncCancelReceiver<'a, T> {
             Err(e) => Poll::Ready(Err(e)),
             Ok(None) => {
                 let mut waker = Some(cx.waker().clone());
-                let mut guard = SELECTOR.lock();
 
-                match guard.send_command(
+                match async_selector::send_command(
                     &client.inner.client.data.node.context,
                     async_selector::Command::ActionClient {
                         data: client.inner.client.data.clone(),
@@ -572,8 +565,7 @@ impl<'a, T: ActionMsg> AsyncResultReceiver<'a, T> {
 impl<'a, T: ActionMsg> Drop for AsyncResultReceiver<'a, T> {
     fn drop(&mut self) {
         if self.is_waiting {
-            let mut guard = SELECTOR.lock();
-            let _ = guard.send_command(
+            let _ = async_selector::send_command(
                 &self.client.inner.client.data.node.context,
                 async_selector::Command::RemoveActionClient(self.client.inner.client.data.clone()),
             );
@@ -596,8 +588,7 @@ impl<'a, T: ActionMsg> Future for AsyncResultReceiver<'a, T> {
             Err(e) => Poll::Ready(Err(e)),
             Ok(None) => {
                 let mut waker = Some(cx.waker().clone());
-                let mut guard = SELECTOR.lock();
-                match guard.send_command(
+                match async_selector::send_command(
                     &client.inner.client.data.node.context,
                     async_selector::Command::ActionClient {
                         data: client.inner.client.data.clone(),
@@ -642,8 +633,7 @@ impl<'a, T: ActionMsg> AsyncFeedbackReceiver<'a, T> {
 impl<'a, T: ActionMsg> Drop for AsyncFeedbackReceiver<'a, T> {
     fn drop(&mut self) {
         if self.is_waiting {
-            let mut guard = SELECTOR.lock();
-            let _ = guard.send_command(
+            let _ = async_selector::send_command(
                 &self.client.data.node.context,
                 async_selector::Command::RemoveActionClient(self.client.data.clone()),
             );
@@ -666,9 +656,8 @@ impl<'a, T: ActionMsg> Future for AsyncFeedbackReceiver<'a, T> {
             Err(e) => Poll::Ready(Err(e)),
             Ok(None) => {
                 let mut waker = Some(cx.waker().clone());
-                let mut guard = SELECTOR.lock();
 
-                match guard.send_command(
+                match async_selector::send_command(
                     &client.data.node.context,
                     async_selector::Command::ActionClient {
                         data: client.data.clone(),
@@ -713,8 +702,7 @@ impl<'a, T: ActionMsg> AsyncStatusReceiver<'a, T> {
 impl<'a, T: ActionMsg> Drop for AsyncStatusReceiver<'a, T> {
     fn drop(&mut self) {
         if self.is_waiting {
-            let mut guard = SELECTOR.lock();
-            let _ = guard.send_command(
+            let _ = async_selector::send_command(
                 &self.client.data.node.context,
                 async_selector::Command::RemoveActionClient(self.client.data.clone()),
             );
@@ -737,9 +725,8 @@ impl<'a, T: ActionMsg> Future for AsyncStatusReceiver<'a, T> {
             Err(e) => Poll::Ready(Err(e)),
             Ok(None) => {
                 let mut waker = Some(cx.waker().clone());
-                let mut guard = SELECTOR.lock();
 
-                match guard.send_command(
+                match async_selector::send_command(
                     &client.data.node.context,
                     async_selector::Command::ActionClient {
                         data: client.data.clone(),

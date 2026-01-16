@@ -23,7 +23,7 @@ use crate::{
     get_allocator,
     node::{Node, NodeOptions},
     rcl,
-    selector::{Selector, async_selector::SELECTOR},
+    selector::{Selector, async_selector},
     signal_handler,
 };
 use once_cell::sync::Lazy;
@@ -278,7 +278,7 @@ impl oxidros_core::api::RosContext for Context {
 #[unsafe(no_mangle)]
 pub(crate) extern "C" fn remove_context() {
     {
-        let _ = SELECTOR.lock().halt();
+        let _ = async_selector::halt();
     }
     signal_handler::halt();
 

@@ -101,12 +101,11 @@ use crate::{
     node::Node,
     qos::Profile,
     rcl::{self, MT_UNSAFE_FN, rmw_request_id_t},
-    selector::async_selector::{self, SELECTOR},
+    selector::async_selector,
     signal_handler::Signaled,
 };
 use oxidros_core::{Error, Message, RclError, selector::CallbackResult};
 use oxidros_msg::TypeSupport;
-use parking_lot::Mutex;
 use std::{
     borrow::Cow, ffi::CString, future::Future, marker::PhantomData, os::raw::c_void, sync::Arc,
     task::Poll,
@@ -161,7 +160,7 @@ unsafe impl Send for ServerData {}
 /// Server.
 #[must_use]
 pub struct Server<T> {
-    pub(crate) data: Arc<Mutex<ServerData>>,
+    pub(crate) data: Arc<ServerData>,
     _phantom: PhantomData<T>,
     _unsync: PhantomUnsync,
 }
@@ -188,7 +187,7 @@ impl<T: ServiceMsg> Server<T> {
         }
 
         Ok(Server {
-            data: Arc::new(Mutex::new(ServerData { service, node })),
+            data: Arc::new(ServerData { service, node }),
             _phantom: Default::default(),
             _unsync: Default::default(),
         })
@@ -196,7 +195,7 @@ impl<T: ServiceMsg> Server<T> {
 
     #[cfg(feature = "jazzy")]
     pub fn configure_introspection(
-        &self,
+        &mut self,
         clock: &mut Clock,
         qos: Profile,
         introspection_state: RCLServiceIntrospection,
@@ -204,12 +203,12 @@ impl<T: ServiceMsg> Server<T> {
         let mut pub_opts = unsafe { rcl::rcl_publisher_get_default_options() };
         pub_opts.qos = (&qos).into();
 
-        let mut data = self.data.lock();
+        let data = &self.data as *const _ as *mut ServerData;
         let guard = rcl::MT_UNSAFE_FN.lock();
 
         guard.rcl_service_configure_service_introspection(
-            &mut data.service,
-            unsafe { data.node.as_ptr_mut() },
+            &mut unsafe { (*data).service },
+            unsafe { (*data).node.as_ptr_mut() },
             clock as *mut Clock as *mut _,
             <T as ServiceMsg>::type_support() as *const rcl::rosidl_service_type_support_t,
             pub_opts,
@@ -259,18 +258,16 @@ impl<T: ServiceMsg> Server<T> {
     /// - `RCLError::Error` if an unspecified error occurs.
     #[allow(clippy::type_complexity)]
     pub fn try_recv(&mut self) -> Result<Option<ServiceRequest<T>>> {
-        let data = self.data.lock();
+        let data = &self.data;
         let (request, header) =
             match rcl_take_request_with_info::<<T as ServiceMsg>::Request>(&data.service) {
                 Ok(data) => data,
                 Err(Error::Rcl(RclError::ServiceTakeFailed)) => {
-                    drop(data);
                     return Ok(None);
                 }
                 Err(e) => return Err(e),
             };
 
-        drop(data);
         Ok(Some(ServiceRequest {
             request: Message::new(request, header.into()),
             sender: ServerSend {
@@ -329,7 +326,7 @@ impl<T: ServiceMsg> Server<T> {
     /// Get the fully qualified service name (includes namespace).
     pub fn fully_qualified_service_name(&self) -> Result<Cow<'_, String>> {
         let guard = MT_UNSAFE_FN.lock();
-        let name = guard.rcl_service_get_service_name(&self.data.lock().service)?;
+        let name = guard.rcl_service_get_service_name(&self.data.service)?;
         Ok(Cow::Owned(name))
     }
 
@@ -347,7 +344,7 @@ unsafe impl<T> Send for Server<T> {}
 /// Sender to send a response.
 #[must_use]
 pub struct ServerSend<T> {
-    data: Arc<Mutex<ServerData>>,
+    data: Arc<ServerData>,
     request_id: rmw_request_id_t,
     _phantom: PhantomData<T>,
     _unsync: PhantomUnsync,
@@ -396,7 +393,7 @@ impl<T: ServiceMsg> ServerSend<T> {
     /// by ROS2 takes normal pointers instead of `const` pointers.
     /// So, currently, `send` takes `data` as mutable.
     pub fn send(mut self, data: &<T as ServiceMsg>::Response) -> Result<()> {
-        let server_data = self.data.lock();
+        let server_data = &self.data;
         rcl::MTSafeFn::rcl_send_response(
             &server_data.service,
             &mut self.request_id,
@@ -458,9 +455,8 @@ impl<'a, T: ServiceMsg> Future for AsyncReceiver<'a, T> {
             Err(e) => Poll::Ready(Err(e)),
             Ok(None) => {
                 let mut waker = Some(cx.waker().clone());
-                let mut guard = SELECTOR.lock();
-                if let Err(e) = guard.send_command(
-                    &data.lock().node.context,
+                if let Err(e) = async_selector::send_command(
+                    &data.node.context,
                     async_selector::Command::Server(
                         data.clone(),
                         Box::new(move || {
@@ -483,9 +479,8 @@ impl<'a, T> Drop for AsyncReceiver<'a, T> {
     fn drop(&mut self) {
         if self.is_waiting {
             let cloned = self.server.data.clone();
-            let data = self.server.data.lock();
-            let mut guard = SELECTOR.lock();
-            let _ = guard.send_command(
+            let data = &self.server.data;
+            let _ = async_selector::send_command(
                 &data.node.context,
                 async_selector::Command::RemoveServer(cloned),
             );

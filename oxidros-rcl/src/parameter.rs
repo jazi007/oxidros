@@ -188,7 +188,7 @@ use crate::{
     qos::Profile,
     selector::{
         Selector,
-        async_selector::{Command, SELECTOR},
+        async_selector::{self, Command},
         guard_condition::GuardCondition,
     },
     signal_handler::Signaled,
@@ -826,9 +826,8 @@ impl<'a> Future for AsyncWait<'a> {
         match self.state {
             WaitState::Init => {
                 let mut waker = Some(cx.waker().clone());
-                let mut guard = SELECTOR.lock();
 
-                if let Err(e) = guard.send_command(
+                if let Err(e) = async_selector::send_command(
                     &self.param_server.node.context,
                     Command::ConditionVar(
                         self.param_server.cond_callback.clone(),
@@ -856,13 +855,11 @@ impl<'a> Future for AsyncWait<'a> {
 
 impl<'a> Drop for AsyncWait<'a> {
     fn drop(&mut self) {
-        let mut guard = SELECTOR.lock();
-        if guard
-            .send_command(
-                &self.param_server.node.context,
-                Command::RemoveConditionVar(self.param_server.cond_callback.clone()),
-            )
-            .is_err()
+        if async_selector::send_command(
+            &self.param_server.node.context,
+            Command::RemoveConditionVar(self.param_server.cond_callback.clone()),
+        )
+        .is_err()
         {}
     }
 }

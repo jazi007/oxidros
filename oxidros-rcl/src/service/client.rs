@@ -60,10 +60,7 @@ use crate::{
     node::Node,
     qos::Profile,
     rcl::{self, MT_UNSAFE_FN},
-    selector::{
-        Selector,
-        async_selector::{self, SELECTOR},
-    },
+    selector::{Selector, async_selector},
     signal_handler::Signaled,
 };
 use oxidros_core::{Error, Message, RclError, selector::CallbackResult};
@@ -446,8 +443,7 @@ impl<'a, T: ServiceMsg> Future for AsyncReceiver<'a, T> {
         }
         // wait message arrival
         let mut waker = Some(cx.waker().clone());
-        let mut guard = SELECTOR.lock();
-        if let Err(e) = guard.send_command(
+        if let Err(e) = async_selector::send_command(
             &this.client.data.data.node.context,
             async_selector::Command::Client(
                 this.client.data.data.clone(),
@@ -468,8 +464,7 @@ impl<'a, T: ServiceMsg> Future for AsyncReceiver<'a, T> {
 impl<'a, T: ServiceMsg> Drop for AsyncReceiver<'a, T> {
     fn drop(&mut self) {
         if self.is_waiting {
-            let mut guard = SELECTOR.lock();
-            let _ = guard.send_command(
+            let _ = async_selector::send_command(
                 &self.client.data.data.node.context,
                 async_selector::Command::RemoveClient(self.client.data.data.clone()),
             );

@@ -176,7 +176,7 @@ pub struct Selector {
     base_time: SystemTime,
     signal_cond: GuardCondition,
     wait_set: rcl::rcl_wait_set_t,
-    services: BTreeMap<*const rcl::rcl_service_t, ConditionHandler<Arc<Mutex<ServerData>>>>,
+    services: BTreeMap<*const rcl::rcl_service_t, ConditionHandler<Arc<ServerData>>>,
     clients: BTreeMap<*const rcl::rcl_client_t, ConditionHandler<Arc<ClientData>>>,
     subscriptions: BTreeMap<*const rcl::rcl_subscription_t, ConditionHandler<Arc<RCLSubscription>>>,
     action_servers: BTreeMap<*const rcl::rcl_action_server_t, Vec<ActionServerConditionHandler>>,
@@ -449,10 +449,7 @@ impl Selector {
         mut server: Server<T>,
         mut handler: ServerCallback<T>,
     ) -> bool {
-        let context_ptr = {
-            let data = server.data.lock();
-            data.node.context.as_ptr()
-        };
+        let context_ptr = server.data.node.context.as_ptr();
         let srv = server.data.clone();
 
         let f = move || {
@@ -502,12 +499,11 @@ impl Selector {
 
     pub(crate) fn add_server_data(
         &mut self,
-        server: Arc<Mutex<ServerData>>,
+        server: Arc<ServerData>,
         handler: Option<Box<dyn FnMut() -> CallbackResult>>,
         is_once: bool,
     ) {
         let cloned = server.clone();
-        let server = server.lock();
         if self.context.as_ptr() == server.node.context.as_ptr() {
             self.services.insert(
                 &server.service,
@@ -841,8 +837,7 @@ impl Selector {
             .remove(&(subscription.subscription.as_ref() as *const _));
     }
 
-    pub(crate) fn remove_server_data(&mut self, server: &Arc<Mutex<ServerData>>) {
-        let server = server.lock();
+    pub(crate) fn remove_server_data(&mut self, server: &Arc<ServerData>) {
         self.services.remove(&(&server.service as *const _));
     }
 
@@ -1074,10 +1069,7 @@ impl Selector {
         }
         // set services
         for (_, h) in self.services.iter() {
-            let Some(service) = h.event.try_lock() else {
-                continue;
-            };
-            guard.rcl_wait_set_add_service(&mut self.wait_set, &service.service, null_mut())?;
+            guard.rcl_wait_set_add_service(&mut self.wait_set, &h.event.service, null_mut())?;
         }
         // set action clients
         for (_, h) in self.action_clients.iter() {

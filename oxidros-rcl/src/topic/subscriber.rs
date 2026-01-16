@@ -159,7 +159,7 @@ use crate::{
     node::Node,
     qos,
     rcl::{self, MT_UNSAFE_FN},
-    selector::async_selector::{self, SELECTOR},
+    selector::async_selector,
     signal_handler::Signaled,
     topic::subscriber_loaned_message::SubscriberLoanedMessage,
 };
@@ -464,9 +464,8 @@ impl<'a, T: TypeSupport> Future for AsyncReceiver<'a, T> {
             Ok(Some(v)) => Poll::Ready(Ok(v)),
             Err(e) => Poll::Ready(Err(e)),
             Ok(None) => {
-                let mut guard = SELECTOR.lock();
                 let mut waker = Some(cx.waker().clone());
-                guard.send_command(
+                async_selector::send_command(
                     &subscriber.subscription.node.context,
                     async_selector::Command::Subscription(
                         subscriber.subscription.clone(),
@@ -487,8 +486,7 @@ impl<'a, T: TypeSupport> Future for AsyncReceiver<'a, T> {
 impl<T> Drop for AsyncReceiver<'_, T> {
     fn drop(&mut self) {
         if self.is_waiting {
-            let mut guard = SELECTOR.lock();
-            let _ = guard.send_command(
+            let _ = async_selector::send_command(
                 &self.subscriber.subscription.node.context,
                 async_selector::Command::RemoveSubscription(self.subscriber.subscription.clone()),
             );

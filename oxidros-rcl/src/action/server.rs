@@ -16,6 +16,7 @@ use crate::PhantomUnsync;
 use crate::helper::is_unpin;
 use crate::logger::{Logger, pr_error_in};
 use crate::msg::GetUUID;
+use crate::selector::async_selector;
 use crate::{
     clock::Clock,
     error::Result,
@@ -31,7 +32,7 @@ use crate::{
         rcl_action_cancel_request_t, rcl_action_goal_handle_t, rcl_action_server_t,
         rmw_request_id_t, unique_identifier_msgs__msg__UUID,
     },
-    selector::async_selector::{Command, SELECTOR},
+    selector::async_selector::Command,
     signal_handler::Signaled,
 };
 
@@ -377,7 +378,6 @@ impl<'a, T: ActionMsg> Future for AsyncGoalReceiver<'a, T> {
             Err(e) => Poll::Ready(Err(e)),
             Ok(None) => {
                 let mut waker = Some(cx.waker().clone());
-                let mut guard = SELECTOR.lock();
 
                 let cmd = Command::ActionServer {
                     data: server.data.clone(),
@@ -389,7 +389,7 @@ impl<'a, T: ActionMsg> Future for AsyncGoalReceiver<'a, T> {
                     cancel: Box::new(move || CallbackResult::Ok),
                     result: Box::new(move || CallbackResult::Ok),
                 };
-                match guard.send_command(&server.data.node.context, cmd) {
+                match async_selector::send_command(&server.data.node.context, cmd) {
                     Ok(_) => {
                         *is_waiting = true;
                         Poll::Pending
@@ -404,8 +404,7 @@ impl<'a, T: ActionMsg> Future for AsyncGoalReceiver<'a, T> {
 impl<'a, T: ActionMsg> Drop for AsyncGoalReceiver<'a, T> {
     fn drop(&mut self) {
         if self.is_waiting {
-            let mut guard = SELECTOR.lock();
-            let _ = guard.send_command(
+            let _ = async_selector::send_command(
                 &self.server.data.node.context,
                 Command::RemoveActionServer(self.server.data.clone()),
             );
@@ -518,9 +517,8 @@ impl<'a, T: ActionMsg> Future for AsyncCancelReceiver<'a, T> {
             Err(e) => Poll::Ready(Err(e)),
             Ok(None) => {
                 let mut waker = Some(cx.waker().clone());
-                let mut guard = SELECTOR.lock();
 
-                match guard.send_command(
+                match async_selector::send_command(
                     &server.data.node.context,
                     Command::ActionServer {
                         data: server.data.clone(),
@@ -547,8 +545,7 @@ impl<'a, T: ActionMsg> Future for AsyncCancelReceiver<'a, T> {
 impl<'a, T: ActionMsg> Drop for AsyncCancelReceiver<'a, T> {
     fn drop(&mut self) {
         if self.is_waiting {
-            let mut guard = SELECTOR.lock();
-            let _ = guard.send_command(
+            let _ = async_selector::send_command(
                 &self.server.data.node.context,
                 Command::RemoveActionServer(self.server.data.clone()),
             );
@@ -631,7 +628,6 @@ impl<'a, T: ActionMsg> Future for AsyncResultReceiver<'a, T> {
             Err(e) => Poll::Ready(Err(e)),
             Ok(None) => {
                 let mut waker = Some(cx.waker().clone());
-                let mut guard = SELECTOR.lock();
                 let cmd = Command::ActionServer {
                     data: server.data.clone(),
                     goal: Box::new(move || CallbackResult::Ok),
@@ -642,7 +638,7 @@ impl<'a, T: ActionMsg> Future for AsyncResultReceiver<'a, T> {
                         CallbackResult::Remove
                     }),
                 };
-                match guard.send_command(&server.data.node.context, cmd) {
+                match async_selector::send_command(&server.data.node.context, cmd) {
                     Ok(_) => {
                         *is_waiting = true;
                         Poll::Pending
@@ -657,8 +653,7 @@ impl<'a, T: ActionMsg> Future for AsyncResultReceiver<'a, T> {
 impl<'a, T: ActionMsg> Drop for AsyncResultReceiver<'a, T> {
     fn drop(&mut self) {
         if self.is_waiting {
-            let mut guard = SELECTOR.lock();
-            let _ = guard.send_command(
+            let _ = async_selector::send_command(
                 &self.server.data.node.context,
                 Command::RemoveActionServer(self.server.data.clone()),
             );

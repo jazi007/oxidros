@@ -8,16 +8,14 @@ use crate::{
     topic::subscriber::RCLSubscription,
 };
 use crossbeam_channel::{Receiver, Sender};
-use once_cell::sync::Lazy;
 use oxidros_core::selector::CallbackResult;
 use parking_lot::Mutex;
 use std::{
-    sync::Arc,
+    sync::{Arc, OnceLock},
     thread::{self, JoinHandle, yield_now},
 };
 
-pub(crate) static SELECTOR: Lazy<Mutex<AsyncSelector>> =
-    Lazy::new(|| Mutex::new(AsyncSelector::new()));
+static SELECTOR_DATA: OnceLock<SelectorData> = OnceLock::new();
 
 pub(crate) enum Command {
     Subscription(
@@ -26,10 +24,10 @@ pub(crate) enum Command {
     ),
     RemoveSubscription(Arc<RCLSubscription>),
     Server(
-        Arc<Mutex<ServerData>>,
+        Arc<ServerData>,
         Box<dyn FnMut() -> CallbackResult + Send + Sync + 'static>,
     ),
-    RemoveServer(Arc<Mutex<ServerData>>),
+    RemoveServer(Arc<ServerData>),
     Client(
         Arc<ClientData>,
         Box<dyn FnMut() -> CallbackResult + Send + Sync + 'static>,
@@ -61,62 +59,50 @@ pub(crate) enum Command {
 
 struct SelectorData {
     tx: Sender<Command>,
-    th: JoinHandle<Result<()>>,
+    th: Mutex<Option<JoinHandle<Result<()>>>>,
     cond: GuardCondition,
-    _context: Arc<Context>,
 }
 
-pub(crate) struct AsyncSelector {
-    data: Option<SelectorData>,
-}
+pub(crate) fn halt() -> Result<()> {
+    if let Some(data) = SELECTOR_DATA.get() {
+        data.tx
+            .send(Command::Halt)
+            .map_err(|_| crate::error::Error::ChannelClosed)?;
+        data.cond.trigger()?;
 
-unsafe impl Sync for AsyncSelector {}
-unsafe impl Send for AsyncSelector {}
+        yield_now();
 
-impl AsyncSelector {
-    fn new() -> Self {
-        AsyncSelector { data: None }
-    }
-
-    pub(crate) fn halt(&mut self) -> Result<()> {
-        if let Some(SelectorData { tx, cond, th, .. }) = self.data.take() {
-            tx.send(Command::Halt)
-                .map_err(|_| crate::error::Error::ChannelClosed)?;
-            cond.trigger()?;
-
-            yield_now();
+        if let Some(th) = data.th.lock().take() {
             let _ = th.join();
         }
-
-        Ok(())
     }
 
-    pub(crate) fn send_command(&mut self, context: &Arc<Context>, cmd: Command) -> Result<()> {
-        loop {
-            if let Some(SelectorData { tx, cond, .. }) = &self.data {
-                tx.send(cmd)
-                    .map_err(|_| crate::error::Error::ChannelClosed)?;
-                cond.trigger()?;
-                return Ok(());
-            } else {
-                if let Command::Halt = cmd {
-                    return Ok(());
-                }
+    Ok(())
+}
 
-                let (tx, rx) = crossbeam_channel::bounded(256);
-                let guard = super::guard_condition::GuardCondition::new(context.clone())?;
-                let ctx = context.clone();
-                let guard2 = guard.clone();
-                let th = thread::spawn(move || select(ctx, guard2, rx));
-                self.data = Some(SelectorData {
-                    tx,
-                    th,
-                    _context: context.clone(),
-                    cond: guard,
-                });
-            }
+pub(crate) fn send_command(context: &Arc<Context>, cmd: Command) -> Result<()> {
+    if let Command::Halt = cmd {
+        return halt();
+    }
+
+    let data = SELECTOR_DATA.get_or_init(|| {
+        let (tx, rx) = crossbeam_channel::unbounded();
+        let guard =
+            super::guard_condition::GuardCondition::new(context.clone()).expect("guard cond");
+        let ctx = context.clone();
+        let guard2 = guard.clone();
+        let th = thread::spawn(move || select(ctx, guard2, rx));
+        SelectorData {
+            tx,
+            th: Mutex::new(Some(th)),
+            cond: guard,
         }
-    }
+    });
+
+    data.tx
+        .send(cmd)
+        .map_err(|_| crate::error::Error::ChannelClosed)?;
+    data.cond.trigger()
 }
 
 fn select(context: Arc<Context>, guard: GuardCondition, rx: Receiver<Command>) -> Result<()> {
