@@ -54,7 +54,6 @@ use crate::{
     node::Node,
     qos,
     rcl::{self, MT_UNSAFE_FN},
-    signal_handler::Signaled,
     topic::publisher_loaned_message::PublisherLoanedMessage,
 };
 use std::{borrow::Cow, ffi::CString, marker::PhantomData, ptr::null_mut, sync::Arc};
@@ -212,10 +211,6 @@ impl<T: TypeSupport> Publisher<T> {
     /// - `RCLError::PublisherInvalid` if the publisher is invalid, or
     /// - `RCLError::Error` if an unspecified error occurs.
     pub fn send(&self, msg: &T) -> Result<()> {
-        if crate::is_halt() {
-            return Err(Signaled.into());
-        }
-
         #[cfg(feature = "rcl_stat")]
         let start = std::time::SystemTime::now();
 
@@ -236,10 +231,6 @@ impl<T: TypeSupport> Publisher<T> {
     ///
     /// This functions takes the ownership of the loaned message since its chunk should be transferred back to the middleware.
     pub fn send_loaned(&self, msg: PublisherLoanedMessage<T>) -> Result<()> {
-        if crate::is_halt() {
-            return Err(Signaled.into());
-        }
-
         #[cfg(feature = "rcl_stat")]
         let start = std::time::SystemTime::now();
 
@@ -263,9 +254,6 @@ impl<T: TypeSupport> Publisher<T> {
     /// This function is marked unsafe as the user is reponsable for CDR serialization
     ///
     pub unsafe fn send_raw(&self, msg: &[u8]) -> Result<()> {
-        if crate::is_halt() {
-            return Err(Signaled.into());
-        }
         #[cfg(feature = "rcl_stat")]
         let start = std::time::SystemTime::now();
 

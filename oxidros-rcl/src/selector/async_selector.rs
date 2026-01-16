@@ -4,7 +4,6 @@ use crate::{
     context::Context,
     error::Result,
     service::{client::ClientData, server::ServerData},
-    signal_handler,
     topic::subscriber::RCLSubscription,
 };
 use crossbeam_channel::{Receiver, Sender};
@@ -72,7 +71,17 @@ pub(crate) fn halt() -> Result<()> {
 
         yield_now();
 
-        if let Some(th) = data.th.lock().take() {
+        let id = data
+            .th
+            .lock()
+            .as_ref()
+            .map(|th| th.thread().id())
+            .unwrap_or(std::thread::current().id());
+        // Don't join if we're calling from inside the selector thread itself
+        // (this happens when Context drops during selector cleanup)
+        if id != std::thread::current().id()
+            && let Some(th) = data.th.lock().take()
+        {
             let _ = th.join();
         }
     }
@@ -147,32 +156,30 @@ fn select(context: Arc<Context>, guard: GuardCondition, rx: Receiver<Command>) -
                 Command::Halt => return Ok(()),
             }
         }
-
-        if selector.wait().is_err() && signal_handler::is_halt() {
+        if selector
+            .wait_timeout(std::time::Duration::from_secs(1))
+            .is_err()
+        {
             for (_, h) in selector.subscriptions.iter_mut() {
                 if let Some(handler) = &mut h.handler {
                     (*handler)();
                 }
             }
-
             for (_, h) in selector.services.iter_mut() {
                 if let Some(handler) = &mut h.handler {
                     (*handler)();
                 }
             }
-
             for (_, h) in selector.clients.iter_mut() {
                 if let Some(handler) = &mut h.handler {
                     (*handler)();
                 }
             }
-
             for (_, h) in selector.cond.iter_mut() {
                 if let Some(handler) = &mut h.handler {
                     (*handler)();
                 }
             }
-
             return Ok(());
         }
     }

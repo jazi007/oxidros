@@ -9,7 +9,7 @@ use std::{ffi::CString, marker::PhantomData, sync::Arc, task::Poll, time::Durati
 use crate::helper::is_unpin;
 use crate::{
     error::Result,
-    get_allocator, is_halt,
+    get_allocator,
     msg::{
         ActionMsg,
         interfaces::action_msgs::{
@@ -21,7 +21,6 @@ use crate::{
     qos::Profile,
     rcl,
     selector::{Selector, async_selector},
-    signal_handler::Signaled,
 };
 
 use super::{
@@ -143,10 +142,6 @@ where
         &mut self,
         data: &SendGoalServiceRequest<T>,
     ) -> Result<ClientGoalRecv<'_, T>> {
-        if crate::is_halt() {
-            return Err(Signaled.into());
-        }
-
         let mut seq: i64 = 0;
         rcl::MTSafeFn::rcl_action_send_goal_request(
             &self.data.client,
@@ -357,10 +352,6 @@ impl<'a, T: ActionMsg> Future for AsyncGoalReceiver<'a, T> {
     type Output = Result<(SendGoalServiceResponse<T>, rcl::rmw_request_id_t)>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
-        if is_halt() {
-            return Poll::Ready(Err(Signaled.into()));
-        }
-
         let (client, is_waiting) = self.project();
         *is_waiting = false;
         match client.try_recv() {
@@ -466,10 +457,6 @@ impl<'a, T: ActionMsg> Future for AsyncCancelReceiver<'a, T> {
     type Output = Result<(CancelGoal_Response, rcl::rmw_request_id_t)>;
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
-        if is_halt() {
-            return Poll::Ready(Err(Signaled.into()));
-        }
-
         let (client, is_waiting) = self.project();
         *is_waiting = false;
         match client.try_recv() {
@@ -577,10 +564,6 @@ impl<'a, T: ActionMsg> Future for AsyncResultReceiver<'a, T> {
     type Output = Result<(GetResultServiceResponse<T>, rcl::rmw_request_id_t)>;
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
-        if is_halt() {
-            return Poll::Ready(Err(Signaled.into()));
-        }
-
         let (client, is_waiting) = self.project();
         *is_waiting = false;
         match client.try_recv() {
@@ -645,10 +628,6 @@ impl<'a, T: ActionMsg> Future for AsyncFeedbackReceiver<'a, T> {
     type Output = Result<<T as ActionMsg>::Feedback>;
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
-        if is_halt() {
-            return Poll::Ready(Err(Signaled.into()));
-        }
-
         let (client, is_waiting) = self.project();
         *is_waiting = false;
         match client.try_recv_feedback() {
@@ -714,10 +693,6 @@ impl<'a, T: ActionMsg> Future for AsyncStatusReceiver<'a, T> {
     type Output = Result<GoalStatusArray>;
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
-        if is_halt() {
-            return Poll::Ready(Err(Signaled.into()));
-        }
-
         let (client, is_waiting) = self.project();
         *is_waiting = false;
         match client.try_recv_status() {

@@ -55,13 +55,12 @@
 
 use crate::{
     error::Result,
-    get_allocator, is_halt,
+    get_allocator,
     msg::ServiceMsg,
     node::Node,
     qos::Profile,
     rcl::{self, MT_UNSAFE_FN},
     selector::{Selector, async_selector},
-    signal_handler::Signaled,
 };
 use oxidros_core::{Error, Message, RclError, selector::CallbackResult};
 use std::{
@@ -431,9 +430,6 @@ impl<'a, T: ServiceMsg> Future for AsyncReceiver<'a, T> {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
-        if is_halt() {
-            return Poll::Ready(Err(Signaled.into()));
-        }
         let mut this = self.as_mut();
         this.is_waiting = false;
         match this.client.try_recv() {

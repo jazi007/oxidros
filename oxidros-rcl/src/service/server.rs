@@ -96,13 +96,11 @@ use crate::{
     error::Result,
     get_allocator,
     helper::is_unpin,
-    is_halt,
     msg::ServiceMsg,
     node::Node,
     qos::Profile,
     rcl::{self, MT_UNSAFE_FN, rmw_request_id_t},
     selector::async_selector,
-    signal_handler::Signaled,
 };
 use oxidros_core::{Error, Message, RclError, selector::CallbackResult};
 use oxidros_msg::TypeSupport;
@@ -443,10 +441,6 @@ impl<'a, T: ServiceMsg> Future for AsyncReceiver<'a, T> {
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
-        if is_halt() {
-            return Poll::Ready(Err(Signaled.into()));
-        }
-
         let (server, is_waiting) = self.project();
         *is_waiting = false;
         let data = server.data.clone();

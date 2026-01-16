@@ -154,13 +154,11 @@ use crate::{
     error::Result,
     get_allocator,
     helper::is_unpin,
-    is_halt,
     msg::TypeSupport,
     node::Node,
     qos,
     rcl::{self, MT_UNSAFE_FN},
     selector::async_selector,
-    signal_handler::Signaled,
     topic::subscriber_loaned_message::SubscriberLoanedMessage,
 };
 pub use oxidros_core::message::Message;
@@ -455,9 +453,6 @@ impl<'a, T: TypeSupport> Future for AsyncReceiver<'a, T> {
     type Output = Result<Message<T>>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
-        if is_halt() {
-            return Poll::Ready(Err(Signaled.into()));
-        }
         let (subscriber, is_waiting) = self.project();
         *is_waiting = false;
         match subscriber.try_recv() {

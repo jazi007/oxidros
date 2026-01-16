@@ -24,14 +24,18 @@ use crate::{
     node::{Node, NodeOptions},
     rcl,
     selector::{Selector, async_selector},
-    signal_handler,
 };
+use libc::atexit;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
-use std::{env, ffi::CString, sync::Arc};
+use std::{
+    env,
+    ffi::CString,
+    sync::{Arc, Weak},
+};
 
-static CONTEXT: Lazy<Mutex<Option<Arc<Context>>>> = Lazy::new(|| Mutex::new(None));
-
+static CONTEXT: Lazy<Mutex<Option<Weak<Context>>>> = Lazy::new(|| Mutex::new(None));
+static SET_ATEXIT: std::sync::OnceLock<()> = std::sync::OnceLock::new();
 static CARGS: Lazy<Vec<usize>> = Lazy::new(|| {
     let cstr_args: Vec<_> = env::args().map(|s| CString::new(s).unwrap()).collect();
     cstr_args
@@ -57,12 +61,18 @@ impl Context {
     /// let ctx = Context::new().unwrap();
     /// ```
     pub fn new() -> Result<Arc<Self>> {
-        signal_handler::init();
+        // FastDDS uses atexit(3) to destroy resources when creating a node.
+        // Because of functions registed to atexit(3) will be invoked reverse order,
+        // remove_context() must be set here.
+        SET_ATEXIT.get_or_init(|| unsafe {
+            atexit(remove_context);
+        });
 
         {
             let guard = CONTEXT.lock();
             if let Some(ctx) = guard.as_ref() {
-                return Ok(ctx.clone());
+                let ctx = ctx.upgrade().ok_or(Error::Rcl(RclError::AlreadyShutdown))?;
+                return Ok(ctx);
             }
         }
 
@@ -89,9 +99,8 @@ impl Context {
         let context = Arc::new(Context { context });
         {
             let mut guard = CONTEXT.lock();
-            *guard = Some(context.clone());
+            *guard = Some(Arc::downgrade(&context))
         }
-
         Ok(context)
     }
 
@@ -203,6 +212,7 @@ impl Drop for Context {
             let guard = rcl::MT_UNSAFE_FN.lock();
             guard.rcl_context_fini(&mut self.context).unwrap();
         }
+        remove_context();
     }
 }
 
@@ -280,8 +290,6 @@ pub(crate) extern "C" fn remove_context() {
     {
         let _ = async_selector::halt();
     }
-    signal_handler::halt();
-
     {
         let mut guard = CONTEXT.lock();
         let _ = guard.take();

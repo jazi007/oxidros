@@ -162,7 +162,6 @@
 
 use crate::{
     error::Result,
-    is_halt,
     logger::{Logger, pr_error_in, pr_fatal_in},
     msg::{
         RosString, RosStringSeq, U8Seq,
@@ -191,7 +190,6 @@ use crate::{
         async_selector::{self, Command},
         guard_condition::GuardCondition,
     },
-    signal_handler::Signaled,
 };
 pub use oxidros_core::parameter::*;
 use oxidros_core::selector::CallbackResult;
@@ -819,10 +817,6 @@ pub struct AsyncWait<'a> {
 impl<'a> Future for AsyncWait<'a> {
     type Output = Result<BTreeSet<String>>;
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
-        if is_halt() {
-            return Poll::Ready(Err(Signaled.into()));
-        }
-
         match self.state {
             WaitState::Init => {
                 let mut waker = Some(cx.waker().clone());

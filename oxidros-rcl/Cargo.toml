@@ -22,7 +22,6 @@ parking_lot.workspace = true
 regex = "1.10"
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
-signal-hook = "0.4"
 futures-util.workspace = true
 
 # Logging
