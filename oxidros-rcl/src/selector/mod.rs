@@ -69,6 +69,7 @@ use crate::{
         client::{ClientData, ClientRecv},
         server::{Server, ServerData},
     },
+    signal_handler::{self, Signaled},
     topic::subscriber::{RCLSubscription, Subscriber},
 };
 use oxidros_core::{
@@ -173,6 +174,7 @@ pub struct Selector {
     param_server: Option<ParameterServer>,
     timer: DeltaList<(ConditionHandler<TimerType>, u64)>,
     base_time: SystemTime,
+    signal_cond: GuardCondition,
     wait_set: rcl::rcl_wait_set_t,
     services: BTreeMap<*const rcl::rcl_service_t, ConditionHandler<Arc<ServerData>>>,
     clients: BTreeMap<*const rcl::rcl_client_t, ConditionHandler<Arc<ClientData>>>,
@@ -218,10 +220,12 @@ impl Selector {
             wall_timer: BTreeMap::new(),
         };
 
-        let selector = Selector {
+        let signal_cond = GuardCondition::new(context.clone())?;
+        let mut selector = Selector {
             param_server: None,
             timer: DeltaList::Nil,
             base_time: SystemTime::now(),
+            signal_cond: signal_cond.clone(),
             wait_set,
             subscriptions: Default::default(),
             services: Default::default(),
@@ -239,6 +243,10 @@ impl Selector {
 
             _unused: (Default::default(), Default::default()),
         };
+
+        selector.add_guard_condition(&signal_cond, None, false);
+        signal_handler::register_guard_condition(signal_cond);
+
         Ok(selector)
     }
 
@@ -1100,11 +1108,7 @@ impl Selector {
         self.set_rcl_wait()?;
 
         // wait events
-        match self.wait_timer() {
-            Ok(()) => {}
-            Err(Error::Rcl(RclError::WaitSetEmpty)) => {}
-            Err(e) => return Err(e),
-        }
+        self.wait_timer()?;
 
         // notify timers
         self.notify_timer();
@@ -1150,6 +1154,10 @@ impl Selector {
     }
 
     fn wait_timer(&mut self) -> Result<()> {
+        if signal_handler::is_halt() {
+            return Err(Signaled.into());
+        }
+
         if self.timer.is_empty() {
             #[cfg(feature = "rcl_stat")]
             let wait_start = SystemTime::now();
@@ -1206,6 +1214,11 @@ impl Selector {
                 }
             }
         }
+
+        if signal_handler::is_halt() {
+            return Err(Signaled.into());
+        }
+
         Ok(())
     }
 
@@ -1321,6 +1334,7 @@ impl Selector {
 
 impl Drop for Selector {
     fn drop(&mut self) {
+        signal_handler::unregister_guard_condition(&self.signal_cond);
         {
             let guard = rcl::MT_UNSAFE_FN.lock();
             guard.rcl_wait_set_fini(&mut self.wait_set).unwrap();

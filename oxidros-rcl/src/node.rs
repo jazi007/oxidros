@@ -15,8 +15,10 @@
 //!     .unwrap();
 //! ```
 
+use libc::atexit;
+
 use crate::{
-    context::Context,
+    context::{Context, remove_context},
     error::Result,
     msg::{ServiceMsg, TypeSupport},
     parameter::ParameterServer,
@@ -26,6 +28,8 @@ use crate::{
     topic::subscriber::Subscriber,
 };
 use std::{ffi::CString, sync::Arc};
+
+static SET_ATEXIT: std::sync::OnceLock<()> = std::sync::OnceLock::new();
 
 /// Node of ROS2.
 pub struct Node {
@@ -56,6 +60,13 @@ impl Node {
                 options.as_ptr(),
             )?;
         }
+
+        // FastDDS uses atexit(3) to destroy resources when creating a node.
+        // Because of functions registed to atexit(3) will be invoked reverse order,
+        // remove_context() must be set here.
+        SET_ATEXIT.get_or_init(|| unsafe {
+            atexit(remove_context);
+        });
 
         Ok(Arc::new(Node {
             node,

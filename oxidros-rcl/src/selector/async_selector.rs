@@ -4,13 +4,14 @@ use crate::{
     context::Context,
     error::Result,
     service::{client::ClientData, server::ServerData},
+    signal_handler,
     topic::subscriber::RCLSubscription,
 };
 use crossbeam_channel::{Receiver, Sender};
 use oxidros_core::selector::CallbackResult;
 use parking_lot::Mutex;
 use std::{
-    sync::{Arc, OnceLock, atomic::AtomicBool},
+    sync::{Arc, OnceLock},
     thread::{self, JoinHandle, yield_now},
 };
 
@@ -56,15 +57,6 @@ pub(crate) enum Command {
     Halt,
 }
 
-static IS_HALT: AtomicBool = AtomicBool::new(false);
-
-pub(crate) fn is_halt() -> Result<()> {
-    if IS_HALT.load(std::sync::atomic::Ordering::SeqCst) {
-        return Err(oxidros_core::Error::Interrupted);
-    }
-    Ok(())
-}
-
 struct SelectorData {
     tx: Sender<Command>,
     th: Mutex<Option<JoinHandle<Result<()>>>>,
@@ -72,7 +64,6 @@ struct SelectorData {
 }
 
 pub(crate) fn halt() -> Result<()> {
-    IS_HALT.store(true, std::sync::atomic::Ordering::SeqCst);
     if let Some(data) = SELECTOR_DATA.get() {
         data.tx
             .send(Command::Halt)
@@ -81,17 +72,7 @@ pub(crate) fn halt() -> Result<()> {
 
         yield_now();
 
-        let id = data
-            .th
-            .lock()
-            .as_ref()
-            .map(|th| th.thread().id())
-            .unwrap_or(std::thread::current().id());
-        // Don't join if we're calling from inside the selector thread itself
-        // (this happens when Context drops during selector cleanup)
-        if id != std::thread::current().id()
-            && let Some(th) = data.th.lock().take()
-        {
+        if let Some(th) = data.th.lock().take() {
             let _ = th.join();
         }
     }
@@ -103,7 +84,7 @@ pub(crate) fn send_command(context: &Arc<Context>, cmd: Command) -> Result<()> {
     if let Command::Halt = cmd {
         return halt();
     }
-    is_halt()?;
+
     let data = SELECTOR_DATA.get_or_init(|| {
         let (tx, rx) = crossbeam_channel::unbounded();
         let guard =
@@ -166,27 +147,32 @@ fn select(context: Arc<Context>, guard: GuardCondition, rx: Receiver<Command>) -
                 Command::Halt => return Ok(()),
             }
         }
-        if selector.wait().is_err() {
+
+        if selector.wait().is_err() && signal_handler::is_halt() {
             for (_, h) in selector.subscriptions.iter_mut() {
                 if let Some(handler) = &mut h.handler {
                     (*handler)();
                 }
             }
+
             for (_, h) in selector.services.iter_mut() {
                 if let Some(handler) = &mut h.handler {
                     (*handler)();
                 }
             }
+
             for (_, h) in selector.clients.iter_mut() {
                 if let Some(handler) = &mut h.handler {
                     (*handler)();
                 }
             }
+
             for (_, h) in selector.cond.iter_mut() {
                 if let Some(handler) = &mut h.handler {
                     (*handler)();
                 }
             }
+
             return Ok(());
         }
     }

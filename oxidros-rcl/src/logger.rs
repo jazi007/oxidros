@@ -93,6 +93,14 @@ macro_rules! pr_info {
     }}
 }
 
+macro_rules! pr_info_in {
+    ($logger:expr, $($arg:tt)*) => {{
+        let res = std::format!($($arg)*);
+        let _ = $logger.write_info(&res, $crate::function!(), std::file!(), std::line!() as u64);
+    }}
+}
+pub(crate) use pr_info_in;
+
 /// Print warning.
 #[macro_export]
 macro_rules! pr_warn {

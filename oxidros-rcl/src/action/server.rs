@@ -20,7 +20,7 @@ use crate::selector::async_selector;
 use crate::{
     clock::Clock,
     error::Result,
-    get_allocator,
+    get_allocator, is_halt,
     msg::{
         ActionGoal, ActionMsg, GoalResponse, builtin_interfaces::UnsafeTime,
         interfaces::action_msgs::msg::GoalInfo,
@@ -33,6 +33,7 @@ use crate::{
         rmw_request_id_t, unique_identifier_msgs__msg__UUID,
     },
     selector::async_selector::Command,
+    signal_handler::Signaled,
 };
 
 use super::GoalEvent;
@@ -367,6 +368,9 @@ impl<'a, T: ActionMsg> Future for AsyncGoalReceiver<'a, T> {
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
+        if is_halt() {
+            return Poll::Ready(Err(Signaled.into()));
+        }
         let (server, is_waiting) = self.project();
         *is_waiting = false;
         match server.try_recv_goal_request() {
@@ -502,6 +506,10 @@ impl<'a, T: ActionMsg> Future for AsyncCancelReceiver<'a, T> {
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
+        if is_halt() {
+            return Poll::Ready(Err(Signaled.into()));
+        }
+
         let (server, is_waiting) = self.project();
         *is_waiting = false;
         match server.try_recv_cancel_request() {
@@ -609,6 +617,10 @@ impl<'a, T: ActionMsg> Future for AsyncResultReceiver<'a, T> {
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
+        if is_halt() {
+            return Poll::Ready(Err(Signaled.into()));
+        }
+
         let (server, is_waiting) = self.project();
         *is_waiting = false;
         match server.try_recv_result_request() {

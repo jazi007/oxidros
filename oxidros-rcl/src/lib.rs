@@ -242,11 +242,14 @@ pub mod topic;
 use oxidros_core::Message;
 pub use oxidros_core::qos;
 
+mod signal_handler;
+
 type PhantomUnsync = PhantomData<Cell<()>>;
 type PhantomUnsend = PhantomData<MutexGuard<'static, ()>>;
 
 use msg::ServiceMsg;
 use service::client::ClientRecv;
+pub use signal_handler::is_halt;
 
 // Re-export oxidros_core so external crates can access traits without direct dependency
 pub use oxidros_core;
