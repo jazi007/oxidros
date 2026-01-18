@@ -35,6 +35,7 @@
 //! **Note**: When using `native` feature, message structs must derive
 //! `serde::Serialize` and `serde::Deserialize`.
 
+pub mod cdr;
 mod error;
 mod hash;
 mod ros_field_type;
@@ -43,12 +44,13 @@ mod traits;
 mod type_description;
 pub mod types;
 
+pub use cdr::CdrSerde;
 pub use error::{Error, Result};
 pub use hash::{calculate_type_hash, parse_rihs_string};
 pub use ros_field_type::RosFieldType;
 pub use traits::{
-    ActionGoal, ActionMsg, ActionResult, CdrSerde, GetUUID, GoalResponse, ResultResponse,
-    SequenceRaw, ServiceMsg, TryClone, TypeSupport, UnsafeDuration, UnsafeTime,
+    ActionGoal, ActionMsg, ActionResult, GetUUID, GoalResponse, ResultResponse, SequenceRaw,
+    ServiceMsg, TryClone, TypeSupport, UnsafeDuration, UnsafeTime,
 };
 pub use type_description::{
     ActionTypeDescription, MessageTypeName, ServiceTypeDescription, TypeDescription,
