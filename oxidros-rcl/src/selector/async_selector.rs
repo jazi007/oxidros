@@ -10,7 +10,7 @@ use crossbeam_channel::{Receiver, Sender};
 use oxidros_core::selector::CallbackResult;
 use parking_lot::Mutex;
 use std::{
-    sync::{Arc, OnceLock},
+    sync::{Arc, OnceLock, atomic::AtomicBool},
     thread::{self, JoinHandle, yield_now},
 };
 
@@ -56,6 +56,15 @@ pub(crate) enum Command {
     Halt,
 }
 
+static IS_HALT: AtomicBool = AtomicBool::new(false);
+
+pub(crate) fn is_halt() -> Result<()> {
+    if IS_HALT.load(std::sync::atomic::Ordering::SeqCst) {
+        return Err(oxidros_core::Error::Interrupted);
+    }
+    Ok(())
+}
+
 struct SelectorData {
     tx: Sender<Command>,
     th: Mutex<Option<JoinHandle<Result<()>>>>,
@@ -63,6 +72,7 @@ struct SelectorData {
 }
 
 pub(crate) fn halt() -> Result<()> {
+    IS_HALT.store(true, std::sync::atomic::Ordering::SeqCst);
     if let Some(data) = SELECTOR_DATA.get() {
         data.tx
             .send(Command::Halt)
@@ -93,7 +103,7 @@ pub(crate) fn send_command(context: &Arc<Context>, cmd: Command) -> Result<()> {
     if let Command::Halt = cmd {
         return halt();
     }
-
+    is_halt()?;
     let data = SELECTOR_DATA.get_or_init(|| {
         let (tx, rx) = crossbeam_channel::unbounded();
         let guard =
@@ -156,10 +166,7 @@ fn select(context: Arc<Context>, guard: GuardCondition, rx: Receiver<Command>) -
                 Command::Halt => return Ok(()),
             }
         }
-        if selector
-            .wait_timeout(std::time::Duration::from_secs(1))
-            .is_err()
-        {
+        if selector.wait().is_err() {
             for (_, h) in selector.subscriptions.iter_mut() {
                 if let Some(handler) = &mut h.handler {
                     (*handler)();
