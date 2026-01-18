@@ -311,3 +311,73 @@ fn test_all_primitives_type_description() {
     let desc = AllPrimitives::type_description();
     assert_eq!(desc.type_description.fields.len(), 11);
 }
+
+// =============================================================================
+// Large Array with Non-Copy Elements Test
+// =============================================================================
+
+/// A simple nested type that is NOT Copy (because it has no Copy derive)
+/// Note: Ros2Msg already generates Clone, Default, and PartialEq
+#[derive(Debug, Ros2Msg, TypeDescription, serde::Serialize, serde::Deserialize)]
+#[ros2(package = "test_msgs", interface_type = "msg")]
+#[repr(C)]
+pub struct PointT {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+}
+
+/// Test struct with a large array (>32 elements) of non-Copy nested type
+/// This tests that the generated Clone and Default impls handle large arrays correctly
+/// by using std::array::from_fn instead of relying on std's array impls
+/// (which require T: Copy for N > 32)
+#[derive(Debug, Ros2Msg, TypeDescription, serde::Serialize, serde::Deserialize)]
+#[ros2(package = "test_msgs", interface_type = "msg")]
+#[repr(C)]
+pub struct PointCollT {
+    #[serde(with = "ros2_types::BigArray")]
+    pub points: [PointT; 64],
+}
+
+#[test]
+fn test_large_array_default() {
+    let msg = PointCollT::default();
+    // All points should be zeroed
+    for point in &msg.points {
+        assert_eq!(point.x, 0.0);
+        assert_eq!(point.y, 0.0);
+        assert_eq!(point.z, 0.0);
+    }
+}
+
+#[test]
+fn test_large_array_clone() {
+    let mut msg = PointCollT::default();
+    // Modify some elements
+    msg.points[0].x = 1.0;
+    msg.points[63].z = 99.0;
+
+    // Clone should work even though PointT is not Copy
+    let cloned = msg.clone();
+
+    // Verify the clone has the same values
+    assert_eq!(cloned.points[0].x, 1.0);
+    assert_eq!(cloned.points[63].z, 99.0);
+
+    // Verify other elements are still default
+    assert_eq!(cloned.points[1].x, 0.0);
+}
+
+#[test]
+fn test_large_array_eq() {
+    let mut msg1 = PointCollT::default();
+    let mut msg2 = PointCollT::default();
+
+    assert_eq!(msg1, msg2);
+
+    msg1.points[32].y = 42.0;
+    assert_ne!(msg1, msg2);
+
+    msg2.points[32].y = 42.0;
+    assert_eq!(msg1, msg2);
+}

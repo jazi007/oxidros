@@ -140,13 +140,30 @@ fn generate_serialized_message_struct() -> TokenStream {
 ///
 /// Arrays with more than 32 elements don't implement Default in Rust's std library,
 /// so we need to use alternative initialization methods.
+/// We use std::array::from_fn which calls Default::default() for each element,
+/// avoiding the Copy requirement of array repeat syntax `[value; N]`.
 fn get_default_expr_for_type(ty: &syn::Type) -> TokenStream {
-    if let Some((elem_ty, size)) = get_large_array_info(ty) {
-        // For large arrays, use array initialization with default element
-        return quote! { [<#elem_ty as Default>::default(); #size] };
+    if let Some((elem_ty, _)) = get_large_array_info(ty) {
+        // For large arrays, use from_fn to call Default for each element
+        // This avoids the Copy requirement of `[T::default(); N]` syntax
+        return quote! { std::array::from_fn(|_| <#elem_ty as Default>::default()) };
     }
     // Fall back to Default::default() for all other types
     quote! { Default::default() }
+}
+
+/// Get the clone expression for a field, handling large arrays specially
+///
+/// Arrays with more than 32 elements don't implement Clone in Rust's std library
+/// unless the element type implements Copy. We use std::array::from_fn to clone
+/// each element individually.
+fn get_clone_expr_for_field(field_name: &syn::Ident, ty: &syn::Type) -> TokenStream {
+    if get_large_array_info(ty).is_some() {
+        // For large arrays, clone each element individually using from_fn
+        return quote! { std::array::from_fn(|i| self.#field_name[i].clone()) };
+    }
+    // Fall back to .clone() for all other types
+    quote! { self.#field_name.clone() }
 }
 
 /// Check if a type is a large array (> 32 elements) and return (element_type, size)
@@ -470,7 +487,9 @@ fn generate_pure_impl(opts: &Ros2TypeOpts, field_opts: &[Ros2FieldOpts]) -> Toke
         .iter()
         .map(|f| {
             let field_name = f.ident.as_ref().unwrap();
-            quote! { #field_name: self.#field_name.clone() }
+            // Check if the type is a large array (size > 32) which doesn't impl Clone
+            let clone_expr = get_clone_expr_for_field(field_name, &f.ty);
+            quote! { #field_name: #clone_expr }
         })
         .collect();
 
