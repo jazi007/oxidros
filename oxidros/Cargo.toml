@@ -1,66 +1,29 @@
 [package]
 name = "oxidros"
-version = "0.4.6"
-description = "Oxidros: Formally Specified Rust Bindings for ROS2"
-license-file = "LICENSE"
-readme = "README.md"
-keywords = ["Robotics", "ROS2"]
-categories = ["science::robotics"]
-repository.workspace = true
+version = "0.1.0"
 edition.workspace = true
 authors.workspace = true
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+repository.workspace = true
+license-file.workspace = true
 
 [dependencies]
-num-traits.workspace = true
-num-derive = "0.4"
-once_cell = "1.14"
-crossbeam-channel = "0.5"
-parking_lot = "0.12"
-signal-hook = "0.3"
-libc = "0.2"
-pin-project = "1.0"
-regex = "1.10.4"
-futures.workspace = true
-
-[dependencies.serde]
-version = "1"
-features = ["derive"]
-optional = true
-
-[dependencies.serde_json]
-version = "1"
-optional = true
-
-[dev-dependencies.memac]
-version = "0.5"
+oxidros-core = { path = "../oxidros-core" }
+oxidros-msg = { path = "../oxidros-msg" }
+oxidros-rcl = { path = "../oxidros-rcl" }
+oxidros-zenoh = { path = "../oxidros-zenoh"}
 
 [dev-dependencies]
-futures.workspace = true
-rand = "0.9"
+tokio = { version = "1", features = ["full"] }
 
-[dev-dependencies.async-std]
-version = "1.12"
-features = ["attributes"]
+[build-dependencies]
+oxidros-build = { path = "../oxidros-build" }
 
 [features]
 default = []
-statistics = ["serde", "serde_json"]
-rcl_stat = ["statistics"]
-jazzy = []
-iron = []
-humble = []
-galactic = []
-custom_alloc = []
+rcl = ["oxidros-msg/rcl"]
+zenoh = []
 
-[package.metadata.docs.rs]
-
-# Features to pass to Cargo (default: [])
-features = ["jazzy", "custom_alloc"]
-
-# Whether to pass `--all-features` to Cargo (default: false)
-all-features = false
-
-# Whether to pass `--no-default-features` to Cargo (default: false)
-no-default-features = true
+# RCL distribution features (require rcl feature)
+humble = ["rcl", "oxidros-rcl/humble", "oxidros-msg/humble"]
+jazzy = ["rcl", "oxidros-rcl/jazzy", "oxidros-msg/jazzy"]
+kilted = ["rcl", "oxidros-rcl/kilted", "oxidros-msg/kilted"]

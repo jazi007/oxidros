@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use oxidros_wrapper::oxidros::msg::common_interfaces::std_msgs;
+use oxidros::{oxidros_msg::common_interfaces::std_msgs, prelude::Context};
 use oxidros_wrapper::prelude::*;
 use tokio::{runtime::Builder, signal::ctrl_c, time::interval};
 
@@ -10,7 +10,7 @@ async fn ros2_main() -> Result<()> {
     // Create a context.
     let ctx = Context::new()?;
     // Create a node.
-    let node = ctx.create_node(NAME, None, Default::default())?;
+    let node = ctx.create_node(NAME, None)?;
     let publisher = node.new_publisher::<std_msgs::msg::String>(&Attributes::new("ex1_pub"))?;
     let mut subscriber = node
         .new_subscriber::<std_msgs::msg::String>(&Attributes::new("ex2_pub"))?

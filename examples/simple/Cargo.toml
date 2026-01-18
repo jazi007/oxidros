@@ -1,0 +1,18 @@
+[package]
+name = "simple"
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license-file.workspace = true
+
+[features]
+# RCL backends (requires ROS2 installation)
+humble = ["oxidros/humble"]
+jazzy = ["oxidros/jazzy"]
+kilted = ["oxidros/kilted"]
+
+[dependencies]
+oxidros = { path = "../../oxidros/" }
+tokio = { version = "1.48.0", features = ["full"] }
+tracing = "0.1"

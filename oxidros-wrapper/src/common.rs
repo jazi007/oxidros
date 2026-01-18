@@ -1,14 +1,11 @@
 //! Common types used by all ROS nodes
 //!
-use futures::ready;
+use futures_util::ready;
 use oxidros::{
     msg::TypeSupport,
-    node::Node,
-    qos::{
-        policy::{DurabilityPolicy, HistoryPolicy, ReliabilityPolicy},
-        Profile,
-    },
-    topic::subscriber::{Subscriber, TakenMsg},
+    prelude::Node,
+    qos::{DurabilityPolicy, HistoryPolicy, Profile, ReliabilityPolicy},
+    topic::subscriber::{Message, Subscriber},
 };
 use std::pin::Pin;
 use std::sync::Arc;
@@ -20,10 +17,9 @@ use tokio_util::sync::ReusableBoxFuture;
 /// Type aliases for ROS2 `Arc<Node>`
 pub type ArcNode = Arc<Node>;
 
-/// Re-export of safe drive DynError
-pub use oxidros::error::DynError;
-/// Result Type for ROS2
-pub type Result<T> = std::result::Result<T, DynError>;
+/// Re-export of oxidros result
+pub use oxidros::error::Result;
+
 /// Publisher attributes
 #[derive(Debug, Default, Clone)]
 pub struct Attributes<'a> {
@@ -58,7 +54,7 @@ pub fn create_qos(depth: usize) -> Profile {
 }
 
 /// Implement a wrapper for [`Subscriber`] that implement Stream
-pub type RecvResult<T> = Result<TakenMsg<T>>;
+pub type RecvResult<T> = Result<Message<T>>;
 
 /// Subscriber Wrapper to make a Stream
 #[derive(Debug)]
@@ -95,5 +91,5 @@ impl<T: 'static + Send + TypeSupport> Stream for SubscriberStream<T> {
 /// Get ROS Time
 pub fn get_time_now() -> Result<Duration> {
     let mut time = oxidros::clock::Clock::new()?;
-    Ok(Duration::from_nanos(time.get_now()?.try_into()?))
+    time.get_now()
 }

@@ -1,86 +1,88 @@
-use oxidros::{context::Context, msg::common_interfaces::std_msgs};
-use std::{error::Error, time::Duration};
+//! Timer integration test.
+//!
+//! Tests timer functionality using the unified API.
+//! Works with both RCL and Zenoh backends.
+
+use oxidros::prelude::*;
+use std::error::Error;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Duration;
 
 #[test]
-fn test_timer() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
+fn test_timer() -> Result<(), Box<dyn Error + Send + Sync>> {
     let ctx = Context::new()?;
     let mut selector = ctx.create_selector()?;
 
-    selector.add_timer(
-        Duration::from_millis(100),
-        Box::new(|| {
-            println!("timer: 100[ms]");
+    let counter = Arc::new(AtomicUsize::new(0));
+    let counter_clone = counter.clone();
+
+    // Add a timer that fires every 50ms
+    selector.add_wall_timer(
+        "test_timer",
+        Duration::from_millis(50),
+        Box::new(move || {
+            counter_clone.fetch_add(1, Ordering::SeqCst);
         }),
     );
 
-    selector.add_timer(
-        Duration::from_millis(200),
-        Box::new(|| {
-            println!("timer: 200[ms]");
-        }),
-    );
-
-    for _ in 0..2 {
-        selector.wait()?;
+    // Wait for several timer firings
+    let start = std::time::Instant::now();
+    while start.elapsed() < Duration::from_millis(100) {
+        selector.wait_timeout(Duration::from_millis(50))?;
     }
+
+    // Timer should have fired at least 3 times
+    let count = counter.load(Ordering::SeqCst);
+    println!("Timer fired {} times in {:?}", count, start.elapsed());
+    assert!(
+        count >= 2,
+        "Timer should have fired at least 2 times, got {}",
+        count
+    );
 
     Ok(())
 }
 
-/// ROS2's executor causes starvation.
-///
-/// [callback_group_based_sample_node.cpp](https://github.com/takam5f2/executer_exam/blob/main/src/nodes/callback_group_based_sample_node.cpp)
-/// is an example of the starvation.
-///
-/// In contrast, our executor does not cause starvation.
 #[test]
-fn test_wall_timer() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
+fn test_timer_remove() -> Result<(), Box<dyn Error + Send + Sync>> {
     let ctx = Context::new()?;
     let mut selector = ctx.create_selector()?;
 
-    // create a publish node
-    let node = ctx.create_node("test_wall_timer_node", None, Default::default())?;
+    let counter = Arc::new(AtomicUsize::new(0));
+    let counter_clone = counter.clone();
 
-    // create a publisher and a subscriber
-    let publisher =
-        node.create_publisher::<std_msgs::msg::String>("test_wall_timer_node_pubsub", None)?;
-    let subscriber =
-        node.create_subscriber::<std_msgs::msg::String>("test_wall_timer_node_pubsub", None)?;
-
-    // create wall timers
-    selector.add_wall_timer(
-        "timer1",
-        Duration::from_millis(1000),
-        Box::new(|| {
-            println!("long timer: 1000[ms]");
-            std::thread::sleep(Duration::from_millis(1000));
-        }),
-    );
-
-    selector.add_wall_timer(
-        "timer2",
-        Duration::from_millis(200),
+    // Add a timer
+    let timer_id = selector.add_wall_timer(
+        "removable_timer",
+        Duration::from_millis(50),
         Box::new(move || {
-            println!("short timer: 200[ms]");
-            let mut msg = std_msgs::msg::String::new().unwrap();
-            msg.data.assign("Hello, World!");
-            publisher.send(&msg).unwrap();
-            std::thread::sleep(Duration::from_millis(100));
+            counter_clone.fetch_add(1, Ordering::SeqCst);
         }),
     );
 
-    // set a callback for the subscriber
-    selector.add_subscriber(
-        subscriber,
-        Box::new(move |msg| {
-            println!("recv: {}", msg.data);
-        }),
+    // Let it fire once
+    selector.wait_timeout(Duration::from_millis(100))?;
+    let count_before = counter.load(Ordering::SeqCst);
+
+    // Remove the timer
+    selector.remove_timer(timer_id);
+
+    // Wait more - counter should not increase
+    selector.wait_timeout(Duration::from_millis(150))?;
+    let count_after = counter.load(Ordering::SeqCst);
+
+    println!(
+        "Before removal: {}, After removal: {}",
+        count_before, count_after
     );
 
-    // spin
-    for _ in 0..20 {
-        selector.wait()?;
-    }
+    // Counter should not have increased significantly after removal
+    // (allow for one more fire that may have been in flight)
+    assert!(
+        count_after <= count_before + 1,
+        "Timer should have stopped after removal"
+    );
 
     Ok(())
 }

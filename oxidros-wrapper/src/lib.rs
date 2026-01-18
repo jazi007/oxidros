@@ -89,22 +89,25 @@ pub mod logger;
 pub mod params_helpers;
 pub mod pubsub;
 
+/// Alias for dynamic error
+pub type DynError = Box<dyn std::error::Error + Send + Sync + 'static>;
+/// Alias for Result with dynamic error
+pub type Result<T> = std::result::Result<T, DynError>;
+
 /// prelude module
 pub mod prelude {
+    pub use super::{DynError, Result};
     pub use crate::clientserver::{Client, Server};
-    pub use crate::common::{create_qos, ArcNode, Attributes, DynError, Result};
+    pub use crate::common::{ArcNode, Attributes, create_qos};
     pub use crate::communicate::Communicate;
     pub use crate::pubsub::{Publish, Subscribe};
     pub use futures::{Stream, StreamExt};
-    pub use oxidros::{
-        context::Context,
-        node::{Node, NodeOptions},
-        topic::{
-            publisher::Publisher,
-            subscriber::{Subscriber, TakenMsg},
-        },
+    pub use oxidros::topic::{
+        publisher::Publisher,
+        subscriber::{Message, Subscriber},
     };
 }
 pub use futures;
 pub use oxidros;
+pub use tokio;
 pub use tokio_stream;

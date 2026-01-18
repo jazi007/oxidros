@@ -4,15 +4,11 @@ default:
 
 # Run all tests in workspace
 test:
-    cargo test --all --all-features
-
-# Generate code coverage report
-coverage:
-    ./scripts/coverage.sh
+    cargo test --all
 
 # Run clippy linter on all crates
 clippy:
-    cargo clippy --all --all-targets --all-features -- -D warnings
+    cargo clippy --all --all-targets -- -D warnings
 
 # Format code with rustfmt (check only)
 fmt:
@@ -28,18 +24,36 @@ check: fmt clippy test
 
 # Build all crates in workspace
 build:
-    cargo build --all --all-features
+    cargo build --all
 
 # Build all crates in release mode
 build-release:
-    cargo build --all --release --all-features
+    cargo build --all --release
 
 # Generate documentation for all crates
 doc:
-    cargo doc --all --all-features --no-deps --open
+    cargo doc --all --no-deps --open
 
 # Clean build artifacts
 clean:
     cargo clean
-    rm -rf coverage/
-    rm -f tarpaulin-report.html cobertura.xml
+
+# Run IDL parser conformance tests against ROS2
+idl-conformance *ARGS:
+    ./scripts/run_idl_conformance.sh {{ARGS}}
+
+# Run TypeDescription hash validation against ROS2
+type-hash-validation *ARGS:
+    ./scripts/run_type_hash_validation.sh {{ARGS}}
+
+# Run all validation tests (IDL conformance + type hash)
+validate: idl-conformance type-hash-validation
+
+# Generate API reference documentation comparing rcl and zenoh backends
+api-docs:
+    python3 scripts/generate_api_docs.py
+
+# Generate API docs with custom output path
+api-docs-to FILE:
+    python3 scripts/generate_api_docs.py --output {{FILE}}
+    @echo "All validation tests passed!"

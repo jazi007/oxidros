@@ -1,0 +1,24 @@
+[package]
+name = "ros2args"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license-file.workspace = true
+repository.workspace = true
+description = "A Rust parser for ROS2 command-line arguments and parameter files"
+readme = "README.md"
+keywords = ["ros2", "robotics", "parser", "cli", "parameters"]
+categories = ["parsing", "parser-implementations", "command-line-utilities"]
+
+[dependencies]
+regex = "1"
+thiserror.workspace = true
+serde = { workspace = true, optional = true }
+yaml-rust2.workspace = true
+
+[features]
+default = []
+serde = ["dep:serde"]
+
+[dev-dependencies]
+tempfile = "3"

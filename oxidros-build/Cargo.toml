@@ -1,0 +1,12 @@
+[package]
+name = "oxidros-build"
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license-file.workspace = true
+
+[dependencies]
+bindgen = "0.72"
+ros2-types = { path = "../ros2-types", features = ["derive"] }
+ros2msg = { path = "../ros2msg" }

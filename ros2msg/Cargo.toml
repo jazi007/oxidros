@@ -1,0 +1,47 @@
+[package]
+name = "ros2msg"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license-file.workspace = true
+repository.workspace = true
+description = "A Rust parser for ROS2 message, service, action, and IDL files with 100% ROS2 Jazzy compatibility"
+readme = "README.md"
+keywords = ["ros2", "robotics", "parser", "idl", "middleware"]
+categories = ["parsing", "parser-implementations"]
+
+[dependencies]
+regex = "1"
+thiserror.workspace = true
+serde = { workspace = true, optional = true }
+pest = "2"
+pest_derive = "2"
+heck = "0.5"
+quote = "1.0"
+proc-macro2 = "1.0"
+syn = { version = "2.0", features = ["full", "printing"] }
+prettyplease = "0.2"
+
+[features]
+default = []
+serde = ["dep:serde"]
+
+[[example]]
+name = "generate_ros_bindings"
+
+
+[[example]]
+name = "validate_ros_idl_files"
+
+[[example]]
+name = "validate_ros_msg_srv_action_files"
+
+[[example]]
+name = "idl_conformance_test"
+required-features = ["serde"]
+
+[dev-dependencies]
+serde_json.workspace = true
+tempfile = "3"
+clap = "4"
+yaml-rust2.workspace = true

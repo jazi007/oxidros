@@ -1,0 +1,487 @@
+//! Client to send a request and receive the reply.
+//!
+//! The callback execution is not suitable for request and response based communications.
+//! So, use async/await to use `Client`.
+//!
+//! # Example
+//!
+//! ```
+//! use oxidros_rcl::{
+//!     context::Context, logger::Logger, msg::common_interfaces::std_srvs, pr_error, pr_info,
+//!     pr_warn, service::client::Client,
+//! };
+//! use std::time::Duration;
+//!
+//! // Create a context.
+//! let ctx = Context::new().unwrap();
+//!
+//! // Create a server node.
+//! let node = ctx
+//!     .create_node_with_opt("service_client_rs", None, Default::default())
+//!     .unwrap();
+//!
+//! // Create a client.
+//! let mut client = node
+//!     .create_client::<std_srvs::srv::Empty>("service_name1", None)
+//!     .unwrap();
+//!
+//! // Create a logger.
+//! let logger = Logger::new("client_rs");
+//!
+//! async fn run_client(mut client: Client<std_srvs::srv::Empty>, logger: Logger) {
+//!     let dur = Duration::from_millis(100);
+//!
+//!     for _ in 0..5 {
+//!         let request = std_srvs::srv::Empty_Request::new().unwrap();
+//!         let receiver = client.send(&request).unwrap().recv();
+//!         match tokio::time::timeout(dur, receiver).await {
+//!             Ok(Ok(response)) => {
+//!                 pr_info!(logger, "received: {:?}", response);
+//!             }
+//!             Ok(Err(e)) => {
+//!                 pr_error!(logger, "error: {e}");
+//!                 break;
+//!             }
+//!             Err(_) => {
+//!                 pr_warn!(logger, "timeout");
+//!             }
+//!         }
+//!     }
+//! }
+//!
+//! let rt = tokio::runtime::Runtime::new().unwrap();
+//! rt.block_on(run_client(client, logger)); // Spawn an asynchronous task.
+//! ```
+
+use crate::{
+    error::Result,
+    get_allocator,
+    msg::ServiceMsg,
+    node::Node,
+    qos::Profile,
+    rcl::{self, MT_UNSAFE_FN},
+    selector::{Selector, async_selector},
+};
+use oxidros_core::{Error, Message, RclError, selector::CallbackResult};
+use std::{
+    borrow::Cow, ffi::CString, future::Future, marker::PhantomData, os::raw::c_void, sync::Arc,
+    task::Poll, time::Duration,
+};
+
+pub(crate) struct ClientData {
+    pub(crate) client: rcl::rcl_client_t,
+    pub(crate) node: Arc<Node>,
+}
+
+impl Drop for ClientData {
+    fn drop(&mut self) {
+        let guard = rcl::MT_UNSAFE_FN.lock();
+        let _ = guard.rcl_client_fini(&mut self.client, unsafe { self.node.as_ptr_mut() });
+    }
+}
+
+unsafe impl Sync for ClientData {}
+unsafe impl Send for ClientData {}
+
+/// Client.
+pub struct Client<T: ServiceMsg> {
+    pub(crate) data: Arc<ClientData>,
+    _phantom: PhantomData<T>,
+}
+
+impl<T: ServiceMsg> Client<T> {
+    pub(crate) fn new(node: Arc<Node>, service_name: &str, qos: Option<Profile>) -> Result<Self> {
+        let mut client = rcl::MTSafeFn::rcl_get_zero_initialized_client();
+        let service_name_c = CString::new(service_name).unwrap_or_default();
+        let profile = qos.unwrap_or_else(Profile::services_default);
+        let options = rcl::rcl_client_options_t {
+            qos: (&profile).into(),
+            allocator: get_allocator(),
+        };
+
+        let guard = rcl::MT_UNSAFE_FN.lock();
+        guard.rcl_client_init(
+            &mut client,
+            node.as_ptr(),
+            <T as ServiceMsg>::type_support() as *const rcl::rosidl_service_type_support_t,
+            service_name_c.as_ptr(),
+            &options,
+        )?;
+
+        Ok(Client {
+            data: Arc::new(ClientData { client, node }),
+            _phantom: Default::default(),
+        })
+    }
+
+    /// Check if service is available
+    pub fn is_service_available(&self) -> bool {
+        let guard = rcl::MT_UNSAFE_FN.lock();
+        guard
+            .rcl_service_server_is_available(self.data.node.as_ptr(), &self.data.client)
+            .unwrap_or_default()
+    }
+
+    /// Send a request.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use oxidros_rcl::{
+    ///     logger::Logger, msg::common_interfaces::std_srvs, pr_error, pr_info, pr_warn, service::client::Client,
+    /// };
+    /// use std::time::Duration;
+    ///
+    /// async fn run_client(mut client: Client<std_srvs::srv::Empty>, logger: Logger) {
+    ///     let dur = Duration::from_millis(100);
+    ///
+    ///     loop {
+    ///         let request = std_srvs::srv::Empty_Request::new().unwrap();
+    ///         let receiver = client.send(&request).unwrap().recv();
+    ///         match tokio::time::timeout(dur, receiver).await {
+    ///             Ok(Ok(response)) => {
+    ///                 pr_info!(logger, "received: {:?}", response);
+    ///             }
+    ///             Ok(Err(e)) => {
+    ///                 pr_error!(logger, "error: {e}");
+    ///                 break;
+    ///             }
+    ///             Err(_) => {
+    ///                 pr_warn!(logger, "timeout");
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// - `RCLError::InvalidArgument` if any arguments are invalid, or
+    /// - `RCLError::ClientInvalid` if the client is invalid, or
+    /// - `RCLError::Error` if an unspecified error occurs.
+    pub fn send(&mut self, data: &<T as ServiceMsg>::Request) -> Result<ClientRecv<'_, T>> {
+        let (s, _) = self.send_ret_seq(data)?;
+        Ok(s)
+    }
+
+    /// Send a request and wait for a response.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The request message
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - `RCLError::InvalidArgument` if any arguments are invalid, or
+    /// - `RCLError::ClientInvalid` if the client is invalid, or
+    /// - `RCLError::Error` if an unspecified error occurs.
+    pub async fn call(&mut self, request: &T::Request) -> Result<Message<T::Response>> {
+        self.send(request)?.recv().await
+    }
+
+    /// `send_ret_seq` is equivalent to `send`, but this returns
+    /// the sequence number together.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use oxidros_rcl::{
+    ///     logger::Logger, msg::common_interfaces::std_srvs, pr_error, pr_info, pr_warn, service::client::Client,
+    /// };
+    /// use std::time::Duration;
+    ///
+    /// async fn run_client(mut client: Client<std_srvs::srv::Empty>, logger: Logger) {
+    ///     let dur = Duration::from_millis(100);
+    ///
+    ///     loop {
+    ///         let request = std_srvs::srv::Empty_Request::new().unwrap();
+    ///         let (receiver, sequence) = client.send_ret_seq(&request).unwrap();
+    ///         let receiver = receiver.recv();
+    ///         pr_info!(logger, "sent: sequence = {sequence}");
+    ///         match tokio::time::timeout(dur, receiver).await {
+    ///             Ok(Ok(response)) => {
+    ///                 pr_info!(logger, "received: {:?}", response);
+    ///             }
+    ///             Ok(Err(e)) => {
+    ///                 pr_error!(logger, "error: {e}");
+    ///                 break;
+    ///             }
+    ///             Err(_) => {
+    ///                 pr_warn!(logger, "timeout");
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// - `RCLError::InvalidArgument` if any arguments are invalid, or
+    /// - `RCLError::ClientInvalid` if the client is invalid, or
+    /// - `RCLError::Error` if an unspecified error occurs.
+    pub fn send_ret_seq(
+        &mut self,
+        data: &<T as ServiceMsg>::Request,
+    ) -> Result<(ClientRecv<'_, T>, i64)> {
+        let mut seq: i64 = 0;
+        rcl::MTSafeFn::rcl_send_request(
+            &self.data.client,
+            data as *const _ as *const c_void,
+            &mut seq,
+        )?;
+        Ok((ClientRecv { data: self, seq }, seq))
+    }
+    /// Get the fully qualified service name (includes namespace).
+    pub fn fully_qualified_service_name(&self) -> Result<Cow<'_, String>> {
+        let guard = MT_UNSAFE_FN.lock();
+        let name = guard.rcl_client_get_service_name(&self.data.client)?;
+        Ok(Cow::Owned(name))
+    }
+
+    /// Get the topic name (last segment of the fully qualified name).
+    pub fn service_name(&self) -> Result<Cow<'_, String>> {
+        let fq_name = self.fully_qualified_service_name()?;
+        // Extract last segment after final '/'
+        let name = fq_name.rsplit('/').next().unwrap_or(&fq_name).to_string();
+        Ok(Cow::Owned(name))
+    }
+}
+
+/// Receiver to receive a response.
+#[must_use]
+pub struct ClientRecv<'a, T: ServiceMsg> {
+    pub(crate) data: &'a mut Client<T>,
+    pub(crate) seq: i64,
+}
+
+impl<'a, T: ServiceMsg> ClientRecv<'a, T> {
+    /// Receive a message.
+    /// `try_recv` is a non-blocking function, and this
+    /// returns `Ok(None)`.
+    /// So, please retry later if this value is returned.
+    ///
+    /// # Errors
+    ///
+    /// - `RCLError::InvalidArgument` if any arguments are invalid, or
+    /// - `RCLError::ClientInvalid` if the client is invalid, or
+    /// - `RCLError::Error` if an unspecified error occurs.
+    pub fn try_recv(&self) -> Result<Option<Message<<T as ServiceMsg>::Response>>> {
+        let (response, header) = match rcl_take_response_with_info::<<T as ServiceMsg>::Response>(
+            &self.data.data.client,
+            self.seq,
+        ) {
+            Ok(data) => data,
+            Err(Error::Rcl(RclError::ClientTakeFailed)) => return Ok(None),
+            Err(e) => return Err(e),
+        };
+
+        if header.request_id.sequence_number != self.seq {
+            return Ok(None);
+        }
+
+        Ok(Some(Message::new(response, header.into())))
+    }
+
+    /// Receive a response asynchronously.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use oxidros_rcl::{
+    ///     logger::Logger, msg::common_interfaces::std_srvs, pr_error, pr_info, pr_warn, service::client::Client,
+    /// };
+    /// use std::time::Duration;
+    ///
+    /// async fn run_client(mut client: Client<std_srvs::srv::Empty>, logger: Logger) {
+    ///     let dur = Duration::from_millis(100);
+    ///
+    ///     loop {
+    ///         let request = std_srvs::srv::Empty_Request::new().unwrap();
+    ///         let receiver = client.send(&request).unwrap().recv();
+    ///         match tokio::time::timeout(dur, receiver).await {
+    ///             Ok(Ok(response)) => {
+    ///                 pr_info!(logger, "received: response = {response:?}");
+    ///             }
+    ///             Ok(Err(e)) => {
+    ///                 pr_error!(logger, "error: {e}");
+    ///                 break;
+    ///             }
+    ///             Err(_) => {
+    ///                 pr_warn!(logger, "timeout");
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// - `RCLError::InvalidArgument` if any arguments are invalid, or
+    /// - `RCLError::ClientInvalid` if the client is invalid, or
+    /// - `RCLError::Error` if an unspecified error occurs.
+    pub async fn recv(self) -> Result<Message<<T as ServiceMsg>::Response>> {
+        AsyncReceiver {
+            client: self,
+            is_waiting: false,
+        }
+        .await
+    }
+
+    /// Receive a message.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use oxidros_rcl::{
+    ///     error::Result,
+    ///     logger::Logger,
+    ///     msg::common_interfaces::{std_msgs, std_srvs},
+    ///     pr_fatal,
+    ///     selector::Selector,
+    ///     service::client::Client,
+    ///     topic::subscriber::Subscriber,
+    /// };
+    /// use std::time::Duration;
+    ///
+    /// fn worker(
+    ///     mut selector: Selector,
+    ///     mut selector_client: Selector,
+    ///     subscriber: Subscriber<std_msgs::msg::Empty>,
+    ///     mut client: Client<std_srvs::srv::Empty>,
+    /// ) -> Result<()> {
+    ///     let logger = Logger::new("listen_client");
+    ///
+    ///     selector.add_subscriber(
+    ///         subscriber,
+    ///         Box::new(move |_msg| {
+    ///             let request = std_srvs::srv::Empty_Request::new().unwrap();
+    ///             // Send a request.
+    ///             let receiver = client.send(&request).unwrap();
+    ///             // Receive a response.
+    ///             match receiver.recv_timeout(Duration::from_millis(20), &mut selector_client) {
+    ///                 Ok(Some(_response)) => {},
+    ///                 Ok(None) => {},
+    ///                 Err(e) => {
+    ///                     pr_fatal!(logger, "{e}");
+    ///                     panic!()
+    ///                 }
+    ///             }
+    ///         }),
+    ///     );
+    ///
+    ///     loop {
+    ///         selector.wait()?;
+    ///     }
+    /// }
+    /// ```
+    pub fn recv_timeout(
+        &self,
+        t: Duration,
+        selector: &mut Selector,
+    ) -> Result<Option<Message<<T as ServiceMsg>::Response>>> {
+        // Add the receiver.
+        selector.add_client_recv(self);
+        // Wait a response with timeout.
+        match selector.wait_timeout(t) {
+            Ok(true) => self.try_recv(),
+            Ok(false) => {
+                // Timeout.
+                Ok(None)
+            }
+            Err(e) => {
+                // Failed to wait.
+                Err(e)
+            }
+        }
+    }
+}
+
+fn rcl_take_response_with_info<T>(
+    client: &rcl::rcl_client_t,
+    seq: i64,
+) -> Result<(T, rcl::rmw_service_info_t)> {
+    let mut header: rcl::rmw_service_info_t = unsafe { std::mem::zeroed() };
+    let mut ros_response: T = unsafe { std::mem::zeroed() };
+
+    header.request_id.sequence_number = seq;
+
+    let guard = rcl::MT_UNSAFE_FN.lock();
+    guard.rcl_take_response_with_info(
+        client,
+        &mut header,
+        &mut ros_response as *mut _ as *mut c_void,
+    )?;
+
+    Ok((ros_response, header))
+}
+
+/// Receiver to receive a response asynchronously.
+#[must_use]
+pub struct AsyncReceiver<'a, T: ServiceMsg> {
+    client: ClientRecv<'a, T>,
+    is_waiting: bool,
+}
+
+impl<'a, T: ServiceMsg> Future for AsyncReceiver<'a, T> {
+    type Output = Result<Message<<T as ServiceMsg>::Response>>;
+
+    fn poll(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        let mut this = self.as_mut();
+        this.is_waiting = false;
+        match this.client.try_recv() {
+            Ok(Some(v)) => return Poll::Ready(Ok(v)),
+            Ok(None) => (),
+            Err(e) => return Poll::Ready(Err(e)),
+        }
+        // wait message arrival
+        let mut waker = Some(cx.waker().clone());
+        if let Err(e) = async_selector::send_command(
+            &this.client.data.data.node.context,
+            async_selector::Command::Client(
+                this.client.data.data.clone(),
+                Box::new(move || {
+                    let w = waker.take().unwrap();
+                    w.wake();
+                    CallbackResult::Ok
+                }),
+            ),
+        ) {
+            return Poll::Ready(Err(e));
+        }
+        this.is_waiting = true;
+        Poll::Pending
+    }
+}
+
+impl<'a, T: ServiceMsg> Drop for AsyncReceiver<'a, T> {
+    fn drop(&mut self) {
+        if self.is_waiting {
+            let _ = async_selector::send_command(
+                &self.client.data.data.node.context,
+                async_selector::Command::RemoveClient(self.client.data.data.clone()),
+            );
+        }
+    }
+}
+
+// ============================================================================
+// RosClient trait implementation
+// ============================================================================
+
+impl<T: ServiceMsg> oxidros_core::api::RosClient<T> for Client<T> {
+    fn service_name(&self) -> Result<Cow<'_, String>> {
+        Self::service_name(self)
+    }
+
+    fn is_service_available(&self) -> bool {
+        Self::is_service_available(self)
+    }
+
+    async fn call(&mut self, request: &T::Request) -> Result<Message<T::Response>> {
+        Self::call(self, request).await
+    }
+}

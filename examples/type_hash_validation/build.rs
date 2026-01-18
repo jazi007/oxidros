@@ -1,0 +1,827 @@
+//! Build script that automatically discovers and generates all ROS2 messages with TypeDescription support
+//!
+//! This uses ros2msg Generator with custom callbacks to automatically add:
+//! 1. derive(TypeDescription) to all generated structs
+//! 2. Custom trait implementations with proper type names
+//! 3. Scans ROS_PATH/share for all .msg, .srv, and .action files
+
+use heck::ToSnakeCase;
+use ros2msg::generator::{Generator, ItemInfo, ParseCallbacks};
+use std::collections::HashMap;
+use std::env;
+use std::fs;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+
+/// Custom callbacks to add TypeDescription derive and attributes
+struct TypeDescCallbacks;
+
+impl ParseCallbacks for TypeDescCallbacks {
+    fn add_derives(&self, _info: &ItemInfo) -> Vec<String> {
+        vec![
+            "ros2_types::TypeDescription".to_string(),
+            "serde::Serialize".to_string(),
+            "serde::Deserialize".to_string(),
+        ]
+    }
+
+    fn add_attributes(&self, info: &ItemInfo) -> Vec<String> {
+        vec![format!(
+            "#[ros2(package = \"{}\", interface_type = \"{}\")]",
+            info.package(),
+            info.interface_kind()
+        )]
+    }
+
+    fn add_field_attributes(&self, field_info: &ros2msg::generator::FieldInfo) -> Vec<String> {
+        let mut attrs = Vec::new();
+
+        // Build #[ros2(...)] attributes for type hash metadata
+        let mut ros2_parts = Vec::new();
+
+        // Add type override if present
+        if let Some(type_override) = field_info.ros2_type_override() {
+            ros2_parts.push(format!("ros2_type = \"{}\"", type_override));
+        }
+
+        // Distinguish between:
+        // 1. Bounded strings (string<=N) - use `string, capacity = N`
+        // 2. Bounded wstrings (wstring<=N) - use `wstring, capacity = N`
+        // 3. Bounded sequences (T[<=N]) - use `sequence, capacity = N`
+        // 4. Unbounded sequences (T[]) - use `sequence`
+        let ros_type_name = field_info.ros_type_name();
+        let rust_type = field_info.field_type();
+
+        // Check if it's a bounded/unbounded string type
+        let is_string_type = ros_type_name == "string";
+        let is_wstring_type = ros_type_name == "wstring";
+
+        // Sequence detection: either explicit sequence in ROS type name (ends with [])
+        // or it's a Vec<...> in Rust without being a fixed-size array
+        let is_sequence = ros_type_name.starts_with("sequence")
+            || (ros_type_name.ends_with("[]") && field_info.array_size().is_none())
+            || (rust_type.starts_with("Vec<")
+                && field_info.array_size().is_none()
+                && !is_string_type
+                && !is_wstring_type);
+
+        // Add string attribute for bounded strings
+        if is_string_type && field_info.capacity().is_some() {
+            ros2_parts.push("string".to_string());
+        }
+
+        // Add wstring attribute for bounded wstrings
+        if is_wstring_type && field_info.capacity().is_some() {
+            ros2_parts.push("wstring".to_string());
+        }
+
+        if is_sequence {
+            ros2_parts.push("sequence".to_string());
+        }
+
+        // Add capacity if present (for sequences)
+        if let Some(capacity) = field_info.capacity() {
+            ros2_parts.push(format!("capacity = {}", capacity));
+        }
+
+        // Add string_capacity if present (for bounded strings in sequences)
+        if let Some(string_capacity) = field_info.string_capacity() {
+            ros2_parts.push(format!("string_capacity = {}", string_capacity));
+        }
+
+        // Add default value if present
+        if let Some(default_value) = field_info.default_value() {
+            // Escape quotes and backslashes in the default value
+            let escaped = default_value.replace('\\', "\\\\").replace('"', "\\\"");
+            ros2_parts.push(format!("default = \"{}\"", escaped));
+        }
+
+        if !ros2_parts.is_empty() {
+            attrs.push(format!("#[ros2({})]", ros2_parts.join(", ")));
+        }
+
+        // Add serde_big_array attribute for large fixed-size arrays (> 32 elements)
+        if let Some(size) = field_info.array_size()
+            && size > 32
+        {
+            attrs.push("#[serde(with = \"serde_big_array::BigArray\")]".to_string());
+        }
+        attrs
+    }
+}
+
+#[derive(Debug)]
+struct DiscoveredType {
+    file_path: String,
+    package: String,
+    interface_type: String, // "msg", "srv", "action"
+    name: String,
+}
+
+/// Recursively scan a directory for .msg, .srv, and .action files
+fn scan_ros_interfaces(
+    share_dir: &PathBuf,
+) -> Result<Vec<DiscoveredType>, Box<dyn std::error::Error>> {
+    let mut discovered = Vec::new();
+
+    if !share_dir.exists() {
+        return Ok(discovered);
+    }
+
+    // Iterate through package directories in share/
+    for entry in fs::read_dir(share_dir)? {
+        let entry = entry?;
+        let package_path = entry.path();
+
+        if !package_path.is_dir() {
+            continue;
+        }
+
+        let package_name = package_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
+
+        // Skip common non-package directories
+        if package_name.starts_with('.') {
+            continue;
+        }
+
+        // Scan msg/, srv/, and action/ subdirectories
+        for interface_type in &["msg", "srv", "action"] {
+            let interface_dir = package_path.join(interface_type);
+
+            if !interface_dir.exists() {
+                continue;
+            }
+
+            // Find all interface files
+            if let Ok(entries) = fs::read_dir(&interface_dir) {
+                for file_entry in entries.flatten() {
+                    let file_path = file_entry.path();
+
+                    if let Some(ext) = file_path.extension()
+                        && let Some(file_name) = file_path.file_stem().and_then(|n| n.to_str())
+                    {
+                        // Accept files with extension matching the interface type (e.g., .msg in msg/)
+                        // or .idl files in any interface directory
+                        let ext_str = ext.to_str().unwrap_or("");
+                        if ext_str == *interface_type || ext_str == "idl" {
+                            discovered.push(DiscoveredType {
+                                file_path: file_path.to_string_lossy().to_string(),
+                                package: package_name.clone(),
+                                interface_type: interface_type.to_string(),
+                                name: file_name.to_string(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(discovered)
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("cargo:rerun-if-env-changed=ROS_PATH");
+    let ros_path = match env::var("AMENT_PREFIX_PATH") {
+        Ok(path) => env::split_paths(&path).next().unwrap(),
+        Err(_) => PathBuf::from("/opt/ros/jazzy"),
+    };
+
+    let out_dir = PathBuf::from(env::var("OUT_DIR")?);
+    println!(
+        "cargo:info=Scanning ROS2 interfaces from: {}",
+        ros_path.display()
+    );
+    let share_dir = ros_path.join("share");
+
+    // Discover all interface files
+    let mut discovered = scan_ros_interfaces(&share_dir)?;
+    if let Ok(paths) = scan_ros_interfaces(&PathBuf::from("~/github/ros2-msg")) {
+        discovered.extend(paths);
+    }
+
+    // Deduplicate by package/interface_type/name key, preferring entries from ros2-msg over ROS share
+    let mut seen_keys: std::collections::HashSet<String> = std::collections::HashSet::new();
+    // Reverse to prefer ros2-msg (appended last) over share_dir entries
+    discovered.reverse();
+    discovered.retain(|d| {
+        let key = format!("{}/{}/{}", d.package, d.interface_type, d.name);
+        seen_keys.insert(key)
+    });
+    // Restore original order
+    discovered.reverse();
+
+    if discovered.is_empty() {
+        println!(
+            "cargo:warning=No ROS2 message files found at {}",
+            share_dir.display()
+        );
+        println!("cargo:info=Set ROS_PATH environment variable to your ROS2 installation");
+        return Ok(());
+    }
+
+    println!("cargo:info=Discovered {} interface files", discovered.len());
+
+    // Organize by category for better logging
+    let mut by_type: HashMap<String, Vec<&DiscoveredType>> = HashMap::new();
+    for d in &discovered {
+        by_type.entry(d.interface_type.clone()).or_default().push(d);
+    }
+
+    for (itype, items) in &by_type {
+        println!("cargo:info=  {} {}: {}", items.len(), itype, items.len());
+    }
+
+    // Collect all file paths for generation
+    let file_paths: Vec<&str> = discovered.iter().map(|d| d.file_path.as_str()).collect();
+
+    // Generate with TypeDescription support
+    match Generator::new()
+        .header("// Auto-generated ROS2 messages with TypeDescription support")
+        .derive_debug(true)
+        .derive_clone(true)
+        .derive_partialeq(true)
+        .parse_callbacks(Box::new(TypeDescCallbacks))
+        .includes(&file_paths)
+        .allowlist_recursively(true) // Generate dependencies recursively
+        .output_dir(&out_dir)
+        .generate()
+    {
+        Ok(_) => {
+            println!("cargo:info=Generated messages to: {}", out_dir.display());
+        }
+        Err(e) => {
+            println!("cargo:warning=Generation failed: {}", e);
+            println!("cargo:warning=Attempting to filter problematic files and retry...");
+
+            // Try to generate files one by one to identify problematic ones
+            let mut successful_paths = Vec::new();
+            let mut failed = Vec::new();
+
+            for d in &discovered {
+                match Generator::new()
+                    .header("// Auto-generated ROS2 messages with TypeDescription support")
+                    .derive_debug(true)
+                    .derive_clone(true)
+                    .derive_partialeq(true)
+                    .parse_callbacks(Box::new(TypeDescCallbacks))
+                    .includes([d.file_path.as_str()])
+                    .allowlist_recursively(false) // Don't recurse when testing individual files
+                    .output_dir(&out_dir)
+                    .generate()
+                {
+                    Ok(_) => {
+                        successful_paths.push(d.file_path.clone());
+                    }
+                    Err(_) => {
+                        failed.push(d);
+                    }
+                }
+            }
+
+            println!(
+                "cargo:warning=Successfully generated: {} files",
+                successful_paths.len()
+            );
+            println!("cargo:warning=Failed to generate: {} files", failed.len());
+
+            if !failed.is_empty() {
+                println!("cargo:warning=Failed files:");
+                for f in &failed {
+                    println!(
+                        "cargo:warning=  - {}/{}/{}",
+                        f.package, f.interface_type, f.name
+                    );
+                }
+            }
+
+            // Update discovered list to only include successful ones
+            discovered.retain(|d| successful_paths.contains(&d.file_path));
+
+            // Now regenerate all successful files together with proper recursion
+            // Keep trying until we have a stable set (some files may depend on failed ones)
+            if !discovered.is_empty() {
+                let mut stable = false;
+                let mut iteration = 0;
+
+                while !stable && iteration < 10 {
+                    iteration += 1;
+                    let successful_file_paths: Vec<&str> =
+                        discovered.iter().map(|d| d.file_path.as_str()).collect();
+
+                    println!(
+                        "cargo:warning=Regeneration attempt {} with {} files...",
+                        iteration,
+                        successful_file_paths.len()
+                    );
+
+                    match Generator::new()
+                        .header("// Auto-generated ROS2 messages with TypeDescription support")
+                        .raw_line("use ros2_types::*;")
+                        .derive_debug(true)
+                        .derive_clone(true)
+                        .derive_partialeq(true)
+                        .parse_callbacks(Box::new(TypeDescCallbacks))
+                        .includes(&successful_file_paths)
+                        .allowlist_recursively(true)
+                        .output_dir(&out_dir)
+                        .generate()
+                    {
+                        Ok(_) => {
+                            println!("cargo:info=Successfully regenerated all working files");
+                            stable = true;
+                        }
+                        Err(e) => {
+                            println!(
+                                "cargo:warning=Regeneration attempt {} failed: {}",
+                                iteration, e
+                            );
+
+                            // The error is from the Generator itself, filter files
+                            let before_count = discovered.len();
+                            let mut new_successful = Vec::new();
+
+                            for d in &discovered {
+                                match Generator::new()
+                                    .header("// Auto-generated ROS2 messages with TypeDescription support")
+                                    .raw_line("use ros2_types::*;")
+                                    .derive_debug(true)
+                                    .derive_clone(true)
+                                    .derive_partialeq(true)
+                                    .parse_callbacks(Box::new(TypeDescCallbacks))
+                                    .includes([d.file_path.as_str()])
+                                    .allowlist_recursively(true)
+                                    .output_dir(&out_dir)
+                                    .generate()
+                                {
+                                    Ok(_) => {
+                                        new_successful.push(d.file_path.clone());
+                                    }
+                                    Err(_) => {
+                                        println!("cargo:warning=  Filtering out: {}/{}/{}", d.package, d.interface_type, d.name);
+                                    }
+                                }
+                            }
+
+                            discovered.retain(|d| new_successful.contains(&d.file_path));
+
+                            if discovered.len() == before_count {
+                                // No progress, might be a compilation issue, not generation
+                                // Try compiling to check
+                                println!(
+                                    "cargo:warning=No generation failures found, issue may be in compilation"
+                                );
+                                println!(
+                                    "cargo:warning=This is likely due to dependencies on failed types"
+                                );
+                                println!("cargo:warning=Stopping with {} files", discovered.len());
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Generate a registry file that main.rs can use to test all types
+    generate_test_registry(&out_dir, &discovered)?;
+
+    Ok(())
+}
+
+/// Generate a Rust file containing metadata and test dispatcher for all discovered types
+fn generate_test_registry(
+    out_dir: &Path,
+    discovered: &[DiscoveredType],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let registry_path = out_dir.join("test_registry.rs");
+    let mut file = fs::File::create(registry_path)?;
+
+    writeln!(file, "// Auto-generated test registry")?;
+    writeln!(
+        file,
+        "// This file contains metadata and test dispatch for all discovered ROS2 types\n"
+    )?;
+
+    writeln!(file, "#[allow(unused_imports)]")?;
+    writeln!(file, "use crate::generated;")?;
+    writeln!(
+        file,
+        "use crate::{{TestResult, test_type_impl, test_service_type_impl, test_action_type_impl}};\n"
+    )?;
+
+    // Generate service marker structs with ServiceTypeDescription derive
+    let services: Vec<_> = discovered
+        .iter()
+        .filter(|d| d.interface_type == "srv")
+        .collect();
+
+    if !services.is_empty() {
+        writeln!(file, "// Service marker structs for type hash computation")?;
+        writeln!(file, "#[allow(dead_code)]")?;
+        writeln!(file, "pub mod service_types {{")?;
+
+        // Group services by package to avoid module name collisions
+        let mut services_by_package: std::collections::HashMap<&str, Vec<&&DiscoveredType>> =
+            std::collections::HashMap::new();
+        for srv in &services {
+            services_by_package
+                .entry(srv.package.as_str())
+                .or_default()
+                .push(srv);
+        }
+
+        for (package, pkg_services) in &services_by_package {
+            writeln!(file, "    pub mod {} {{", package)?;
+            for srv in pkg_services {
+                let module_name = srv.name.to_snake_case();
+                // Each service gets its own submodule with the Request/Response types imported
+                writeln!(file, "        pub mod {} {{", module_name)?;
+                writeln!(file, "            #[allow(unused_imports)]")?;
+                writeln!(
+                    file,
+                    "            use crate::generated::{}::srv::{}::*;",
+                    srv.package, module_name
+                )?;
+                writeln!(file)?;
+                writeln!(
+                    file,
+                    "            #[derive(ros2_types::ServiceTypeDescription)]"
+                )?;
+                writeln!(file, "            #[ros2(package = \"{}\")]", srv.package)?;
+                writeln!(file, "            pub struct {};", srv.name)?;
+                writeln!(file, "        }}")?;
+            }
+            writeln!(file, "    }}")?;
+        }
+        writeln!(file, "}}\n")?;
+    }
+
+    // Generate action marker structs with ActionTypeDescription derive
+    let actions: Vec<_> = discovered
+        .iter()
+        .filter(|d| d.interface_type == "action")
+        .collect();
+
+    if !actions.is_empty() {
+        writeln!(file, "// Action marker structs for type hash computation")?;
+        writeln!(file, "#[allow(dead_code)]")?;
+        writeln!(file, "pub mod action_types {{")?;
+
+        // Group actions by package to avoid module name collisions
+        let mut actions_by_package: std::collections::HashMap<&str, Vec<&&DiscoveredType>> =
+            std::collections::HashMap::new();
+        for action in &actions {
+            actions_by_package
+                .entry(action.package.as_str())
+                .or_default()
+                .push(action);
+        }
+
+        for (package, pkg_actions) in &actions_by_package {
+            writeln!(file, "    pub mod {} {{", package)?;
+            for action in pkg_actions {
+                let module_name = action.name.to_snake_case();
+                // Each action gets its own submodule with the Goal/Result/Feedback types imported
+                writeln!(file, "        pub mod {} {{", module_name)?;
+                writeln!(file, "            #[allow(unused_imports)]")?;
+                writeln!(
+                    file,
+                    "            use crate::generated::{}::action::{}::*;",
+                    action.package, module_name
+                )?;
+                writeln!(file)?;
+                writeln!(
+                    file,
+                    "            #[derive(ros2_types::ActionTypeDescription)]"
+                )?;
+                writeln!(
+                    file,
+                    "            #[ros2(package = \"{}\")]",
+                    action.package
+                )?;
+                writeln!(file, "            pub struct {};", action.name)?;
+                writeln!(file, "        }}")?;
+            }
+            writeln!(file, "    }}")?;
+        }
+        writeln!(file, "}}\n")?;
+    }
+
+    writeln!(file, "pub struct TypeEntry {{")?;
+    writeln!(
+        file,
+        "    pub ros2_name: &'static str,  // e.g., \"std_msgs/msg/String\""
+    )?;
+    writeln!(file, "    pub package: &'static str,")?;
+    writeln!(
+        file,
+        "    pub interface_type: &'static str,  // \"msg\", \"srv\", \"action\""
+    )?;
+    writeln!(file, "    pub name: &'static str,")?;
+    writeln!(file, "}}\n")?;
+
+    writeln!(file, "pub const ALL_TYPES: &[TypeEntry] = &[")?;
+
+    for d in discovered {
+        // For services, we'll register both Request and Response variants
+        if d.interface_type == "srv" {
+            writeln!(
+                file,
+                "    TypeEntry {{ ros2_name: \"{}/{}/{}_Request\", package: \"{}\", interface_type: \"{}\", name: \"{}\" }},",
+                d.package, d.interface_type, d.name, d.package, d.interface_type, d.name
+            )?;
+            writeln!(
+                file,
+                "    TypeEntry {{ ros2_name: \"{}/{}/{}_Response\", package: \"{}\", interface_type: \"{}\", name: \"{}\" }},",
+                d.package, d.interface_type, d.name, d.package, d.interface_type, d.name
+            )?;
+        } else if d.interface_type == "action" {
+            // For actions, register Goal, Result, and Feedback variants
+            writeln!(
+                file,
+                "    TypeEntry {{ ros2_name: \"{}/{}/{}_Goal\", package: \"{}\", interface_type: \"{}\", name: \"{}\" }},",
+                d.package, d.interface_type, d.name, d.package, d.interface_type, d.name
+            )?;
+            writeln!(
+                file,
+                "    TypeEntry {{ ros2_name: \"{}/{}/{}_Result\", package: \"{}\", interface_type: \"{}\", name: \"{}\" }},",
+                d.package, d.interface_type, d.name, d.package, d.interface_type, d.name
+            )?;
+            writeln!(
+                file,
+                "    TypeEntry {{ ros2_name: \"{}/{}/{}_Feedback\", package: \"{}\", interface_type: \"{}\", name: \"{}\" }},",
+                d.package, d.interface_type, d.name, d.package, d.interface_type, d.name
+            )?;
+        } else {
+            writeln!(
+                file,
+                "    TypeEntry {{ ros2_name: \"{}/{}/{}\", package: \"{}\", interface_type: \"{}\", name: \"{}\" }},",
+                d.package, d.interface_type, d.name, d.package, d.interface_type, d.name
+            )?;
+        }
+    }
+
+    writeln!(file, "];\n")?;
+
+    // Generate list of service types (for testing service type hashes)
+    writeln!(file, "pub const ALL_SERVICE_TYPES: &[TypeEntry] = &[")?;
+    for d in discovered.iter().filter(|d| d.interface_type == "srv") {
+        writeln!(
+            file,
+            "    TypeEntry {{ ros2_name: \"{}/srv/{}\", package: \"{}\", interface_type: \"srv\", name: \"{}\" }},",
+            d.package, d.name, d.package, d.name
+        )?;
+    }
+    writeln!(file, "];\n")?;
+
+    // Generate list of action types (for testing action type hashes)
+    writeln!(file, "pub const ALL_ACTION_TYPES: &[TypeEntry] = &[")?;
+    for d in discovered.iter().filter(|d| d.interface_type == "action") {
+        writeln!(
+            file,
+            "    TypeEntry {{ ros2_name: \"{}/action/{}\", package: \"{}\", interface_type: \"action\", name: \"{}\" }},",
+            d.package, d.name, d.package, d.name
+        )?;
+    }
+    writeln!(file, "];\n")?;
+
+    // Build a map of actual module names from the generated code
+    let mut module_names = std::collections::HashMap::new();
+    for d in discovered {
+        let mod_rs = out_dir
+            .join(&d.package)
+            .join(&d.interface_type)
+            .join("mod.rs");
+        if let Ok(content) = fs::read_to_string(&mod_rs) {
+            // Parse module names from "pub mod <name>;"
+            for line in content.lines() {
+                if let Some(mod_name) = line
+                    .trim()
+                    .strip_prefix("pub mod ")
+                    .and_then(|s| s.strip_suffix(';'))
+                {
+                    // Try to find which discovered type this module corresponds to
+                    for check_d in discovered {
+                        if check_d.package == d.package
+                            && check_d.interface_type == d.interface_type
+                        {
+                            let test_snake = check_d.name.to_snake_case();
+                            if mod_name == test_snake {
+                                let key = format!(
+                                    "{}/{}/{}",
+                                    check_d.package, check_d.interface_type, check_d.name
+                                );
+                                module_names.insert(key, mod_name.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Generate the automatic dispatch function
+    writeln!(
+        file,
+        "pub fn test_type_by_name(ros2_name: &str) -> TestResult {{"
+    )?;
+    writeln!(file, "    let mut total = 0;")?;
+    writeln!(file, "    let mut matches = 0;")?;
+    writeln!(file, "    let mut mismatches = 0;")?;
+    writeln!(file, "    let mut errors = 0;\n")?;
+
+    writeln!(file, "    match ros2_name {{")?;
+
+    // Generate match arms for all discovered types
+    for d in discovered {
+        let key = format!("{}/{}/{}", d.package, d.interface_type, d.name);
+        let module_name = module_names
+            .get(&key)
+            .map(|s| s.as_str())
+            .unwrap_or_else(|| {
+                println!(
+                    "cargo:warning=Could not find module name for {}, using fallback",
+                    key
+                );
+                ""
+            });
+
+        if module_name.is_empty() {
+            continue; // Skip if we couldn't find the module
+        }
+
+        if d.interface_type == "srv" {
+            // Service Request
+            writeln!(
+                file,
+                "        \"{}/{}/{}_Request\" => test_type_impl::<generated::{}::{}::{}::{}_Request>(ros2_name, &mut total, &mut matches, &mut mismatches, &mut errors),",
+                d.package,
+                d.interface_type,
+                d.name,
+                d.package,
+                d.interface_type,
+                module_name,
+                d.name
+            )?;
+            // Service Response
+            writeln!(
+                file,
+                "        \"{}/{}/{}_Response\" => test_type_impl::<generated::{}::{}::{}::{}_Response>(ros2_name, &mut total, &mut matches, &mut mismatches, &mut errors),",
+                d.package,
+                d.interface_type,
+                d.name,
+                d.package,
+                d.interface_type,
+                module_name,
+                d.name
+            )?;
+        } else if d.interface_type == "action" {
+            // Action Goal
+            writeln!(
+                file,
+                "        \"{}/{}/{}_Goal\" => test_type_impl::<generated::{}::{}::{}::{}_Goal>(ros2_name, &mut total, &mut matches, &mut mismatches, &mut errors),",
+                d.package,
+                d.interface_type,
+                d.name,
+                d.package,
+                d.interface_type,
+                module_name,
+                d.name
+            )?;
+            // Action Result
+            writeln!(
+                file,
+                "        \"{}/{}/{}_Result\" => test_type_impl::<generated::{}::{}::{}::{}_Result>(ros2_name, &mut total, &mut matches, &mut mismatches, &mut errors),",
+                d.package,
+                d.interface_type,
+                d.name,
+                d.package,
+                d.interface_type,
+                module_name,
+                d.name
+            )?;
+            // Action Feedback
+            writeln!(
+                file,
+                "        \"{}/{}/{}_Feedback\" => test_type_impl::<generated::{}::{}::{}::{}_Feedback>(ros2_name, &mut total, &mut matches, &mut mismatches, &mut errors),",
+                d.package,
+                d.interface_type,
+                d.name,
+                d.package,
+                d.interface_type,
+                module_name,
+                d.name
+            )?;
+        } else {
+            // Regular message
+            writeln!(
+                file,
+                "        \"{}/{}/{}\" => test_type_impl::<generated::{}::{}::{}::{}>(ros2_name, &mut total, &mut matches, &mut mismatches, &mut errors),",
+                d.package,
+                d.interface_type,
+                d.name,
+                d.package,
+                d.interface_type,
+                module_name,
+                d.name
+            )?;
+        }
+    }
+
+    writeln!(file, "        _ => {{")?;
+    writeln!(
+        file,
+        "            println!(\"⊘ Skipped (not in generated code)\");"
+    )?;
+    writeln!(file, "            TestResult::Skipped")?;
+    writeln!(file, "        }}")?;
+    writeln!(file, "    }}")?;
+    writeln!(file, "}}\n")?;
+
+    // Generate test_service_type_by_name dispatch function
+    writeln!(
+        file,
+        "pub fn test_service_type_by_name(ros2_name: &str) -> TestResult {{"
+    )?;
+    writeln!(file, "    let mut total = 0;")?;
+    writeln!(file, "    let mut matches = 0;")?;
+    writeln!(file, "    let mut mismatches = 0;")?;
+    writeln!(file, "    let mut errors = 0;\n")?;
+    writeln!(file, "    match ros2_name {{")?;
+
+    for d in discovered.iter().filter(|d| d.interface_type == "srv") {
+        let key = format!("{}/srv/{}", d.package, d.name);
+        let module_name = module_names
+            .get(&key)
+            .map(|s| s.as_str())
+            .unwrap_or_else(|| d.name.to_snake_case().leak());
+
+        if !module_name.is_empty() {
+            writeln!(
+                file,
+                "        \"{}/srv/{}\" => test_service_type_impl::<service_types::{}::{}::{}>(ros2_name, &mut total, &mut matches, &mut mismatches, &mut errors),",
+                d.package, d.name, d.package, module_name, d.name
+            )?;
+        }
+    }
+
+    writeln!(file, "        _ => {{")?;
+    writeln!(
+        file,
+        "            println!(\"⊘ Skipped (service not in generated code)\");"
+    )?;
+    writeln!(file, "            TestResult::Skipped")?;
+    writeln!(file, "        }}")?;
+    writeln!(file, "    }}")?;
+    writeln!(file, "}}\n")?;
+
+    // Generate test_action_type_by_name dispatch function
+    writeln!(
+        file,
+        "pub fn test_action_type_by_name(ros2_name: &str) -> TestResult {{"
+    )?;
+    writeln!(file, "    let mut total = 0;")?;
+    writeln!(file, "    let mut matches = 0;")?;
+    writeln!(file, "    let mut mismatches = 0;")?;
+    writeln!(file, "    let mut errors = 0;\n")?;
+    writeln!(file, "    match ros2_name {{")?;
+
+    for d in discovered.iter().filter(|d| d.interface_type == "action") {
+        let key = format!("{}/action/{}", d.package, d.name);
+        let module_name = module_names
+            .get(&key)
+            .map(|s| s.as_str())
+            .unwrap_or_else(|| d.name.to_snake_case().leak());
+
+        if !module_name.is_empty() {
+            writeln!(
+                file,
+                "        \"{}/action/{}\" => test_action_type_impl::<action_types::{}::{}::{}>(ros2_name, &mut total, &mut matches, &mut mismatches, &mut errors),",
+                d.package, d.name, d.package, module_name, d.name
+            )?;
+        }
+    }
+
+    writeln!(file, "        _ => {{")?;
+    writeln!(
+        file,
+        "            println!(\"⊘ Skipped (action not in generated code)\");"
+    )?;
+    writeln!(file, "            TestResult::Skipped")?;
+    writeln!(file, "        }}")?;
+    writeln!(file, "    }}")?;
+    writeln!(file, "}}")?;
+
+    println!(
+        "cargo:info=Generated test registry with {} entries",
+        discovered.len()
+    );
+
+    Ok(())
+}

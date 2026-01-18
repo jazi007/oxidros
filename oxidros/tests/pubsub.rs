@@ -1,79 +1,86 @@
-pub mod common;
+//! Publish/Subscribe integration test.
+//!
+//! Tests basic pub/sub functionality using the unified API.
+//! Works with both RCL and Zenoh backends.
 
-use common::msgs::example_msg::msg::Num;
-use oxidros::{context::Context, msg::common_interfaces::std_msgs};
+mod common;
+
+use oxidros::prelude::*;
+use oxidros_msg::common_interfaces::example_interfaces::msg::Int64;
 use std::error::Error;
+use std::ops::Deref;
+use std::time::Duration;
 
-const TOPIC_NAME: &str = "test_pubsub";
+const TOPIC_NAME: &str = "test_unified_pubsub";
 
 #[test]
-fn test_pubsub() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
-    // create a context
+fn test_pubsub() -> Result<(), Box<dyn Error + Send + Sync>> {
+    // Create a context
     let ctx = Context::new()?;
 
-    // create a publish node
-    let node_pub = ctx.create_node("test_pubusub_pub_node", None, Default::default())?;
+    // Create nodes
+    let node_pub = ctx.create_node("test_unified_pub_node", None)?;
+    let node_sub = ctx.create_node("test_unified_sub_node", None)?;
 
-    // create a subscribe node
-    let node_sub = ctx.create_node("test_pubusub_sub_node", None, Default::default())?;
+    // Create publisher and subscriber
+    let publisher = common::create_publisher(node_pub.clone(), TOPIC_NAME)?;
+    let subscriber = common::create_subscriber(node_sub.clone(), TOPIC_NAME)?;
 
-    // create a publisher and a subscriber
-    let publisher = common::create_publisher(node_pub, TOPIC_NAME, true)?;
-    let subscriber = common::create_subscriber(node_sub, TOPIC_NAME, true)?;
+    // Publish a message
+    let n = 42i64;
+    let msg = Int64 { data: n };
+    publisher.send(&msg)?;
 
-    // publish a message
-    let n = 100;
-    let msg = Num { num: n };
-    publisher.send(&msg)?; // send message
-
-    // wait messages
+    // Wait for message using selector
     let mut selector = ctx.create_selector()?;
+    static COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
     selector.add_subscriber(
         subscriber,
-        Box::new(move |msg| {
-            assert_eq!(msg.num, n);
+        Box::new(move |msg: Message<Int64>| {
+            // Message implements Deref, so we can directly access fields
+            let data = msg.deref().data;
+            assert_eq!(data, n);
+            COUNT.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
         }),
     );
-    selector.wait()?;
 
+    // Wait with timeout to avoid hanging
+    selector.wait_timeout(Duration::from_secs(2))?;
+
+    assert_ne!(COUNT.load(std::sync::atomic::Ordering::Relaxed), 0);
     Ok(())
 }
 
-const PUBSUB_MSG: &str = "Hello, World!";
-
 #[test]
-fn test_pubsub_string() -> Result<(), Box<dyn Error + Sync + Send + 'static>> {
-    // create a context
+fn test_pubsub_multiple_messages() -> Result<(), Box<dyn Error + Send + Sync>> {
     let ctx = Context::new()?;
+
+    let node_pub = ctx.create_node("test_multi_pub_node", None)?;
+    let node_sub = ctx.create_node("test_multi_sub_node", None)?;
+
+    let publisher: Publisher<Int64> = node_pub.create_publisher("test_multi_pubsub", None)?;
+    let subscriber: Subscriber<Int64> = node_sub.create_subscriber("test_multi_pubsub", None)?;
+
+    // Publish multiple messages
+    for i in 0..3 {
+        let msg = Int64 { data: i };
+        publisher.send(&msg)?;
+    }
+
+    // Receive messages
     let mut selector = ctx.create_selector()?;
-
-    // create a subscribe node
-    let node_sub = ctx.create_node("test_pubusub_string_sub_node", None, Default::default())?;
-
-    // create a publish node
-    let node_pub = ctx.create_node("test_pubusub_string_pub_node", None, Default::default())?;
-
-    // create a publisher and a subscriber
-    let subscriber =
-        node_sub.create_subscriber::<std_msgs::msg::String>("test_pubsub_string", None)?;
-    let publisher =
-        node_pub.create_publisher::<std_msgs::msg::String>("test_pubsub_string", None)?;
-
-    // publish a message
-    let mut msg = std_msgs::msg::String::new().unwrap();
-    msg.data.assign(PUBSUB_MSG);
-    publisher.send(&msg)?; // send message
-
-    // wait messages
+    static COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
     selector.add_subscriber(
         subscriber,
-        Box::new(|msg| {
-            let s = msg.data.to_string();
-            println!("{s}");
-            assert_eq!(&s, PUBSUB_MSG);
+        Box::new(|_msg: Message<Int64>| {
+            COUNT.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
         }),
     );
-    selector.wait()?;
-
+    // Wait a few times to receive all messages
+    for _ in 0..3 {
+        let _ = selector.wait_timeout(Duration::from_millis(500));
+    }
+    assert_ne!(COUNT.load(std::sync::atomic::Ordering::Relaxed), 0);
     Ok(())
 }

@@ -6,8 +6,26 @@ authors.workspace = true
 repository.workspace = true
 license-file.workspace = true
 
+# Build script for generating ROS2 message types
+build = "build.rs"
+
+
 [dependencies]
-oxidros = { path = "../../oxidros/" }
+# ros2-types provides the Ros2Msg derive macro for FFI code generation
+ros2-types = { path = "../../ros2-types", features = ["derive"] }
+oxidros-msg = { path = "../../oxidros-msg" }
+
+[dev-dependencies]
+serde_json = "1"
+serde = { version = "1", features = ["derive"] }
 
 [build-dependencies]
-ros2-msg-gen = { path = "../../ros2-msg-gen/" }
+oxidros-build = { path = "../../oxidros-build" }
+heck = "0.5"
+
+[features]
+default = []
+jazzy = ["rcl"]
+humble = ["rcl"]
+kilted = ["rcl"]
+rcl = []

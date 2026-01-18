@@ -1,50 +1,41 @@
+//! Common utilities for integration tests.
+//!
+//! This module provides helper functions that work with both RCL and Zenoh backends.
+
 #![allow(dead_code)]
-#![allow(non_upper_case_globals)]
-#![allow(non_camel_case_types)]
-#![allow(deref_nullptr)]
-#![allow(non_snake_case)]
-#![allow(improper_ctypes)]
-#![allow(unused_imports)]
-#![allow(clippy::upper_case_acronyms)]
 
-pub mod action_msg;
-pub mod msgs;
+use oxidros::prelude::*;
+use oxidros_msg::common_interfaces::example_interfaces::{msg::Int64, srv::AddTwoInts};
+use std::sync::Arc;
 
-use msgs::example_msg::{msg::Num, srv::AddThreeInts};
-
-use oxidros::{
-    self,
-    error::{DynError, RCLResult},
-    msg::{ServiceMsg, TypeSupport},
-    node::Node,
-    rcl,
-    service::{client::Client, server::Server},
-    topic::{publisher::Publisher, subscriber::Subscriber},
-};
-use std::{error::Error, sync::Arc};
-
+/// Create a publisher for Int64 messages.
 pub fn create_publisher(
     node: Arc<Node>,
     topic_name: &str,
-    disable_loaned_message: bool,
-) -> RCLResult<Publisher<Num>> {
-    let _ = disable_loaned_message;
-    node.create_publisher(topic_name, Default::default())
+) -> oxidros_core::Result<Publisher<Int64>> {
+    node.create_publisher(topic_name, None)
 }
 
+/// Create a subscriber for Int64 messages.
 pub fn create_subscriber(
     node: Arc<Node>,
     topic_name: &str,
-    disable_loaned_message: bool,
-) -> RCLResult<Subscriber<Num>> {
-    let _ = disable_loaned_message;
-    node.create_subscriber(topic_name, Default::default())
+) -> oxidros_core::Result<Subscriber<Int64>> {
+    node.create_subscriber(topic_name, None)
 }
 
-pub fn create_server(node: Arc<Node>, service_name: &str) -> RCLResult<Server<AddThreeInts>> {
+/// Create a service server for AddTwoInts.
+pub fn create_server(
+    node: Arc<Node>,
+    service_name: &str,
+) -> oxidros_core::Result<Server<AddTwoInts>> {
     node.create_server(service_name, None)
 }
 
-pub fn create_client(node: Arc<Node>, service_name: &str) -> RCLResult<Client<AddThreeInts>> {
+/// Create a service client for AddTwoInts.
+pub fn create_client(
+    node: Arc<Node>,
+    service_name: &str,
+) -> oxidros_core::Result<Client<AddTwoInts>> {
     node.create_client(service_name, None)
 }

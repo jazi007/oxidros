@@ -3,7 +3,7 @@
 use crate::common::Result;
 use log::{debug, error, trace};
 use oxidros::{
-    msg::ServiceMsg,
+    prelude::{Message, ServiceMsg},
     service::{client::Client as SdClient, server::Server as SdServer},
 };
 use std::{fmt::Debug, time::Duration};
@@ -11,7 +11,7 @@ use tokio::time;
 
 /// RPC Client
 #[allow(missing_debug_implementations)]
-pub struct Client<T>(pub(crate) Option<SdClient<T>>);
+pub struct Client<T: ServiceMsg>(pub(crate) SdClient<T>);
 
 impl<T: ServiceMsg> Client<T>
 where
@@ -21,48 +21,38 @@ where
     /// Send a request
     pub async fn send(
         &mut self,
-        data: &<T as ServiceMsg>::Request,
-    ) -> Result<<T as ServiceMsg>::Response> {
-        let client = self.0.take();
-        let Some(client) = client else {
-            return Err("Client not yet added".into());
-        };
-        debug!("Request: {:?}", data);
-        let mut receiver = client.send(data)?.recv();
-        // Send a request.
-        let resp = match (&mut receiver).await {
-            Ok((c, response, header)) => {
-                trace!("Header: {header:?}");
-                debug!("Response: {:?}", response);
-                self.0 = Some(c);
-                response
-            }
-            Err(e) => {
-                self.0 = Some(receiver.give_up());
-                return Err(e);
-            }
-        };
-        Ok(resp)
-    }
-    /// Send a request with a timeout
-    pub async fn send_timeout(
-        &mut self,
-        data: &<T as ServiceMsg>::Request,
-        timeout: Duration,
-    ) -> Result<<T as ServiceMsg>::Response> {
-        match time::timeout(timeout, self.send(data)).await {
-            Ok(Ok(v)) => Ok(v),
-            Ok(Err(e)) => Err(e),
-            Err(e) => Err(e.into()),
+        request: &<T as ServiceMsg>::Request,
+    ) -> Result<Message<<T as ServiceMsg>::Response>> {
+        let client = &mut self.0;
+        debug!("Waiting for service availability");
+        while !client.is_service_available() {
+            time::sleep(Duration::from_millis(100)).await;
+        }
+        debug!("Request: {:?}", request);
+        loop {
+            // Send a request.
+            match time::timeout(Duration::from_secs(1), client.call(request)).await {
+                Ok(Ok(response)) => {
+                    trace!("Header: {:?}", response.info);
+                    debug!("Response: {:?}", response.sample);
+                    return Ok(response);
+                }
+                Ok(Err(e)) => {
+                    return Err(e);
+                }
+                Err(_) => {
+                    log::error!("Timeout retrying ...");
+                }
+            };
         }
     }
 }
 
 /// RPC Server
 #[allow(missing_debug_implementations)]
-pub struct Server<T>(pub(crate) Option<SdServer<T>>);
+pub struct Server<T: ServiceMsg>(pub(crate) Option<SdServer<T>>);
 pub(crate) type ServerCallback<T> =
-    Box<dyn FnMut(<T as ServiceMsg>::Request) -> <T as ServiceMsg>::Response + Send>;
+    Box<dyn FnMut(Message<<T as ServiceMsg>::Request>) -> <T as ServiceMsg>::Response + Send>;
 
 impl<T: ServiceMsg> Server<T>
 where
@@ -79,16 +69,16 @@ where
             // Receive a request.
             let req = server.recv().await;
             match req {
-                Ok((sender, request, header)) => {
-                    trace!("Header: {header:?}");
-                    debug!("Request: {request:?}");
+                Ok(service_req) => {
+                    let (sender, request) = service_req.split();
+                    trace!("Header: {:?}", request.info);
+                    debug!("Request: {:?}", request.sample);
                     let response = callback(request);
                     debug!("Response: {response:?}");
                     match sender.send(&response) {
-                        Ok(s) => server = s, // Get a new server to handle next request.
-                        Err((s, e)) => {
+                        Ok(()) => {} // Get a new server to handle next request.
+                        Err(e) => {
                             error!("Failed to send response {:?}", e);
-                            server = s.give_up();
                         }
                     }
                 }

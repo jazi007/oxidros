@@ -1,0 +1,534 @@
+//! Server to receive a request and send the reply.
+//!
+//! # Examples
+//!
+//! ## Single Threaded Execution
+//!
+//! ```
+//! use oxidros_rcl::{context::Context, msg::common_interfaces::std_srvs};
+//! use std::time::Duration;
+//!
+//! // Create a context.
+//! let ctx = Context::new().unwrap();
+//!
+//! // Create a server node.
+//! let node = ctx
+//!     .create_node_with_opt("service_server_rs", None, Default::default())
+//!     .unwrap();
+//!
+//! // Create a server.
+//! let server = node
+//!     .create_server::<std_srvs::srv::Empty>("service_name1", None)
+//!     .unwrap();
+//!
+//! // Create a selector.
+//! let mut selector = ctx.create_selector().unwrap();
+//!
+//! // Add a wall timer.
+//! selector.add_wall_timer("timer_name", Duration::from_millis(100), Box::new(|| ()));
+//!
+//! // Add a callback of the server.
+//! selector.add_server(
+//!     server,
+//!     Box::new(|request| {
+//!         // Create a response.
+//!         let response = std_srvs::srv::Empty_Response::new().unwrap();
+//!         response
+//!     })
+//! );
+//!
+//! for _ in 0..2 {
+//!     selector.wait().unwrap();
+//! }
+//! ```
+//!
+//! ## Multi Threaded Execution
+//!
+//! ```
+//! use oxidros_rcl::{
+//!     context::Context, logger::Logger, msg::common_interfaces::std_srvs, pr_error,
+//!     service::server::Server,
+//! };
+//! use std::time::Duration;
+//!
+//! // Create a context.
+//! let ctx = Context::new().unwrap();
+//!
+//! // Create a server node.
+//! let node = ctx.create_node_with_opt("service_server_rs", None, Default::default()).unwrap();
+//!
+//! // Create a server.
+//! let server = node
+//!     .create_server::<std_srvs::srv::Empty>("service_name1", None)
+//!     .unwrap();
+//!
+//! let logger = Logger::new("service_rs");
+//!
+//! async fn server_task(mut server: Server<std_srvs::srv::Empty>, logger: Logger) {
+//!     loop {
+//!         // Receive a request.
+//!         let req = server.recv().await;
+//!         match req {
+//!             Ok(service_req) => {
+//!                 let response = std_srvs::srv::Empty_Response::new().unwrap();
+//!                 match service_req.send(&response) {
+//!                     Ok(()) => {},                  // Get a new server to handle next request.
+//!                     Err(_e) => {}, // Failed to send.
+//!                 }
+//!             }
+//!             Err(e) => {
+//!                 pr_error!(logger, "error: {e}");
+//!                 return;
+//!             }
+//!         }
+//!     }
+//! }
+//!
+//! // We don't call `server_task` here because testing this code will block forever.
+//! // let rt = tokio::runtime::Runtime::new().unwrap(); --- IGNORE ---
+//! // rt.block_on(server_task(server, logger)); // Spawn an asynchronous task.
+//! ```
+
+#[cfg(feature = "jazzy")]
+use crate::msg::interfaces::rosgraph_msgs::msg::Clock;
+use crate::{
+    PhantomUnsync,
+    error::Result,
+    get_allocator,
+    helper::is_unpin,
+    msg::ServiceMsg,
+    node::Node,
+    qos::Profile,
+    rcl::{self, MT_UNSAFE_FN, rmw_request_id_t},
+    selector::async_selector,
+};
+use oxidros_core::{Error, Message, RclError, selector::CallbackResult};
+use oxidros_msg::TypeSupport;
+use std::{
+    borrow::Cow, ffi::CString, future::Future, marker::PhantomData, os::raw::c_void, sync::Arc,
+    task::Poll,
+};
+
+pub(crate) struct ServerData {
+    pub(crate) service: rcl::rcl_service_t,
+    pub(crate) node: Arc<Node>,
+}
+
+impl Drop for ServerData {
+    fn drop(&mut self) {
+        let guard = rcl::MT_UNSAFE_FN.lock();
+        let _ = guard.rcl_service_fini(&mut self.service, unsafe { self.node.as_ptr_mut() });
+    }
+}
+
+#[cfg(any(feature = "jazzy", feature = "kilted"))]
+pub enum RCLServiceIntrospection {
+    RCLServiceIntrospectionOff,
+    RCLServiceIntrospectionMetadata,
+    RCLServiceIntrospectionContents,
+}
+
+#[cfg(any(feature = "jazzy", feature = "kilted"))]
+impl From<rcl::rcl_service_introspection_state_t> for RCLServiceIntrospection {
+    fn from(value: rcl::rcl_service_introspection_state_t) -> Self {
+        use rcl::rcl_service_introspection_state_t::*;
+        match value {
+            RCL_SERVICE_INTROSPECTION_OFF => Self::RCLServiceIntrospectionOff,
+            RCL_SERVICE_INTROSPECTION_CONTENTS => Self::RCLServiceIntrospectionContents,
+            RCL_SERVICE_INTROSPECTION_METADATA => Self::RCLServiceIntrospectionMetadata,
+        }
+    }
+}
+#[cfg(any(feature = "jazzy", feature = "kilted"))]
+impl From<RCLServiceIntrospection> for rcl::rcl_service_introspection_state_t {
+    fn from(value: RCLServiceIntrospection) -> Self {
+        use RCLServiceIntrospection::*;
+        use rcl::rcl_service_introspection_state_t::*;
+        match value {
+            RCLServiceIntrospectionOff => RCL_SERVICE_INTROSPECTION_OFF,
+            RCLServiceIntrospectionMetadata => RCL_SERVICE_INTROSPECTION_METADATA,
+            RCLServiceIntrospectionContents => RCL_SERVICE_INTROSPECTION_CONTENTS,
+        }
+    }
+}
+
+unsafe impl Sync for ServerData {}
+unsafe impl Send for ServerData {}
+
+/// Server.
+#[must_use]
+pub struct Server<T> {
+    pub(crate) data: Arc<ServerData>,
+    _phantom: PhantomData<T>,
+    _unsync: PhantomUnsync,
+}
+
+impl<T: ServiceMsg> Server<T> {
+    pub(crate) fn new(node: Arc<Node>, service_name: &str, qos: Option<Profile>) -> Result<Self> {
+        let mut service = rcl::MTSafeFn::rcl_get_zero_initialized_service();
+        let service_name_c = CString::new(service_name).unwrap_or_default();
+        let profile = qos.unwrap_or_else(Profile::services_default);
+        let options = rcl::rcl_service_options_t {
+            qos: (&profile).into(),
+            allocator: get_allocator(),
+        };
+
+        {
+            let guard = rcl::MT_UNSAFE_FN.lock();
+            guard.rcl_service_init(
+                &mut service,
+                node.as_ptr(),
+                <T as ServiceMsg>::type_support() as *const rcl::rosidl_service_type_support_t,
+                service_name_c.as_ptr(),
+                &options,
+            )?;
+        }
+
+        Ok(Server {
+            data: Arc::new(ServerData { service, node }),
+            _phantom: Default::default(),
+            _unsync: Default::default(),
+        })
+    }
+
+    #[cfg(feature = "jazzy")]
+    pub fn configure_introspection(
+        &mut self,
+        clock: &mut Clock,
+        qos: Profile,
+        introspection_state: RCLServiceIntrospection,
+    ) -> Result<()> {
+        let mut pub_opts = unsafe { rcl::rcl_publisher_get_default_options() };
+        pub_opts.qos = (&qos).into();
+
+        let data = &self.data as *const _ as *mut ServerData;
+        let guard = rcl::MT_UNSAFE_FN.lock();
+
+        guard.rcl_service_configure_service_introspection(
+            &mut unsafe { (*data).service },
+            unsafe { (*data).node.as_ptr_mut() },
+            clock as *mut Clock as *mut _,
+            <T as ServiceMsg>::type_support() as *const rcl::rosidl_service_type_support_t,
+            pub_opts,
+            introspection_state.into(),
+        )
+    }
+
+    /// Receive a request.
+    /// `try_recv` is a non-blocking function, and
+    /// this returns `Ok(None)` if there is no available data.
+    /// So, please retry later if this error is returned.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use oxidros_rcl::{
+    ///     logger::Logger, msg::common_interfaces::std_srvs, pr_error, pr_info, service::server::Server,
+    /// };
+    ///
+    /// fn server_fn(mut server: Server<std_srvs::srv::Empty>, logger: Logger) {
+    ///     loop {
+    ///         match server.try_recv() {
+    ///             Ok(Some(service_req)) => {
+    ///                 let msg = std_srvs::srv::Empty_Response::new().unwrap();
+    ///                 match service_req.send(&msg) {
+    ///                     Ok(()) => {},                  // Get a new server to handle next request.
+    ///                     Err(_e) => {}, // Failed to send.
+    ///                 }
+    ///             }
+    ///             Ok(None) => {
+    ///                 pr_info!(logger, "retry later");
+    ///             }
+    ///             Err(e) => {
+    ///                 pr_error!(logger, "error: {e}");
+    ///                 break;
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// - `RCLError::InvalidArgument` if any arguments are invalid, or
+    /// - `RCLError::ServiceInvalid` if the service is invalid, or
+    /// - `RCLError::BadAlloc` if allocating memory failed, or
+    /// - `RCLError::Error` if an unspecified error occurs.
+    #[allow(clippy::type_complexity)]
+    pub fn try_recv(&mut self) -> Result<Option<ServiceRequest<T>>> {
+        let data = &self.data;
+        let (request, header) =
+            match rcl_take_request_with_info::<<T as ServiceMsg>::Request>(&data.service) {
+                Ok(data) => data,
+                Err(Error::Rcl(RclError::ServiceTakeFailed)) => {
+                    return Ok(None);
+                }
+                Err(e) => return Err(e),
+            };
+
+        Ok(Some(ServiceRequest {
+            request: Message::new(request, header.into()),
+            sender: ServerSend {
+                data: self.data.clone(),
+                request_id: header.request_id,
+                _phantom: Default::default(),
+                _unsync: Default::default(),
+            },
+        }))
+    }
+
+    /// Receive a request asynchronously.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use oxidros_rcl::{
+    ///     logger::Logger, msg::common_interfaces::std_srvs, pr_error, pr_info, service::server::Server,
+    /// };
+    ///
+    /// async fn server_task(mut server: Server<std_srvs::srv::Empty>, logger: Logger) {
+    ///     loop {
+    ///         // Receive a request.
+    ///         let req = server.recv().await;
+    ///         match req {
+    ///             Ok(service_req) => {
+    ///                 pr_info!(logger, "recv: header = {:?}", service_req.request.info);
+    ///                 let response = std_srvs::srv::Empty_Response::new().unwrap();
+    ///                 match service_req.send(&response) {
+    ///                     Ok(()) => {},                  // Get a new server to handle next request.
+    ///                     Err(_e) => {}, // Failed to send.
+    ///                 }
+    ///             }
+    ///             Err(e) => {
+    ///                 pr_error!(logger, "error: {e}");
+    ///                 return;
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// - `RCLError::InvalidArgument` if any arguments are invalid, or
+    /// - `RCLError::ServiceInvalid` if the service is invalid, or
+    /// - `RCLError::BadAlloc` if allocating memory failed, or
+    /// - `RCLError::Error` if an unspecified error occurs.
+    pub async fn recv(&mut self) -> Result<ServiceRequest<T>> {
+        AsyncReceiver {
+            server: self,
+            is_waiting: false,
+        }
+        .await
+    }
+    /// Get the fully qualified service name (includes namespace).
+    pub fn fully_qualified_service_name(&self) -> Result<Cow<'_, String>> {
+        let guard = MT_UNSAFE_FN.lock();
+        let name = guard.rcl_service_get_service_name(&self.data.service)?;
+        Ok(Cow::Owned(name))
+    }
+
+    /// Get the topic name (last segment of the fully qualified name).
+    pub fn service_name(&self) -> Result<Cow<'_, String>> {
+        let fq_name = self.fully_qualified_service_name()?;
+        // Extract last segment after final '/'
+        let name = fq_name.rsplit('/').next().unwrap_or(&fq_name).to_string();
+        Ok(Cow::Owned(name))
+    }
+}
+
+unsafe impl<T> Send for Server<T> {}
+
+/// Sender to send a response.
+#[must_use]
+pub struct ServerSend<T> {
+    data: Arc<ServerData>,
+    request_id: rmw_request_id_t,
+    _phantom: PhantomData<T>,
+    _unsync: PhantomUnsync,
+}
+
+impl<T: ServiceMsg> ServerSend<T> {
+    /// Send a response to the client.
+    ///
+    /// # Errors
+    ///
+    /// - `RCLError::InvalidArgument` if any arguments are invalid, or
+    /// - `RCLError::ServiceInvalid` if the service is invalid, or
+    /// - `RCLError::Error` if an unspecified error occurs.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use oxidros_rcl::{
+    ///     logger::Logger, msg::common_interfaces::std_srvs, pr_error, service::server::Server,
+    /// };
+    ///
+    /// async fn server_task(mut server: Server<std_srvs::srv::Empty>, logger: Logger) {
+    ///     loop {
+    ///         // Call recv() by using timeout.
+    ///         let req = server.recv().await;
+    ///         match req {
+    ///             Ok(service_req) => {
+    ///                 let response = std_srvs::srv::Empty_Response::new().unwrap();
+    ///                 match service_req.send(&response) {
+    ///                     Ok(()) => {},                  // Get a new server to handle next request.
+    ///                     Err(_e) => {}, // Failed to send.
+    ///                 }
+    ///             }
+    ///             Err(e) => {
+    ///                 pr_error!(logger, "error: {e}");
+    ///                 return;
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// # Notes
+    ///
+    /// `data` should be immutable, but `rcl_send_response` provided
+    /// by ROS2 takes normal pointers instead of `const` pointers.
+    /// So, currently, `send` takes `data` as mutable.
+    pub fn send(mut self, data: &<T as ServiceMsg>::Response) -> Result<()> {
+        let server_data = &self.data;
+        rcl::MTSafeFn::rcl_send_response(
+            &server_data.service,
+            &mut self.request_id,
+            data as *const _ as *mut c_void,
+        )
+    }
+}
+
+fn rcl_take_request_with_info<T>(
+    service: &rcl::rcl_service_t,
+) -> Result<(T, rcl::rmw_service_info_t)> {
+    let mut header: rcl::rmw_service_info_t = unsafe { std::mem::zeroed() };
+    let mut ros_request: T = unsafe { std::mem::zeroed() };
+
+    let guard = rcl::MT_UNSAFE_FN.lock();
+    guard.rcl_take_request_with_info(
+        service,
+        &mut header,
+        &mut ros_request as *mut _ as *mut c_void,
+    )?;
+
+    Ok((ros_request, header))
+}
+
+/// Receiver to receive a request asynchronously.
+#[must_use]
+pub struct AsyncReceiver<'a, T> {
+    server: &'a mut Server<T>,
+    is_waiting: bool,
+}
+
+impl<'a, T> AsyncReceiver<'a, T> {
+    fn project(self: std::pin::Pin<&mut Self>) -> (&mut Server<T>, &mut bool) {
+        // Safety: Server is Unpin
+        is_unpin::<&mut Server<T>>();
+        unsafe {
+            let this = self.get_unchecked_mut();
+            (this.server, &mut this.is_waiting)
+        }
+    }
+}
+
+impl<'a, T: ServiceMsg> Future for AsyncReceiver<'a, T> {
+    type Output = Result<ServiceRequest<T>>;
+
+    fn poll(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        let (server, is_waiting) = self.project();
+        *is_waiting = false;
+        let data = server.data.clone();
+        match server.try_recv() {
+            Ok(Some(v)) => Poll::Ready(Ok(v)),
+            Err(e) => Poll::Ready(Err(e)),
+            Ok(None) => {
+                let mut waker = Some(cx.waker().clone());
+                if let Err(e) = async_selector::send_command(
+                    &data.node.context,
+                    async_selector::Command::Server(
+                        data.clone(),
+                        Box::new(move || {
+                            let w = waker.take().unwrap();
+                            w.wake();
+                            CallbackResult::Ok
+                        }),
+                    ),
+                ) {
+                    return Poll::Ready(Err(e));
+                }
+                *is_waiting = true;
+                Poll::Pending
+            }
+        }
+    }
+}
+
+impl<'a, T> Drop for AsyncReceiver<'a, T> {
+    fn drop(&mut self) {
+        if self.is_waiting {
+            let cloned = self.server.data.clone();
+            let data = &self.server.data;
+            let _ = async_selector::send_command(
+                &data.node.context,
+                async_selector::Command::RemoveServer(cloned),
+            );
+        }
+    }
+}
+
+// ============================================================================
+// RosServer trait implementation
+// ============================================================================
+
+/// A request wrapper that implements `ServiceRequest` for the API traits.
+pub struct ServiceRequest<T: ServiceMsg> {
+    pub request: Message<<T as ServiceMsg>::Request>,
+    pub(crate) sender: ServerSend<T>,
+}
+
+impl<T: ServiceMsg> ServiceRequest<T>
+where
+    T::Response: TypeSupport,
+{
+    /// Send a response to this request.
+    pub fn send(self, response: &T::Response) -> Result<()> {
+        self.sender.send(response)
+    }
+
+    /// Split into sender and request
+    pub fn split(self) -> (ServerSend<T>, Message<T::Request>) {
+        (self.sender, self.request)
+    }
+}
+
+impl<T: ServiceMsg> oxidros_core::api::ServiceRequest<T> for ServiceRequest<T> {
+    fn request(&self) -> &T::Request {
+        &self.request
+    }
+
+    fn respond(self, response: &T::Response) -> Result<()> {
+        self.sender.send(response)
+    }
+}
+
+impl<T: ServiceMsg> oxidros_core::api::RosServer<T> for Server<T> {
+    type Request = ServiceRequest<T>;
+
+    fn service_name(&self) -> Result<Cow<'_, String>> {
+        Self::service_name(self)
+    }
+
+    async fn recv(&mut self) -> Result<Self::Request> {
+        Self::recv(self).await
+    }
+
+    fn try_recv(&mut self) -> Result<Option<Self::Request>> {
+        Self::try_recv(self)
+    }
+}

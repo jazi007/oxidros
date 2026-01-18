@@ -1,0 +1,23 @@
+[package]
+name = "oxidros-core"
+version = "0.1.0"
+description = "Core traits and types for oxidros ROS2 client library"
+keywords = ["ros2", "robotics"]
+edition.workspace = true
+repository.workspace = true
+license-file.workspace = true
+authors.workspace = true
+
+[features]
+default = []
+statistics = []
+
+[dependencies]
+parking_lot = "0.12"
+num-traits = "0.2"
+thiserror = "2"
+ros2-types = { path = "../ros2-types" }
+
+[lib]
+name = "oxidros_core"
+path = "src/lib.rs"

@@ -1,0 +1,22 @@
+[package]
+name = "ros2-types-derive"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license-file.workspace = true
+repository.workspace = true
+description = "Derive macros for ROS2 TypeDescription and Ros2Msg traits"
+
+[lib]
+proc-macro = true
+
+[features]
+default = []
+# Enable FFI code generation for ROS2 C libraries (rcl)
+rcl = []
+
+[dependencies]
+syn = { version = "2.0", features = ["full", "extra-traits"] }
+quote = "1.0"
+proc-macro2 = "1.0"
+darling = "0.23"

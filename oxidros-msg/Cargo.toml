@@ -1,0 +1,32 @@
+[package]
+name = "oxidros-msg"
+version = "0.1.0"
+description = "Generated ROS2 message types for oxidros"
+license-file = "../LICENSE"
+readme = "README.md"
+keywords = ["Robotics", "ROS2", "Messages"]
+categories = ["science::robotics"]
+repository.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+oxidros-core = { path = "../oxidros-core" }
+log.workspace = true
+widestring = "1.2.1"
+# Re-export ros2-types traits for generated code
+ros2-types = { path = "../ros2-types", features = ["derive"] }
+
+[features]
+default = []
+jazzy = ["rcl"]
+humble = ["rcl"]
+kilted = ["rcl"]
+# Enable FFI code generation for ROS2 C libraries
+rcl = ["ros2-types/rcl"]
+
+[build-dependencies]
+ros2msg = { path = "../ros2msg" }
+oxidros-build = { path = "../oxidros-build" }
+quote = "1.0"
+proc-macro2 = "1.0"

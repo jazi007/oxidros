@@ -1,0 +1,317 @@
+//! # oxidros
+//!
+//! `oxidros` is a Rust bindings for ROS2.
+//! This library provides formal specifications and tested the specifications by using a model checker.
+//! Therefore, you can clearly understand how the scheduler work and the safeness of it.
+//!
+//! ## Specifications
+//!
+//! Some algorithms we adopted are formally specified and tested the safeness by using TLA+.
+//! Original ROS2's executor (rclcpp) is suffering from starvation.
+//! In contrast, the starvation freedom of our executor has been validated by not only dynamic analysis but also
+//! formal verification.
+//!
+//!
+//! We specified and tested as follows.
+//!
+//! - Async/await Scheduler
+//!   - Deadlock freedom
+//!   - Starvation freedom
+//! - Single Threaded Callback Execution
+//!   - Deadlock freedom
+//!   - Starvation freedom
+//! - Initialize Once
+//!   - Deadlock freedom
+//!   - Termination
+//!   - Initialization is performed just once
+
+// This crate requires the rcl feature to be enabled
+#![cfg(feature = "rcl")]
+
+//!
+//! # Important Types
+//!
+//! - Context
+//!   - [`context::Context`]
+//! - Node
+//!   - [`node::Node`]
+//! - Selector
+//!   - [`selector::Selector`]
+//! - Topic
+//!   - [`topic::publisher::Publisher`]
+//!   - [`topic::subscriber::Subscriber`]
+//! - Service
+//!   - [`service::client::Client`]
+//!   - [`service::client::ClientRecv`]
+//!   - [`service::server::Server`]
+//!   - [`service::server::ServerSend`]
+//! - Action
+//!   - [`action::client::Client`]
+//!   - [`action::server::Server`]
+//!
+//!
+//! ## Examples
+//!
+//! `oxidros` provides single threaded and multi threaded execution methods.
+//! The single threaded execution is based on traditional callback based execution.
+//! You need to register callback functions for subscribers, servers, clients, and timers.
+//!
+//! The multi threaded execution is performed by async/await fashion.
+//! You can choose any async/await's runtime.
+//!
+//! ### Single Threaded Execution
+//!
+//! This code is an example of Pub/Sub.
+//!
+//! ```
+//! use oxidros_rcl::{
+//!     context::Context, logger::Logger, msg::common_interfaces::std_msgs, pr_info,
+//! };
+//! use std::time::Duration;
+//!
+//! // First of all, you need create a context.
+//! let ctx = Context::new().unwrap();
+//!
+//! // Create a publish node.
+//! let node_pub = ctx
+//!     .create_node_with_opt("publish_node", None, Default::default())
+//!     .unwrap();
+//!
+//! // Create a subscribe node.
+//! let node_sub = ctx
+//!     .create_node_with_opt("subscribe_node", None, Default::default())
+//!     .unwrap();
+//!
+//! // Create a publisher.
+//! // The 2nd argument is for QoS.
+//! // If `None` is specified to the 2nd argument, the default QoS will be used.
+//! let publisher = node_pub
+//!     .create_publisher::<std_msgs::msg::String>("example_topic", None,
+//! ).unwrap();
+//!
+//! // Create a subscriber.
+//! let subscriber = node_sub
+//!     .create_subscriber::<std_msgs::msg::String>("example_topic", None,
+//! ).unwrap();
+//!
+//! // Create a selector, which is for IO multiplexing.
+//! let mut selector = ctx.create_selector().unwrap();
+//!
+//! // Create loggers.
+//! let logger_pub = Logger::new("example_publisher");
+//! let logger_sub = Logger::new("example_subscriber");
+//!
+//! // Add subscriber to the selector.
+//! // The 2nd argument is a callback function.
+//! // If data arrive, the callback will be invoked.
+//! // The 3rd argument is used to specify the callback will be invoked only once or infinitely.
+//! // If the 3rd argument is `true`, the callback function is invoked once and unregistered.
+//! selector.add_subscriber(
+//!     subscriber,
+//!     Box::new(move |msg| {
+//!         // Print the message
+//!         pr_info!(logger_sub, "Received: msg = {}", msg.data); // Print a message.
+//!     }),
+//! );
+//!
+//! // Create a wall timer, which invoke the callback periodically.
+//! selector.add_wall_timer(
+//!     "timer_name", // name of the timer
+//!     Duration::from_millis(100),
+//!     Box::new(move || {
+//!         let mut msg = std_msgs::msg::String::new().unwrap();
+//!         msg.data.assign("Hello, World!");
+//!         pr_info!(logger_pub, "Send: msg = {}", msg.data); // Print a message.
+//!         publisher.send(&msg).unwrap();
+//!     }),
+//! );
+//!
+//! // Spin.
+//! for _ in 0..10 {
+//!     selector.wait().unwrap();
+//! }
+//! ```
+//!
+//! ### Multi Threaded Execution
+//!
+//! This code uses `tokio` as a async/await's runtime.
+//! You can use other runtime
+//!
+//! ```
+//! use oxidros_rcl::{
+//!     context::Context,
+//!     logger::Logger,
+//!     msg::common_interfaces::std_msgs,
+//!     pr_info, pr_warn,
+//!     topic::{publisher::Publisher, subscriber::Subscriber},
+//! };
+//! use std::time::Duration;
+//!
+//! // Create a context.
+//! let ctx = Context::new().unwrap();
+//!
+//! // Create nodes.
+//! let node_pub = ctx
+//!     .create_node_with_opt("publish_node_async", None, Default::default())
+//!     .unwrap();
+//! let node_sub = ctx
+//!     .create_node_with_opt("subscribe_node_async", None, Default::default())
+//!     .unwrap();
+//!
+//! // Create a publisher.
+//! let publisher = node_pub
+//!     .create_publisher::<std_msgs::msg::String>("example_topic_async", None,
+//! ).unwrap();
+//!
+//! // Create a subscriber.
+//! let subscriber = node_sub
+//!     .create_subscriber::<std_msgs::msg::String>("example_topic_async", None,
+//! ).unwrap();
+//!
+//! let rt = tokio::runtime::Runtime::new().unwrap();
+//! // Create tasks.
+//! rt.block_on(async {
+//!     let p = tokio::task::spawn(run_publisher(publisher));
+//!     let s = tokio::task::spawn(run_subscriber(subscriber));
+//!     p.await;
+//!     s.await;
+//! });
+//!
+//! /// The publisher.
+//! async fn run_publisher(publisher: Publisher<std_msgs::msg::String>) {
+//!     let dur = Duration::from_millis(100);
+//!     let logger = Logger::new("example_publisher_async");
+//!     let mut msg = std_msgs::msg::String::new().unwrap();
+//!     for _ in 0..10 {
+//!         // Publish a message periodically.
+//!         msg.data.assign("Hello, World!");
+//!
+//!         pr_info!(logger, "Send (async): msg = {}", msg.data);
+//!         publisher.send(&msg).unwrap();
+//!
+//!         // Sleep 100[ms].
+//!         tokio::time::sleep(dur).await;
+//!     }
+//! }
+//!
+//! /// The subscriber
+//! async fn run_subscriber(mut s: Subscriber<std_msgs::msg::String>) {
+//!     let dur = Duration::from_millis(500);
+//!     let logger = Logger::new("example_subscriber_async");
+//!     loop {
+//!         // receive a message specifying timeout of 500ms
+//!         match tokio::time::timeout(dur, s.recv()).await {
+//!             Ok(Ok(msg)) => {
+//!                 // received a message
+//!                 pr_info!(logger, "Received (async): msg = {}", msg.data);
+//!             }
+//!             Ok(Err(e)) => panic!("{}", e), // fatal error
+//!             Err(_) => {
+//!                 // timeout
+//!                 pr_warn!(logger, "Subscribe (async): timeout");
+//!                 break;
+//!             }
+//!         }
+//!     }
+//! }
+//! ```
+
+use std::{
+    cell::Cell,
+    marker::PhantomData,
+    ops::{Deref, DerefMut},
+    sync::MutexGuard,
+};
+
+#[cfg(feature = "custom_alloc")]
+pub mod allocator;
+
+pub mod action;
+pub mod clock;
+pub mod context;
+pub mod error;
+pub mod helper;
+pub mod logger;
+pub mod msg;
+pub mod node;
+pub mod parameter;
+pub(crate) mod rcl;
+pub mod selector;
+pub mod service;
+pub mod topic;
+use oxidros_core::Message;
+pub use oxidros_core::qos;
+
+type PhantomUnsync = PhantomData<Cell<()>>;
+type PhantomUnsend = PhantomData<MutexGuard<'static, ()>>;
+
+use msg::ServiceMsg;
+use service::client::ClientRecv;
+
+// Re-export oxidros_core so external crates can access traits without direct dependency
+pub use oxidros_core;
+
+// Re-export error types at crate root for API parity with oxidros-zenoh
+pub use error::{ActionError, Error, RclError, Result};
+
+/// Single-threaded container.
+/// `ST<T>` cannot be send to another thread and shared by multiple threads.
+pub struct ST<T> {
+    data: T,
+    _phantom: (PhantomUnsync, PhantomUnsend),
+}
+
+impl<T> ST<T> {
+    pub fn new(data: T) -> Self {
+        ST {
+            data,
+            _phantom: Default::default(),
+        }
+    }
+
+    pub fn unwrap(self) -> T {
+        self.data
+    }
+}
+
+impl<T> Deref for ST<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
+
+impl<T> DerefMut for ST<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.data
+    }
+}
+
+impl<'a, T: msg::ServiceMsg> ST<ClientRecv<'a, T>> {
+    /// This function calls `ClientRecv::try_recv` internally,
+    /// but `Ok(None)` includes `ST<CleintRecv<T>>` instead of `ClientRecv<T>`.
+    pub fn try_recv(&self) -> Result<Option<Message<<T as ServiceMsg>::Response>>> {
+        self.data.try_recv()
+    }
+}
+
+#[cfg(any(feature = "humble", feature = "jazzy", feature = "kilted"))]
+type RcutilsAllocator = rcl::rcutils_allocator_s;
+
+#[cfg(feature = "custom_alloc")]
+pub(crate) fn get_allocator() -> RcutilsAllocator {
+    use std::ptr::null_mut;
+
+    RcutilsAllocator {
+        allocate: Some(allocator::allocate),
+        deallocate: Some(allocator::deallocate),
+        reallocate: Some(allocator::reallocate),
+        zero_allocate: Some(allocator::zero_allocate),
+        state: null_mut(),
+    }
+}
+
+#[cfg(not(feature = "custom_alloc"))]
+pub(crate) fn get_allocator() -> RcutilsAllocator {
+    crate::rcl::MTSafeFn::rcutils_get_default_allocator()
+}

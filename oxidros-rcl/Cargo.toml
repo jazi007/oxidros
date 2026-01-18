@@ -1,0 +1,54 @@
+[package]
+name = "oxidros-rcl"
+version = "0.4.6"
+description = "Oxidros: Formally Specified Rust Bindings for ROS2"
+license-file = "LICENSE"
+readme = "README.md"
+keywords = ["Robotics", "ROS2"]
+categories = ["science::robotics"]
+repository.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+oxidros-core = { path = "../oxidros-core" }
+oxidros-msg = { path = "../oxidros-msg" }
+crossbeam-channel = "0.5"
+libc = "0.2"
+num-traits.workspace = true
+num-derive = "0.4"
+once_cell = "1.14"
+parking_lot.workspace = true
+regex = "1.10"
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+futures-util.workspace = true
+
+# Logging
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tracing-log.workspace = true
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
+memac = "0.5"
+rand = "0.9"
+log.workspace = true
+
+[build-dependencies]
+oxidros-build = { path = "../oxidros-build" }
+
+[features]
+default = []
+custom_alloc = []
+humble = ["oxidros-msg/humble", "rcl"]
+jazzy = ["oxidros-msg/jazzy", "rcl"]
+kilted = ["oxidros-msg/kilted", "rcl"]
+rcl_stat = ["statistics"]
+statistics = ["serde", "serde_json"]
+rcl = []
+
+[package.metadata.docs.rs]
+features = ["jazzy", "custom_alloc"]
+all-features = false
+no-default-features = true

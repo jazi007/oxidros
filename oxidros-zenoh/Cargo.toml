@@ -1,0 +1,45 @@
+[package]
+name = "oxidros-zenoh"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license-file.workspace = true
+repository.workspace = true
+description = "Native ROS2 implementation using Zenoh - compatible with rmw_zenoh_cpp"
+readme = "README.md"
+keywords = ["ros2", "robotics", "zenoh", "middleware"]
+categories = ["network-programming", "science::robotics"]
+
+[dependencies]
+# Zenoh
+zenoh = { version = "1.0", features = ["unstable"] }
+zenoh-ext = { version = "1.0", features = ["unstable"] }
+tokio = { workspace = true, features = ["time", "rt"] }
+flume = "0.12"
+serde_json.workspace = true
+parking_lot.workspace = true
+yaml-rust2.workspace = true
+uuid = { version = "1", features = ["v4"] }
+
+# Oxidros workspace crates
+oxidros-core = { path = "../oxidros-core" }
+ros2args = { path = "../ros2args" }
+
+# Optional: ROS2 message types (requires AMENT_PREFIX_PATH for building)
+oxidros-msg = { path = "../oxidros-msg" }
+
+# Utilities
+thiserror.workspace = true
+serde.workspace = true
+
+# Logging
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tracing-log.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
+log.workspace = true
+
+[features]
+default = []

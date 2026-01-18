@@ -1,0 +1,94 @@
+//! Build script for oxidros-msg
+//!
+//! Uses ros2msg to generate ROS2 message types with ros2-types-derive for FFI support.
+
+use std::env;
+use std::path::Path;
+
+use oxidros_build::msg::{Config, get_base_generator};
+
+fn main() {
+    let out_dir = env::var("OUT_DIR").unwrap();
+    let out_path = Path::new(&out_dir);
+
+    oxidros_build::ros2_env_var_changed();
+
+    // Define ROS2 package groups
+    let common_interfaces_deps = [
+        "actionlib_msgs",
+        "diagnostic_msgs",
+        "example_interfaces",
+        "geometry_msgs",
+        "nav_msgs",
+        "sensor_msgs",
+        "shape_msgs",
+        "std_msgs",
+        "std_srvs",
+        "stereo_msgs",
+        "trajectory_msgs",
+        "visualization_msgs",
+    ];
+
+    let interface_deps = [
+        "action_msgs",
+        "builtin_interfaces",
+        "composition_interfaces",
+        "lifecycle_msgs",
+        "rcl_interfaces",
+        "rosgraph_msgs",
+        "service_msgs",
+        "statistics_msgs",
+        "type_description_interfaces",
+    ];
+
+    let ros2msg_deps = ["unique_identifier_msgs"];
+
+    // Generate common_interfaces
+    let common_interfaces_dir = out_path.join("common_interfaces");
+    let config = Config::builder()
+        .packages(&common_interfaces_deps)
+        .uuid_path("crate::ros2msg")
+        .primitive_path("crate")
+        .build();
+    let generator = get_base_generator(&config).unwrap();
+    std::fs::create_dir_all(&common_interfaces_dir).unwrap();
+
+    generator
+        .output_dir(&common_interfaces_dir)
+        .generate()
+        .expect("Failed to generate common_interfaces");
+
+    // Generate interfaces
+    let interfaces_dir = out_path.join("interfaces");
+    std::fs::create_dir_all(&interfaces_dir).unwrap();
+    let config = Config::builder()
+        .packages(&interface_deps)
+        .uuid_path("crate::ros2msg")
+        .primitive_path("crate")
+        .build();
+    let generator = get_base_generator(&config).unwrap();
+    generator
+        .output_dir(&interfaces_dir)
+        .generate()
+        .expect("Failed to generate interfaces");
+
+    // Generate ros2msg
+    let ros2msg_dir = out_path.join("ros2msg");
+    std::fs::create_dir_all(&ros2msg_dir).unwrap();
+    let config = Config::builder()
+        .packages(&ros2msg_deps)
+        .uuid_path("crate::ros2msg")
+        .primitive_path("crate")
+        .build();
+    let generator = get_base_generator(&config).unwrap();
+    generator
+        .output_dir(&ros2msg_dir)
+        .generate()
+        .expect("Failed to generate ros2msg");
+    // Generate runtime_c.rs using bindgen
+    oxidros_build::generate_runtime_c(out_path);
+
+    // Link ROS2 libraries (required for tests and standalone use)
+    oxidros_build::link_rcl_ros2_libs();
+    oxidros_build::link_msg_ros2_libs();
+}
