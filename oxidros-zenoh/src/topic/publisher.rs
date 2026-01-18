@@ -158,6 +158,20 @@ impl<T: TypeSupport> Publisher<T> {
         &self.gid
     }
 
+    fn send_internal(&self, payload: Vec<u8>) -> Result<()> {
+        // Increment sequence number
+        let seq = self.sequence_number.fetch_add(1, Ordering::Relaxed);
+        // Create attachment
+        let attachment = Attachment::new(seq, self.gid);
+        let attachment_bytes = attachment.to_bytes();
+        // Publish with attachment
+        self.zenoh_publisher
+            .put(payload)
+            .attachment(ZBytes::from(attachment_bytes.to_vec()))
+            .wait()?;
+        Ok(())
+    }
+
     /// Publish a message.
     ///
     /// # Errors
@@ -166,23 +180,22 @@ impl<T: TypeSupport> Publisher<T> {
     pub fn send(&self, msg: &T) -> Result<()> {
         // Serialize message to CDR
         let payload = msg.to_bytes()?;
-
-        // Increment sequence number
-        let seq = self.sequence_number.fetch_add(1, Ordering::Relaxed);
-
-        // Create attachment
-        let attachment = Attachment::new(seq, self.gid);
-        let attachment_bytes = attachment.to_bytes();
-
-        // Publish with attachment
-        self.zenoh_publisher
-            .put(payload)
-            .attachment(ZBytes::from(attachment_bytes.to_vec()))
-            .wait()?;
-
-        Ok(())
+        self.send_internal(payload)
     }
 
+    /// Send a raw message.
+    ///
+    /// # Safety
+    ///
+    /// This function is marked unsafe as the user is reponsable for CDR serialization
+    ///
+    #[allow(unsafe_code)]
+    pub unsafe fn send_raw(&self, msg: &[u8]) -> Result<()> {
+        // Serialize message to CDR
+        use oxidros_core::CdrSerde;
+        let payload = msg.to_vec().serialize()?;
+        self.send_internal(payload)
+    }
     /// Get the parent node.
     pub fn node(&self) -> &Arc<Node> {
         &self.node
