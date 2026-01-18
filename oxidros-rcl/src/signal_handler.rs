@@ -59,7 +59,7 @@ impl From<Signaled> for oxidros_core::Error {
 #[cfg(not(target_os = "windows"))]
 pub(crate) fn init() {
     INITIALIZER.get_or_init(|| {
-        let signals = Signals::new([SIGHUP, SIGTERM, SIGINT, SIGQUIT]).unwrap();
+        let signals = Signals::new([SIGHUP, SIGTERM, SIGQUIT]).unwrap();
         let handle = signals.handle();
 
         let mut guard = SIGHDL.lock();
@@ -74,7 +74,7 @@ pub(crate) fn init() {
 pub(crate) fn init() {
     INITIALIZER.get_or_init(|| {
         let term = Arc::clone(&IS_HALT);
-        signal_hook::flag::register(SIGTERM | SIGINT, Arc::clone(&term)).unwrap();
+        signal_hook::flag::register(SIGTERM, Arc::clone(&term)).unwrap();
         let th = thread::spawn(move || handler(term));
         *THREAD.lock() = Some(th);
     });
@@ -126,7 +126,7 @@ fn get_guard_condition() -> MutexGuard<'static, RawMutex, ConditionSet> {
 fn handler(mut signals: SignalsInfo) {
     if let Some(signal) = signals.forever().next() {
         match signal {
-            SIGTERM | SIGINT | SIGQUIT | SIGHUP => {
+            SIGTERM | SIGQUIT | SIGHUP => {
                 IS_HALT.store(true, Ordering::SeqCst);
                 let mut cond = get_guard_condition();
                 let cond = std::mem::take(&mut *cond);
