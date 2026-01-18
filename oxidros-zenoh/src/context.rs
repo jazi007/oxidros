@@ -247,7 +247,8 @@ impl Context {
     fn start_graph_discovery(&self) -> Result<()> {
         use crate::keyexpr::LIVELINESS_PREFIX;
 
-        let key = format!("{}/**", LIVELINESS_PREFIX);
+        // Include domain_id in the key pattern to match rmw_zenoh behavior
+        let key = format!("{}/{}/**", LIVELINESS_PREFIX, self.inner.domain_id);
         let graph_cache = Arc::clone(&self.inner.graph_cache);
 
         // Subscribe to liveliness tokens

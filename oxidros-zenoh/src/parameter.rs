@@ -27,10 +27,10 @@
 //! ```
 
 use crate::{error::Result, node::Node, service::server::Server};
-use oxidros_core::parameter::{Parameters, Value};
+pub use oxidros_core::parameter::{Parameters, Value};
 use oxidros_core::qos::Profile;
 use parking_lot::RwLock;
-use std::sync::Arc;
+use std::{collections::BTreeSet, sync::Arc};
 
 // Import rcl_interfaces types when the feature is enabled
 use oxidros_msg::interfaces::rcl_interfaces::{
@@ -70,6 +70,8 @@ pub struct ParameterServer {
     srv_set_atomic: Server<SetParametersAtomically>,
     srv_describe: Server<DescribeParameters>,
     srv_get_types: Server<GetParameterTypes>,
+    /// Parameters updated by external service calls (not local app changes).
+    service_updated: BTreeSet<String>,
 }
 
 impl ParameterServer {
@@ -106,6 +108,9 @@ impl ParameterServer {
             }
         }
 
+        // Clear the updated set - initial parameters shouldn't be considered "updated"
+        let _ = params.take_updated();
+
         let params = Arc::new(RwLock::new(params));
 
         let qos = Profile::services_default();
@@ -140,6 +145,7 @@ impl ParameterServer {
             srv_set_atomic,
             srv_describe,
             srv_get_types,
+            service_updated: BTreeSet::new(),
         })
     }
 
@@ -148,17 +154,43 @@ impl ParameterServer {
         &self.node
     }
 
+    /// Wait for parameter updates asynchronously.
+    ///
+    /// This method returns a future that completes when parameters are updated
+    /// via the set_parameters or set_parameters_atomically services.
+    /// Returns the set of parameter names that were updated.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// loop {
+    ///     let updated = param_server.wait().await?;
+    ///     let params = param_server.params.read();
+    ///     for key in updated.iter() {
+    ///         let value = &params.get_parameter(key).unwrap().value;
+    ///         println!("{key} = {value}");
+    ///     }
+    /// }
+    /// ```
+    pub async fn wait(&mut self) -> Result<BTreeSet<String>> {
+        loop {
+            // Process service requests
+            self.process_once().await?;
+
+            // Check if any parameters were updated by external service calls
+            if !self.service_updated.is_empty() {
+                return Ok(std::mem::take(&mut self.service_updated));
+            }
+        }
+    }
+
     /// Process one iteration of parameter service requests.
     ///
     /// This is a non-blocking check that processes any pending requests
     /// on all parameter services.
     pub async fn process_once(&mut self) -> Result<()> {
-        // Use tokio::select! to handle whichever service has a request ready
         tokio::select! {
-            biased;
-
             result = self.srv_list.recv() => {
-                tracing::info!("Received list_parameters request");
                 if let Ok(req) = result {
                     let response = self.handle_list_parameters(&req.request);
                     let _ = req.send(&response);
@@ -166,7 +198,6 @@ impl ParameterServer {
             }
 
             result = self.srv_get.recv() => {
-                tracing::info!("Received get_parameters request");
                 if let Ok(req) = result {
                     let response = self.handle_get_parameters(&req.request);
                     let _ = req.send(&response);
@@ -181,7 +212,6 @@ impl ParameterServer {
             }
 
             result = self.srv_set_atomic.recv() => {
-                tracing::info!("Received set_parameters_atomically request");
                 if let Ok(req) = result {
                     let response = self.handle_set_parameters_atomically(&req.request);
                     let _ = req.send(&response);
@@ -309,13 +339,12 @@ impl ParameterServer {
     }
 
     fn handle_set_parameters(
-        &self,
+        &mut self,
         request: &<SetParameters as oxidros_core::ServiceMsg>::Request,
     ) -> <SetParameters as oxidros_core::ServiceMsg>::Response {
         let mut guard = self.params.write();
 
         let mut response = SetParameters_Response::new().unwrap_or_default();
-
         if let Some(mut results) = SetParametersResultSeq::<0>::new(request.parameters.len()) {
             for (i, param) in request.parameters.iter().enumerate() {
                 let name = param.name.to_string();
@@ -323,9 +352,10 @@ impl ParameterServer {
 
                 let mut result = SetParametersResult::new().unwrap_or_default();
 
-                match guard.set_parameter(name, value, false, None) {
+                match guard.set_parameter(name.clone(), value, false, None) {
                     Ok(()) => {
                         result.successful = true;
+                        self.service_updated.insert(name);
                     }
                     Err(e) => {
                         result.successful = false;
@@ -344,7 +374,7 @@ impl ParameterServer {
     }
 
     fn handle_set_parameters_atomically(
-        &self,
+        &mut self,
         request: &<SetParametersAtomically as oxidros_core::ServiceMsg>::Request,
     ) -> <SetParametersAtomically as oxidros_core::ServiceMsg>::Response {
         let mut guard = self.params.write();
@@ -382,10 +412,12 @@ impl ParameterServer {
 
         // All validated, now apply atomically
         for (name, value) in validated {
-            let _ = guard.set_parameter(name, value, false, None);
+            let _ = guard.set_parameter(name.clone(), value, false, None);
+            self.service_updated.insert(name);
         }
 
         response.result.successful = true;
+
         response
     }
 
