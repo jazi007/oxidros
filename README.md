@@ -166,7 +166,6 @@ cargo run -p simple --bin subscriber --features jazzy
 ## Documentation
 
 - [API Reference](docs/API_REFERENCE.md) - Auto-generated API comparison
-- [API Alignment Plan](docs/API_ALIGNMENT_PLAN.md) - Backend API alignment status
 
 Generate API docs:
 
