@@ -268,6 +268,15 @@ pub fn generate_rcl_bindings(out_dir: &Path) {
     // Start building bindings with the header
     let mut builder = builder_base().header(wrapper_path.to_str().unwrap());
 
+    // On Windows, define _Check_return_ SAL annotation as empty for clang compatibility,
+    // and suppress dllimport warnings on typedefs/enums.
+    #[cfg(target_os = "windows")]
+    {
+        builder = builder
+            .clang_arg("-D_Check_return_=")
+            .clang_arg("-Wno-ignored-attributes");
+    }
+
     // Add all collected include paths
     for include_path in &include_paths {
         builder = builder.clang_arg(format!("-I{}", include_path.display()));
@@ -512,6 +521,15 @@ pub fn generate_runtime_c(out_dir: &Path) {
     let mut builder = builder_base()
         .header(wrapper_path.to_str().unwrap())
         .derive_copy(false);
+
+    // On Windows, define _Check_return_ SAL annotation as empty for clang compatibility,
+    // and suppress dllimport warnings on typedefs/enums.
+    #[cfg(target_os = "windows")]
+    {
+        builder = builder
+            .clang_arg("-D_Check_return_=")
+            .clang_arg("-Wno-ignored-attributes");
+    }
 
     // Add all collected include paths
     for include_path in &include_paths {
