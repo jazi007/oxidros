@@ -214,4 +214,11 @@ impl<T: TypeSupport> oxidros_core::api::RosPublisher<T> for Publisher<T> {
     fn send(&self, msg: &T) -> crate::error::Result<()> {
         self.send(msg)
     }
+
+    fn send_raw(&self, data: &[u8]) -> crate::error::Result<()> {
+        // Add CDR serialization header to the raw data and send
+        use oxidros_core::CdrSerde;
+        let payload = data.to_vec().serialize()?;
+        self.send_internal(payload)
+    }
 }

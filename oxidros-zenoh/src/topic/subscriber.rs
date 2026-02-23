@@ -231,7 +231,7 @@ impl<T: TypeSupport> Subscriber<T> {
 // RosSubscriber trait implementation
 // ============================================================================
 
-impl<T: TypeSupport> oxidros_core::api::RosSubscriber<T> for Subscriber<T> {
+impl<T: TypeSupport + Send + 'static> oxidros_core::api::RosSubscriber<T> for Subscriber<T> {
     fn topic_name(&self) -> Result<Cow<'_, String>> {
         Subscriber::topic_name(self)
     }
@@ -242,5 +242,65 @@ impl<T: TypeSupport> oxidros_core::api::RosSubscriber<T> for Subscriber<T> {
 
     fn try_recv(&mut self) -> Result<Option<Message<T>>> {
         Self::try_recv(self)
+    }
+
+    fn into_stream(self) -> oxidros_core::MessageStream<T>
+    where
+        Self: Sized + 'static,
+    {
+        Box::pin(SubscriberStream::new(self))
+    }
+}
+
+/// A stream wrapper for async subscription using flume's native async support.
+pub struct SubscriberStream<T: TypeSupport + Send + 'static> {
+    /// Flume's async stream for receiving samples
+    inner: flume::r#async::RecvStream<'static, zenoh::sample::Sample>,
+    /// Phantom for the message type
+    _phantom: PhantomData<T>,
+}
+
+// SAFETY: RecvStream is Unpin, PhantomData is Unpin
+impl<T: TypeSupport + Send + 'static> Unpin for SubscriberStream<T> {}
+
+impl<T: TypeSupport + Send + 'static> SubscriberStream<T> {
+    /// Create a new stream from a subscriber.
+    pub fn new(subscriber: Subscriber<T>) -> Self {
+        // Convert the receiver into an owned stream
+        // We use into_stream() which gives us a 'static lifetime stream
+        let inner = subscriber.receiver.into_stream();
+        Self {
+            inner,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<T: TypeSupport + Send + 'static> futures_core::Stream for SubscriberStream<T> {
+    type Item = Result<Message<T>>;
+
+    fn poll_next(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Result<Message<T>>>> {
+        use std::task::Poll;
+
+        let this = self.get_mut();
+
+        // Poll the inner flume stream
+        match std::pin::Pin::new(&mut this.inner).poll_next(cx) {
+            Poll::Ready(Some(sample)) => {
+                // Deserialize the message
+                let result = (|| {
+                    let data = T::from_bytes(&sample.payload().to_bytes())?;
+                    let attachment_bytes = sample.attachment().ok_or(Error::MissingAttachment)?;
+                    let info = Attachment::from_bytes(&attachment_bytes.to_bytes())?.into();
+                    Ok(Message::new(data, info))
+                })();
+                Poll::Ready(Some(result))
+            }
+            Poll::Ready(None) => Poll::Ready(None), // Channel closed
+            Poll::Pending => Poll::Pending,
+        }
     }
 }

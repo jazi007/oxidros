@@ -331,17 +331,3 @@ impl Options {
 
 unsafe impl<T> Sync for Publisher<T> {}
 unsafe impl<T> Send for Publisher<T> {}
-
-// ============================================================================
-// RosPublisher trait implementation
-// ============================================================================
-
-impl<T: TypeSupport> oxidros_core::api::RosPublisher<T> for Publisher<T> {
-    fn topic_name(&self) -> Result<Cow<'_, String>> {
-        Self::topic_name(self)
-    }
-
-    fn send(&self, msg: &T) -> oxidros_core::Result<()> {
-        Self::send(self, msg)
-    }
-}

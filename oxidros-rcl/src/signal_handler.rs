@@ -6,7 +6,10 @@ use crate::{
     selector::guard_condition::GuardCondition,
 };
 use once_cell::sync::Lazy;
-use parking_lot::{Condvar, Mutex, RawMutex, lock_api::MutexGuard};
+#[cfg(target_os = "windows")]
+use parking_lot::Condvar;
+use parking_lot::{Mutex, RawMutex, lock_api::MutexGuard};
+
 use signal_hook::consts::*;
 
 #[cfg(not(target_os = "windows"))]

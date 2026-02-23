@@ -471,21 +471,3 @@ impl<'a, T: ServiceMsg> Drop for AsyncReceiver<'a, T> {
         }
     }
 }
-
-// ============================================================================
-// RosClient trait implementation
-// ============================================================================
-
-impl<T: ServiceMsg> oxidros_core::api::RosClient<T> for Client<T> {
-    fn service_name(&self) -> Result<Cow<'_, String>> {
-        Self::service_name(self)
-    }
-
-    fn is_service_available(&self) -> bool {
-        Self::is_service_available(self)
-    }
-
-    async fn call(&mut self, request: &T::Request) -> Result<Message<T::Response>> {
-        Self::call(self, request).await
-    }
-}

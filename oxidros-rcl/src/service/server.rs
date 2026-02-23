@@ -489,11 +489,12 @@ impl<'a, T> Drop for AsyncReceiver<'a, T> {
 }
 
 // ============================================================================
-// RosServer trait implementation
+// ServiceRequest - Request wrapper for server
 // ============================================================================
 
-/// A request wrapper that implements `ServiceRequest` for the API traits.
+/// A request wrapper for service requests.
 pub struct ServiceRequest<T: ServiceMsg> {
+    /// The request message.
     pub request: Message<<T as ServiceMsg>::Request>,
     pub(crate) sender: ServerSend<T>,
 }
@@ -511,30 +512,22 @@ where
     pub fn split(self) -> (ServerSend<T>, Message<T::Request>) {
         (self.sender, self.request)
     }
+
+    /// Get the request data.
+    pub fn request(&self) -> &T::Request {
+        &self.request.sample
+    }
 }
 
-impl<T: ServiceMsg> oxidros_core::api::ServiceRequest<T> for ServiceRequest<T> {
+impl<T: ServiceMsg> oxidros_core::api::ServiceRequest<T> for ServiceRequest<T>
+where
+    T::Response: TypeSupport,
+{
     fn request(&self) -> &T::Request {
-        &self.request
+        &self.request.sample
     }
 
     fn respond(self, response: &T::Response) -> Result<()> {
         self.sender.send(response)
-    }
-}
-
-impl<T: ServiceMsg> oxidros_core::api::RosServer<T> for Server<T> {
-    type Request = ServiceRequest<T>;
-
-    fn service_name(&self) -> Result<Cow<'_, String>> {
-        Self::service_name(self)
-    }
-
-    async fn recv(&mut self) -> Result<Self::Request> {
-        Self::recv(self).await
-    }
-
-    fn try_recv(&mut self) -> Result<Option<Self::Request>> {
-        Self::try_recv(self)
     }
 }
