@@ -99,6 +99,12 @@ impl Config {
             // Fall back to common installation paths
             paths.extend(Self::get_default_ros2_paths());
         }
+        // On Windows, also check CMAKE_PREFIX_PATH
+        if cfg!(target_os = "windows")
+            && let Some(cmake_paths) = Self::get_cmake_prefix_paths()
+        {
+            paths.extend(cmake_paths);
+        }
 
         // Add user-provided extra paths
         for extra in &self.extra_search_paths {
