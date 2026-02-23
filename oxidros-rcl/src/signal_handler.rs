@@ -6,13 +6,11 @@ use crate::{
     selector::guard_condition::GuardCondition,
 };
 use once_cell::sync::Lazy;
-use parking_lot::{Mutex, RawMutex, lock_api::MutexGuard};
+use parking_lot::{Condvar, Mutex, RawMutex, lock_api::MutexGuard};
 use signal_hook::consts::*;
 
 #[cfg(not(target_os = "windows"))]
 use signal_hook::iterator::{Handle, Signals, SignalsInfo};
-#[cfg(target_os = "windows")]
-use std::sync::Arc;
 use std::{
     collections::BTreeMap,
     error::Error,
@@ -34,10 +32,10 @@ static GUARD_COND: Lazy<Mutex<ConditionSet>> = Lazy::new(|| Mutex::new(Condition
 #[cfg(not(target_os = "windows"))]
 static SIGHDL: Lazy<Mutex<Option<Handle>>> = Lazy::new(|| Mutex::new(None));
 static THREAD: Lazy<Mutex<Option<JoinHandle<()>>>> = Lazy::new(|| Mutex::new(None));
-#[cfg(not(target_os = "windows"))]
 static IS_HALT: AtomicBool = AtomicBool::new(false);
 #[cfg(target_os = "windows")]
-static IS_HALT: Lazy<Arc<AtomicBool>> = Lazy::new(|| Arc::new(AtomicBool::new(false)));
+static WIN_SIGNAL_NOTIFY: Lazy<(Mutex<bool>, Condvar)> =
+    Lazy::new(|| (Mutex::new(false), Condvar::new()));
 
 #[derive(Debug)]
 pub struct Signaled;
@@ -73,9 +71,18 @@ pub(crate) fn init() {
 #[cfg(target_os = "windows")]
 pub(crate) fn init() {
     INITIALIZER.get_or_init(|| {
-        let term = Arc::clone(&IS_HALT);
-        signal_hook::flag::register(SIGTERM, Arc::clone(&term)).unwrap();
-        let th = thread::spawn(move || handler(term));
+        // SAFETY: On Windows, signal handlers run in a separate thread created by Windows
+        // (Console Control Handler), so using locks/condvar is safe.
+        unsafe {
+            signal_hook::low_level::register(SIGTERM, || {
+                let (lock, cvar) = &*WIN_SIGNAL_NOTIFY;
+                let mut signaled = lock.lock();
+                *signaled = true;
+                cvar.notify_all();
+            })
+            .unwrap();
+        }
+        let th = thread::spawn(handler);
         *THREAD.lock() = Some(th);
     });
 }
@@ -144,8 +151,21 @@ fn handler(mut signals: SignalsInfo) {
 }
 
 #[cfg(target_os = "windows")]
-fn handler(term: Arc<AtomicBool>) {
-    while !term.load(Ordering::Relaxed) {}
+fn handler() {
+    let (lock, cvar) = &*WIN_SIGNAL_NOTIFY;
+    let mut signaled = lock.lock();
+    while !*signaled {
+        cvar.wait(&mut signaled);
+    }
+
+    IS_HALT.store(true, Ordering::SeqCst);
+    let mut cond = get_guard_condition();
+    let cond = std::mem::take(&mut *cond);
+
+    for (_, c) in cond {
+        c.trigger().unwrap();
+    }
+
     let logger = Logger::new("oxidros");
     pr_info_in!(logger, "Received signal");
 }
