@@ -226,4 +226,27 @@ where
     async fn call(&mut self, request: &T::Request) -> Result<Message<T::Response>> {
         Self::call(self, request).await
     }
+    async fn call_with_retry(
+        &mut self,
+        request: &T::Request,
+        timeout: std::time::Duration,
+    ) -> Result<Message<T::Response>> {
+        use tokio::time;
+
+        // Wait for service availability
+        while !Self::is_service_available(self) {
+            time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+
+        // Retry loop with timeout
+        loop {
+            match time::timeout(timeout, Self::call(self, request)).await {
+                Ok(Ok(response)) => return Ok(response),
+                Ok(Err(e)) => return Err(e),
+                Err(_) => {
+                    tracing::warn!("Service call timeout, retrying...");
+                }
+            }
+        }
+    }
 }

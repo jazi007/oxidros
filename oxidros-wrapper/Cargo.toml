@@ -1,22 +1,28 @@
 [package]
 name = "oxidros-wrapper"
 version = "0.1.7"
-description = "A wrapper around oxidros"
+description = "Ergonomic ROS2 API implementing oxidros-core traits for RCL backend"
 license-file.workspace = true
 edition.workspace = true
 authors.workspace = true
 repository.workspace = true
 
+[features]
+default = []
+humble = ["oxidros-rcl/humble", "oxidros-msg/humble"]
+jazzy = ["oxidros-rcl/jazzy", "oxidros-msg/jazzy"]
+kilted = ["oxidros-rcl/kilted", "oxidros-msg/kilted"]
 
 [dependencies]
-futures = "0.3"
+futures-core = "0.3"
 log = { version = "0.4", features = ["std"] }
-oxidros = { path = "../oxidros" }
-tokio-stream = "0.1"
-tokio-util = "0.7"
+oxidros-core = { path = "../oxidros-core" }
+oxidros-rcl = { path = "../oxidros-rcl" }
+oxidros-msg = { path = "../oxidros-msg" }
 tokio = { version = "1", features = ["time"] }
-yaml-rust2 = "0.11"
+tokio-util = "0.7"
 futures-util.workspace = true
+tracing = "0.1"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }

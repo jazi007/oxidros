@@ -33,7 +33,7 @@ tracing-log.workspace = true
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
 memac = "0.5"
-rand = "0.9"
+rand = "0.10"
 log.workspace = true
 
 [build-dependencies]

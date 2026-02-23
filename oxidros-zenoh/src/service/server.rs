@@ -309,7 +309,7 @@ where
     T::Response: TypeSupport,
 {
     fn request(&self) -> &T::Request {
-        &self.request
+        &self.request.sample
     }
 
     fn respond(self, response: &T::Response) -> Result<()> {
@@ -338,5 +338,27 @@ where
 
     fn try_recv(&mut self) -> Result<Option<Self::Request>> {
         Self::try_recv(self)
+    }
+
+    async fn serve<F>(mut self, mut handler: F) -> Result<()>
+    where
+        Self: Sized,
+        F: FnMut(oxidros_core::message::Message<T::Request>) -> T::Response + Send,
+    {
+        loop {
+            match Self::recv(&mut self).await {
+                Ok(service_req) => {
+                    let (sender, request) = service_req.split();
+                    let response = handler(request);
+                    if let Err(e) = sender.send(&response) {
+                        tracing::error!("Failed to send response: {:?}", e);
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Error receiving request: {:?}", e);
+                    return Err(e);
+                }
+            }
+        }
     }
 }

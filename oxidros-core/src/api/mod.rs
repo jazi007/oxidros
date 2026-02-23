@@ -26,7 +26,8 @@
 //! ```
 
 use crate::{ActionMsg, Result, ServiceMsg, TypeSupport, message::Message, qos::Profile};
-use std::{borrow::Cow, sync::Arc, time::Duration};
+use futures_core::Stream;
+use std::{borrow::Cow, pin::Pin, sync::Arc, time::Duration};
 
 // ============================================================================
 // Common Types
@@ -175,11 +176,37 @@ pub trait RosPublisher<T: TypeSupport>: Send + Sync {
     ///
     /// Returns an error if serialization fails or the publish operation fails.
     fn send(&self, msg: &T) -> Result<()>;
+
+    /// Publish raw serialized bytes directly (no serialization).
+    ///
+    /// Useful for message forwarding and bridge scenarios where data is already serialized.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the publish operation fails.
+    fn send_raw(&self, data: &[u8]) -> Result<()>;
+
+    /// Publish multiple messages.
+    ///
+    /// Default implementation calls `send` for each message.
+    /// Implementations may override for better efficiency.
+    fn send_many<'a>(&self, messages: impl IntoIterator<Item = &'a T>) -> Result<()>
+    where
+        T: 'a,
+    {
+        for msg in messages {
+            self.send(msg)?;
+        }
+        Ok(())
+    }
 }
 
 // ============================================================================
 // Subscriber Trait
 // ============================================================================
+
+/// Type alias for subscriber message streams.
+pub type MessageStream<T> = Pin<Box<dyn Stream<Item = Result<Message<T>>> + Send>>;
 
 /// A ROS2 subscriber that can receive messages from a topic.
 ///
@@ -209,6 +236,28 @@ pub trait RosSubscriber<T: TypeSupport>: Send {
     ///
     /// Returns an error if deserialization fails or the subscription is closed.
     fn try_recv(&mut self) -> Result<Option<Message<T>>>;
+
+    /// Receive up to `limit` messages without blocking.
+    ///
+    /// Returns immediately with available messages, up to `limit`.
+    /// Default implementation calls `try_recv` repeatedly.
+    fn recv_many(&mut self, limit: usize) -> Result<Vec<Message<T>>> {
+        let mut results = Vec::with_capacity(limit.min(64));
+        while results.len() < limit {
+            match self.try_recv()? {
+                Some(msg) => results.push(msg),
+                None => break,
+            }
+        }
+        Ok(results)
+    }
+
+    /// Convert this subscriber into an async Stream.
+    ///
+    /// Consumes the subscriber and returns a stream that yields messages.
+    fn into_stream(self) -> MessageStream<T>
+    where
+        Self: Sized + 'static;
 }
 
 // ============================================================================
@@ -229,6 +278,22 @@ pub trait RosClient<T: ServiceMsg>: Send {
     fn call(
         &mut self,
         request: &T::Request,
+    ) -> impl std::future::Future<Output = Result<Message<T::Response>>> + Send;
+
+    /// Call with automatic retry on timeout, waits for service availability.
+    ///
+    /// This method first waits for the service to become available,
+    /// then sends the request with the specified timeout. If the call
+    /// times out, it will retry indefinitely until a response is received.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The request to send
+    /// * `timeout` - Timeout for each call attempt
+    fn call_with_retry(
+        &mut self,
+        request: &T::Request,
+        timeout: Duration,
     ) -> impl std::future::Future<Output = Result<Message<T::Response>>> + Send;
 }
 
@@ -253,6 +318,24 @@ pub trait RosServer<T: ServiceMsg>: Send {
     ///
     /// Returns `Ok(None)` if no request is currently available.
     fn try_recv(&mut self) -> Result<Option<Self::Request>>;
+
+    /// Run a serving loop with the given handler.
+    ///
+    /// Continuously receives requests and invokes the handler to generate responses.
+    /// The handler receives the request message and must return the response.
+    ///
+    /// # Arguments
+    ///
+    /// * `handler` - A function that takes a request and returns a response
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if the server shuts down gracefully, or an error if
+    /// receiving or sending fails.
+    fn serve<F>(self, handler: F) -> impl std::future::Future<Output = Result<()>> + Send
+    where
+        Self: Sized,
+        F: FnMut(Message<T::Request>) -> T::Response + Send;
 }
 
 // ============================================================================
