@@ -7,10 +7,7 @@ repository.workspace = true
 license-file.workspace = true
 
 [features]
-# RCL backends (requires ROS2 installation)
-humble = ["oxidros/humble"]
-jazzy = ["oxidros/jazzy"]
-kilted = ["oxidros/kilted"]
+default = []
 
 [dependencies]
 oxidros = { path = "../../oxidros/" }

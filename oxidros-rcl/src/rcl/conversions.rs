@@ -59,7 +59,7 @@ impl From<super::rmw_qos_reliability_policy_t> for oxidros_core::ReliabilityPoli
             RMW_QOS_POLICY_RELIABILITY_RELIABLE => Self::Reliable,
             RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT => Self::BestEffort,
             RMW_QOS_POLICY_RELIABILITY_UNKNOWN => Self::Unknown,
-            #[cfg(any(feature = "jazzy", feature = "kilted"))]
+            #[cfg(any(ros_distro_jazzy, ros_distro_kilted))]
             RMW_QOS_POLICY_RELIABILITY_BEST_AVAILABLE => Self::BestAvailable,
         }
     }
@@ -73,7 +73,7 @@ impl From<super::rmw_qos_durability_policy_t> for oxidros_core::DurabilityPolicy
             RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL => Self::TransientLocal,
             RMW_QOS_POLICY_DURABILITY_VOLATILE => Self::Volatile,
             RMW_QOS_POLICY_DURABILITY_UNKNOWN => Self::Unknown,
-            #[cfg(any(feature = "jazzy", feature = "kilted"))]
+            #[cfg(any(ros_distro_jazzy, ros_distro_kilted))]
             RMW_QOS_POLICY_DURABILITY_BEST_AVAILABLE => Self::Unknown,
         }
     }
@@ -88,7 +88,7 @@ impl From<super::rmw_qos_liveliness_policy_t> for oxidros_core::LivelinessPolicy
             RMW_QOS_POLICY_LIVELINESS_MANUAL_BY_NODE
             | RMW_QOS_POLICY_LIVELINESS_MANUAL_BY_TOPIC => Self::ManualByTopic,
             RMW_QOS_POLICY_LIVELINESS_UNKNOWN => Self::Unknown,
-            #[cfg(any(feature = "jazzy", feature = "kilted"))]
+            #[cfg(any(ros_distro_jazzy, ros_distro_kilted))]
             RMW_QOS_POLICY_LIVELINESS_BEST_AVAILABLE => Self::Unknown,
         }
     }
@@ -115,9 +115,9 @@ impl From<oxidros_core::ReliabilityPolicy> for super::rmw_qos_reliability_policy
             SystemDefault => Self::RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT,
             Reliable => Self::RMW_QOS_POLICY_RELIABILITY_RELIABLE,
             BestEffort => Self::RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT,
-            #[cfg(any(feature = "jazzy", feature = "kilted"))]
+            #[cfg(any(ros_distro_jazzy, ros_distro_kilted))]
             BestAvailable => Self::RMW_QOS_POLICY_RELIABILITY_BEST_AVAILABLE,
-            #[cfg(not(any(feature = "jazzy", feature = "kilted")))]
+            #[cfg(not(any(ros_distro_jazzy, ros_distro_kilted)))]
             BestAvailable => Self::RMW_QOS_POLICY_RELIABILITY_UNKNOWN,
             Unknown => Self::RMW_QOS_POLICY_RELIABILITY_UNKNOWN,
         }
@@ -131,9 +131,9 @@ impl From<oxidros_core::DurabilityPolicy> for super::rmw_qos_durability_policy_t
             SystemDefault => Self::RMW_QOS_POLICY_DURABILITY_SYSTEM_DEFAULT,
             TransientLocal => Self::RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL,
             Volatile => Self::RMW_QOS_POLICY_DURABILITY_VOLATILE,
-            #[cfg(any(feature = "jazzy", feature = "kilted"))]
+            #[cfg(any(ros_distro_jazzy, ros_distro_kilted))]
             BestAvailable => Self::RMW_QOS_POLICY_DURABILITY_BEST_AVAILABLE,
-            #[cfg(not(any(feature = "jazzy", feature = "kilted")))]
+            #[cfg(not(any(ros_distro_jazzy, ros_distro_kilted)))]
             BestAvailable => Self::RMW_QOS_POLICY_DURABILITY_UNKNOWN,
             Unknown => Self::RMW_QOS_POLICY_DURABILITY_UNKNOWN,
         }
@@ -147,9 +147,9 @@ impl From<oxidros_core::LivelinessPolicy> for super::rmw_qos_liveliness_policy_t
             SystemDefault => Self::RMW_QOS_POLICY_LIVELINESS_SYSTEM_DEFAULT,
             Automatic => Self::RMW_QOS_POLICY_LIVELINESS_AUTOMATIC,
             ManualByTopic => Self::RMW_QOS_POLICY_LIVELINESS_MANUAL_BY_TOPIC,
-            #[cfg(any(feature = "jazzy", feature = "kilted"))]
+            #[cfg(any(ros_distro_jazzy, ros_distro_kilted))]
             BestAvailable => Self::RMW_QOS_POLICY_LIVELINESS_BEST_AVAILABLE,
-            #[cfg(not(any(feature = "jazzy", feature = "kilted")))]
+            #[cfg(not(any(ros_distro_jazzy, ros_distro_kilted)))]
             BestAvailable => Self::RMW_QOS_POLICY_LIVELINESS_UNKNOWN,
             Unknown => Self::RMW_QOS_POLICY_LIVELINESS_UNKNOWN,
         }
@@ -381,7 +381,7 @@ impl From<i32> for RclRetErr {
 }
 
 impl From<rmw_message_info_t> for oxidros_core::message::MessageInfo {
-    #[cfg(feature = "humble")]
+    #[cfg(ros_distro_humble)]
     fn from(value: rmw_message_info_t) -> Self {
         let mut publisher_gid = [0; 16];
         for (o, i) in publisher_gid.iter_mut().zip(value.publisher_gid.data) {
@@ -393,7 +393,7 @@ impl From<rmw_message_info_t> for oxidros_core::message::MessageInfo {
             publisher_gid,
         }
     }
-    #[cfg(not(feature = "humble"))]
+    #[cfg(not(ros_distro_humble))]
     fn from(value: rmw_message_info_t) -> Self {
         Self {
             sequence_number: value.publication_sequence_number as i64,
@@ -404,7 +404,7 @@ impl From<rmw_message_info_t> for oxidros_core::message::MessageInfo {
 }
 
 impl From<rmw_service_info_t> for oxidros_core::message::MessageInfo {
-    #[cfg(feature = "humble")]
+    #[cfg(ros_distro_humble)]
     fn from(value: rmw_service_info_t) -> Self {
         let mut publisher_gid = [0; 16];
         for (o, i) in publisher_gid.iter_mut().zip(value.request_id.writer_guid) {
@@ -416,7 +416,7 @@ impl From<rmw_service_info_t> for oxidros_core::message::MessageInfo {
             publisher_gid,
         }
     }
-    #[cfg(not(feature = "humble"))]
+    #[cfg(not(ros_distro_humble))]
     fn from(value: rmw_service_info_t) -> Self {
         Self {
             sequence_number: value.request_id.sequence_number,

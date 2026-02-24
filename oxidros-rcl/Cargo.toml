@@ -42,14 +42,11 @@ oxidros-build = { path = "../oxidros-build" }
 [features]
 default = []
 custom_alloc = []
-humble = ["oxidros-msg/humble", "rcl"]
-jazzy = ["oxidros-msg/jazzy", "rcl"]
-kilted = ["oxidros-msg/kilted", "rcl"]
 rcl_stat = ["statistics"]
 statistics = ["serde", "serde_json"]
-rcl = []
+rcl = ["oxidros-msg/rcl"]
 
 [package.metadata.docs.rs]
-features = ["jazzy", "custom_alloc"]
+features = ["rcl", "custom_alloc"]
 all-features = false
 no-default-features = true

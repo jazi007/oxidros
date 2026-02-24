@@ -2,13 +2,18 @@
 default:
     @just --list
 
-# Run all tests in workspace
-test:
-    cargo test --all
+# Detect backend feature from environment
+_backend := if env("ROS_DISTRO", "") != "" { "rcl" } else { "zenoh" }
+# Exclude RCL-only crates when building with zenoh
+_exclude := if env("ROS_DISTRO", "") != "" { "" } else { "--exclude oxidros-wrapper --exclude oxidros-rcl" }
 
-# Run clippy linter on all crates
+# Run all tests in workspace (backend auto-detected from ROS_DISTRO)
+test:
+    cargo test --workspace {{ _exclude }} --no-default-features --features {{ _backend }}
+
+# Run clippy linter on all crates (backend auto-detected from ROS_DISTRO)
 clippy:
-    cargo clippy --all --all-targets -- -D warnings
+    cargo clippy --workspace {{ _exclude }} --all-targets --no-default-features --features {{ _backend }} -- -D warnings
 
 # Format code with rustfmt (check only)
 fmt:

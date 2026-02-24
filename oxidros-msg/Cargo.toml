@@ -19,9 +19,6 @@ ros2-types = { path = "../ros2-types", features = ["derive"] }
 
 [features]
 default = []
-jazzy = ["rcl"]
-humble = ["rcl"]
-kilted = ["rcl"]
 # Enable FFI code generation for ROS2 C libraries
 rcl = ["ros2-types/rcl"]
 

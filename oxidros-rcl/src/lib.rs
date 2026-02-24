@@ -298,7 +298,7 @@ impl<'a, T: msg::ServiceMsg> ST<ClientRecv<'a, T>> {
     }
 }
 
-#[cfg(any(feature = "humble", feature = "jazzy", feature = "kilted"))]
+#[cfg(any(ros_distro_humble, ros_distro_jazzy, ros_distro_kilted))]
 type RcutilsAllocator = rcl::rcutils_allocator_s;
 
 #[cfg(feature = "custom_alloc")]

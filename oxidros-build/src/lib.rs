@@ -12,6 +12,7 @@
 //! - **Message Bindings Generation**: Generate Rust FFI bindings for ROS2 message types
 //! - **Library Linking**: Set up cargo link directives for ROS2 shared libraries
 //! - **Environment Detection**: Handle ROS2 environment variables (`AMENT_PREFIX_PATH`, `ROS_DISTRO`, etc.)
+//! - **Distro Detection**: Automatically detect ROS2 distribution from environment
 //!
 //! # Requirements
 //!
@@ -52,6 +53,104 @@ use std::{
 
 use crate::msg::is_ros2_env;
 pub mod msg;
+
+// ============================================================================
+// Distro Detection
+// ============================================================================
+
+/// ROS2 distribution version.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RosDistro {
+    /// ROS2 Humble Hawksbill (LTS until May 2027)
+    Humble,
+    /// ROS2 Jazzy Jalisco (LTS until May 2029)
+    Jazzy,
+    /// ROS2 Kilted Kaiju
+    Kilted,
+}
+
+impl RosDistro {
+    /// Returns the distro name as a string.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            RosDistro::Humble => "humble",
+            RosDistro::Jazzy => "jazzy",
+            RosDistro::Kilted => "kilted",
+        }
+    }
+}
+
+/// Detect ROS2 distro from environment variables.
+///
+/// Checks `ROS_DISTRO` and `AMENT_PREFIX_PATH` to determine which
+/// ROS2 distribution is available.
+///
+/// # Example
+/// ```rust,ignore
+/// if let Some(distro) = oxidros_build::detect_distro() {
+///     oxidros_build::emit_distro_cfg(distro);
+/// }
+/// ```
+pub fn detect_distro() -> Option<RosDistro> {
+    // Check ROS_DISTRO env var first (most reliable)
+    if let Ok(distro) = env::var("ROS_DISTRO") {
+        match distro.as_str() {
+            "humble" => return Some(RosDistro::Humble),
+            "jazzy" => return Some(RosDistro::Jazzy),
+            "kilted" => return Some(RosDistro::Kilted),
+            _ => {}
+        }
+    }
+
+    // Check AMENT_PREFIX_PATH as fallback
+    if let Ok(ament_path) = env::var("AMENT_PREFIX_PATH")
+        && let Some(distro) = detect_distro_from_path(&ament_path)
+    {
+        return Some(distro);
+    }
+
+    None
+}
+
+fn detect_distro_from_path(path: &str) -> Option<RosDistro> {
+    use std::ffi::OsStr;
+    for component in env::split_paths(OsStr::new(path)) {
+        let path_str = component.to_string_lossy();
+        if path_str.contains("/opt/ros/")
+            || path_str.contains("/ros/")
+            || path_str.contains("\\ros\\")
+        {
+            if path_str.contains("humble") {
+                return Some(RosDistro::Humble);
+            }
+            if path_str.contains("jazzy") {
+                return Some(RosDistro::Jazzy);
+            }
+            if path_str.contains("kilted") {
+                return Some(RosDistro::Kilted);
+            }
+        }
+    }
+    None
+}
+
+/// Emit `cargo:rustc-cfg=ros_distro_{distro}` for conditional compilation.
+///
+/// Call this from `build.rs` to enable distro-specific code paths.
+///
+/// # Example
+/// ```rust,ignore
+/// if let Some(distro) = oxidros_build::detect_distro() {
+///     oxidros_build::emit_distro_cfg(distro);
+/// }
+/// ```
+pub fn emit_distro_cfg(distro: RosDistro) {
+    println!("cargo:rustc-cfg=ros_distro_{}", distro.as_str());
+}
+
+// ============================================================================
+// RCL Bindings Generation
+// ============================================================================
 
 /// Required ROS2 packages for RCL bindings generation.
 const RCL_REQUIRED_PACKAGES: &[&str] = &[
@@ -138,14 +237,7 @@ fn collect_include_paths(packages: &[&str]) -> Vec<PathBuf> {
 ///
 /// # Emitted Directives
 ///
-/// - Sets `rustc-cfg=feature="<distro>"` where `<distro>` is the value of `ROS_DISTRO`
-/// - Sets `rustc-cfg=feature="rcl"` to enable RCL-dependent code paths
 /// - Registers `AMENT_PREFIX_PATH`, `CMAKE_PREFIX_PATH`, and `ROS_DISTRO` for change detection
-///
-/// # Panics
-///
-/// Panics if `ROS_DISTRO` environment variable is not set. Make sure to source
-/// your ROS2 installation before building.
 ///
 /// # Example
 ///
@@ -154,16 +246,8 @@ fn collect_include_paths(packages: &[&str]) -> Vec<PathBuf> {
 /// oxidros_build::ros2_env_var_changed();
 /// ```
 pub fn ros2_env_var_changed() {
-    match std::env::var_os("ROS_DISTRO") {
-        Some(distro_env) => {
-            let distro = distro_env.to_string_lossy();
-            println!("cargo:rustc-cfg=feature=\"{distro}\"");
-            println!("cargo:rustc-cfg=feature=\"rcl\"");
-        }
-        None => {
-            println!("cargo:rustc-cfg=feature=\"zenoh\"");
-        }
-    }
+    // Only emit rerun-if-env-changed directives
+    // Feature cfg should be handled by Cargo features, not by build script
     println!("cargo:rerun-if-env-changed=AMENT_PREFIX_PATH");
     println!("cargo:rerun-if-env-changed=CMAKE_PREFIX_PATH");
     println!("cargo:rerun-if-env-changed=ROS_DISTRO");

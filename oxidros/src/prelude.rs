@@ -39,7 +39,9 @@ pub use oxidros_core::selector::CallbackResult;
 pub use oxidros_core::{Parameter, Value};
 
 // Backend-specific types - only one will be active at a time
+// RCL backend requires explicit `rcl` Cargo feature (via humble/jazzy/kilted)
 #[cfg(feature = "rcl")]
+#[cfg(not(feature = "zenoh"))]
 mod backend {
     pub use oxidros_rcl::context::Context;
     pub use oxidros_rcl::logger::init_ros_logging;
@@ -50,7 +52,8 @@ mod backend {
     pub use oxidros_rcl::topic::{publisher::Publisher, subscriber::Subscriber};
 }
 
-#[cfg(feature = "zenoh")]
+// Zenoh backend - used when `zenoh` is explicit OR `rcl` is not enabled
+#[cfg(any(feature = "zenoh", not(feature = "rcl")))]
 mod backend {
     pub use oxidros_zenoh::Context;
     pub use oxidros_zenoh::Node;
@@ -61,5 +64,4 @@ mod backend {
     pub use oxidros_zenoh::topic::{publisher::Publisher, subscriber::Subscriber};
 }
 
-#[cfg(any(feature = "rcl", feature = "zenoh"))]
 pub use backend::*;

@@ -832,7 +832,7 @@ impl MTUnsafeFn {
         Ok(available)
     }
 
-    #[cfg(feature = "jazzy")]
+    #[cfg(ros_distro_jazzy)]
     pub fn rcl_service_configure_service_introspection(
         &self,
         service: *mut rcl_service_t,
