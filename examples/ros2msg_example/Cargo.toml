@@ -25,7 +25,5 @@ heck = "0.5"
 
 [features]
 default = []
-jazzy = ["rcl"]
-humble = ["rcl"]
-kilted = ["rcl"]
+# Enable FFI code generation for ROS2 messages
 rcl = []

@@ -19,11 +19,9 @@ tokio = { version = "1", features = ["full"] }
 oxidros-build = { path = "../oxidros-build" }
 
 [features]
+# No default - user must explicitly choose a backend
 default = []
-rcl = ["oxidros-msg/rcl"]
-zenoh = []
 
-# RCL distribution features (require rcl feature)
-humble = ["rcl", "oxidros-rcl/humble", "oxidros-msg/humble"]
-jazzy = ["rcl", "oxidros-rcl/jazzy", "oxidros-msg/jazzy"]
-kilted = ["rcl", "oxidros-rcl/kilted", "oxidros-msg/kilted"]
+# Backend selection
+rcl = ["oxidros-msg/rcl", "oxidros-rcl/rcl"]
+zenoh = []

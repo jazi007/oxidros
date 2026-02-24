@@ -9,9 +9,6 @@ repository.workspace = true
 
 [features]
 default = []
-humble = ["oxidros-rcl/humble", "oxidros-msg/humble"]
-jazzy = ["oxidros-rcl/jazzy", "oxidros-msg/jazzy"]
-kilted = ["oxidros-rcl/kilted", "oxidros-msg/kilted"]
 
 [dependencies]
 futures-core = "0.3"

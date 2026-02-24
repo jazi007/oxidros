@@ -151,14 +151,13 @@ pub(crate) fn emit_ros_idl(pkg: &str) {
 /// }
 /// ```
 pub fn get_base_generator(config: &Config) -> Option<Generator> {
-    if std::env::var_os("ROS_DISTRO").is_some() {
-        println!("cargo:rustc-cfg=feature=\"rcl\"");
-        println!("cargo:rerun-if-env-changed=ROS_DISTRO");
-        println!("cargo:rerun-if-env-changed=AMENT_PREFIX_PATH");
-        if cfg!(target_os = "windows") {
-            println!("cargo:rerun-if-env-changed=CMAKE_PREFIX_PATH");
-        }
+    // Rerun if ROS2 environment changes
+    println!("cargo:rerun-if-env-changed=ROS_DISTRO");
+    println!("cargo:rerun-if-env-changed=AMENT_PREFIX_PATH");
+    if cfg!(target_os = "windows") {
+        println!("cargo:rerun-if-env-changed=CMAKE_PREFIX_PATH");
     }
+
     let out_dir = env::var("OUT_DIR").expect("OUT_DIR not set");
     let out_path = Path::new(&out_dir);
     // Get search paths from config (handles AMENT_PREFIX_PATH fallback automatically)

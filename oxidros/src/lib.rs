@@ -15,10 +15,10 @@
 //!
 //! | Feature | Backend | Requirements |
 //! |---------|---------|--------------|
+//! | `zenoh` | Zenoh | None (pure Rust) - **default** |
 //! | `humble` | RCL | ROS2 Humble installation |
 //! | `jazzy` | RCL | ROS2 Jazzy installation |
 //! | `kilted` | RCL | ROS2 Kilted installation |
-//! | `zenoh` | Zenoh | None (pure Rust) |
 //!
 //! # Quick Start
 //!
@@ -26,7 +26,11 @@
 //!
 //! ```toml
 //! [dependencies]
-//! oxidros = { version = "0.1", features = ["jazzy"] }  # or "zenoh"
+//! # For Zenoh backend (no ROS2 needed):
+//! oxidros = { version = "0.1", features = ["zenoh"] }
+//!
+//! # For RCL backend (requires ROS2 installation):
+//! oxidros = { version = "0.1", features = ["jazzy"] }  # or "humble", "kilted"
 //! tokio = { version = "1", features = ["full"] }
 //! ```
 //!
@@ -190,22 +194,24 @@
 //! - `oxidros-msg` - ROS2 message type generation
 //! - `ros2-types` - CDR serialization and type traits
 
-// Compile-time check: ensure exactly one backend is selected
+// Compile-time check: ensure not both backends are explicitly selected
 #[cfg(all(feature = "rcl", feature = "zenoh"))]
 compile_error!("Features `rcl` and `zenoh` are mutually exclusive. Choose one backend.");
-
-#[cfg(not(any(feature = "rcl", feature = "zenoh")))]
-compile_error!("No backend selected. Enable one of: `humble`, `jazzy`, `kilted`, or `zenoh`.");
 
 // Prelude module for convenient imports
 pub mod prelude;
 
-// Re-export the selected backend
-#[cfg(all(feature = "rcl", not(feature = "zenoh")))]
+// Re-export the selected backend (explicit feature or auto-detected)
+// RCL backend - requires `rcl` Cargo feature to be enabled (via humble/jazzy/kilted)
+// The backend_rcl cfg alone isn't enough because oxidros-rcl needs the Cargo feature
+#[cfg(feature = "rcl")]
+#[cfg(not(feature = "zenoh"))]
 pub use oxidros_rcl::{self, action, clock, logger, parameter, service, topic};
 
-// Re-export the selected backend
-#[cfg(all(feature = "zenoh", not(feature = "rcl")))]
+// Zenoh backend - used when:
+// 1. Explicit `zenoh` feature is enabled, OR
+// 2. `rcl` feature is NOT enabled (includes `auto` without ROS2 distro feature)
+#[cfg(any(feature = "zenoh", not(feature = "rcl")))]
 pub use oxidros_zenoh::{self, clock, logger, parameter, service, topic};
 
 // Always re-export core types and traits

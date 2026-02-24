@@ -9,7 +9,7 @@
 Oxidros provides two ways to build ROS2 applications in Rust:
 
 - **RCL Backend** (`oxidros-rcl`): FFI bindings to the official ROS2 C library.
-  Requires a ROS2 installation (Humble, Jazzy, or Kilted).
+  Requires a ROS2 installation (Humble, Jazzy, or Kilted). The specific distro is **automatically detected** from the `ROS_DISTRO` environment variable.
 
 - **Zenoh Backend** (`oxidros-zenoh`): Pure Rust implementation using [Zenoh](https://zenoh.io/) middleware.
   Compatible with `rmw_zenoh_cpp`. No ROS2 installation required at runtime.
@@ -19,6 +19,8 @@ Both backends share a unified API through the `oxidros` crate, making it easy to
 ## Features
 
 - **Unified API**: Write code once, run with either backend
+- **Explicit backend selection**: Choose `rcl` or `zenoh` via Cargo features
+- **Automatic distro detection**: ROS2 distribution (jazzy/humble/kilted) detected from `ROS_DISTRO` env
 - **Standard Rust tooling**: Works with `cargo` - no custom build tools required
 - **Build-time message generation**: Message types generated at compile time via `build.rs`
 - **Async/await support**: First-class async support with tokio
@@ -31,13 +33,19 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-# For RCL backend (requires ROS2 installation)
-oxidros = { version = "0.1", features = ["jazzy"] }
+# For RCL backend (requires sourced ROS2 installation)
+oxidros = { version = "0.1", features = ["rcl"] }
 
-# OR for Zenoh backend (pure Rust)
+# OR for Zenoh backend (pure Rust, no ROS2 required)
 oxidros = { version = "0.1", features = ["zenoh"] }
 
 tokio = { version = "1", features = ["full"] }
+```
+
+**Important**: When using `rcl`, source your ROS2 installation first:
+```bash
+source /opt/ros/jazzy/setup.bash  # or humble/kilted
+cargo build --features rcl
 ```
 
 ### Async Publisher/Subscriber
@@ -129,11 +137,15 @@ fn main() -> oxidros::error::Result<()> {
 | Crate | Description |
 |-------|-------------|
 | `oxidros` | Unified API crate - use this in your applications |
-| `oxidros-rcl` | RCL backend (FFI bindings) |
-| `oxidros-zenoh` | Zenoh backend (pure Rust) |
-| `oxidros-core` | Shared types and traits |
+| `oxidros-core` | Shared traits and types (backend-agnostic) |
+| `oxidros-rcl` | RCL backend (FFI bindings to ROS2 C library) |
+| `oxidros-zenoh` | Zenoh backend (pure Rust implementation) |
+| `oxidros-wrapper` | Ergonomic wrappers implementing core traits (RCL) |
 | `oxidros-msg` | ROS2 message type generation |
+| `oxidros-build` | Build utilities (distro detection, linking) |
 | `ros2-types` | CDR serialization and type traits |
+| `ros2-types-derive` | Derive macros for ROS2 types |
+| `ros2msg` | IDL/msg parser for code generation |
 | `ros2args` | ROS2 argument parsing |
 
 ## Examples
@@ -153,14 +165,27 @@ See the `examples/simple` directory for complete working examples (RCL backend):
 Run examples:
 
 ```bash
-# Source ROS2 (required for examples)
+# Source ROS2 first (sets ROS_DISTRO for automatic detection)
 source /opt/ros/jazzy/setup.bash
 
 # Run publisher
-cargo run -p simple --bin publisher --features jazzy
+cargo run -p simple --features rcl --bin publisher
 
 # Run subscriber (in another terminal)
-cargo run -p simple --bin subscriber --features jazzy
+cargo run -p simple --features rcl --bin subscriber
+```
+
+## Development
+
+The `justfile` automatically detects the backend from `ROS_DISTRO`:
+
+```bash
+# With ROS2 sourced → uses rcl backend
+source /opt/ros/jazzy/setup.bash
+just check  # runs fmt, clippy, test with --features rcl
+
+# Without ROS2 → uses zenoh backend
+ROS_DISTRO= just check  # runs with --features zenoh (excludes rcl-only crates)
 ```
 
 ## Documentation
