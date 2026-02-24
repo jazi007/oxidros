@@ -14,8 +14,8 @@ default = []
 futures-core = "0.3"
 log = { version = "0.4", features = ["std"] }
 oxidros-core = { path = "../oxidros-core" }
-oxidros-rcl = { path = "../oxidros-rcl" }
-oxidros-msg = { path = "../oxidros-msg" }
+oxidros-rcl = { path = "../oxidros-rcl", features = ["rcl"] }
+oxidros-msg = { path = "../oxidros-msg", features = ["rcl"] }
 tokio = { version = "1", features = ["time"] }
 tokio-util = "0.7"
 futures-util.workspace = true

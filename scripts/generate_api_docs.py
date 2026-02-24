@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
 """
-Generate API documentation comparing oxidros-rcl and oxidros-zenoh.
+Generate API documentation comparing oxidros-wrapper and oxidros-zenoh.
 
 This script uses `cargo public-api` to extract public APIs from both backends
 and generates a Markdown file showing common APIs and differences.
 
 Requirements:
-- cargo-public-api (install with: cargo install cargo-public-api)
-- ROS2 environment sourced (for oxidros-msg build)
+- cargo-public-api: cargo install cargo-public-api
+- ROS2 environment sourced: oxidros-wrapper requires ROS2 to compile
 
 Usage:
-    python scripts/generate_api_docs.py [--output docs/API_REFERENCE.md]
+    # With ROS2 sourced
+    source /opt/ros/jazzy/setup.bash
+    python scripts/generate_api_docs.py
+
+    # Generate partial docs (zenoh-only) without ROS2
+    python scripts/generate_api_docs.py --force
 """
 
 import subprocess
@@ -162,20 +167,31 @@ def categorize_by_module(apis: dict[str, ApiItem]) -> dict[str, list[ApiItem]]:
     return by_module
 
 
+def clean_module_name(module: str) -> str:
+    """Strip generic parameters and struct internals from module name for display."""
+    # Handle cases like "ServiceRequest<T" -> "ServiceRequest"
+    if "<" in module:
+        module = module.split("<")[0]
+    # Handle cases like "Context(pub" -> "Context"
+    if "(" in module:
+        module = module.split("(")[0]
+    return module
+
+
 def generate_markdown(
     zenoh_apis: dict[str, ApiItem],
-    rcl_apis: dict[str, ApiItem],
+    wrapper_apis: dict[str, ApiItem],
     output_path: Path
 ) -> None:
     """Generate Markdown documentation."""
     
     # Find common and unique APIs
     zenoh_keys = set(zenoh_apis.keys())
-    rcl_keys = set(rcl_apis.keys())
+    wrapper_keys = set(wrapper_apis.keys())
     
-    common = zenoh_keys & rcl_keys
-    zenoh_only = zenoh_keys - rcl_keys
-    rcl_only = rcl_keys - zenoh_keys
+    common = zenoh_keys & wrapper_keys
+    zenoh_only = zenoh_keys - wrapper_keys
+    wrapper_only = wrapper_keys - zenoh_keys
     
     lines = [
         "# Oxidros API Reference",
@@ -188,7 +204,7 @@ def generate_markdown(
         f"|----------|-------|",
         f"| Common APIs | {len(common)} |",
         f"| Zenoh-only APIs | {len(zenoh_only)} |",
-        f"| RCL-only APIs | {len(rcl_only)} |",
+        f"| Wrapper-only APIs | {len(wrapper_only)} |",
         "",
         "---",
         "",
@@ -198,7 +214,7 @@ def generate_markdown(
     lines.extend([
         "## Common APIs (Both Backends)",
         "",
-        "These APIs are available in both `oxidros-rcl` and `oxidros-zenoh` with the same signature.",
+        "These APIs are available in both `oxidros-wrapper` and `oxidros-zenoh` with the same signature.",
         "",
     ])
     
@@ -211,7 +227,7 @@ def generate_markdown(
     
     for module in sorted(common_by_module.keys()):
         items = common_by_module[module]
-        lines.append(f"### {module}")
+        lines.append(f"### {clean_module_name(module)}")
         lines.append("")
         lines.append("```rust")
         for item in sorted(items, key=lambda x: x.name):
@@ -240,7 +256,7 @@ def generate_markdown(
     
     for module in sorted(zenoh_by_module.keys()):
         items = zenoh_by_module[module]
-        lines.append(f"### {module}")
+        lines.append(f"### {clean_module_name(module)}")
         lines.append("")
         lines.append("```rust")
         for item in sorted(items, key=lambda x: x.name):
@@ -249,30 +265,30 @@ def generate_markdown(
         lines.append("```")
         lines.append("")
     
-    # RCL-only APIs
+    # Wrapper-only APIs
     lines.extend([
         "---",
         "",
-        "## RCL-Only APIs",
+        "## Wrapper-Only APIs",
         "",
-        "These APIs are specific to `oxidros-rcl`.",
+        "These APIs are specific to `oxidros-wrapper` (RCL backend).",
         "",
     ])
     
-    rcl_by_module = defaultdict(list)
-    for key in sorted(rcl_only):
-        item = rcl_apis[key]
+    wrapper_by_module = defaultdict(list)
+    for key in sorted(wrapper_only):
+        item = wrapper_apis[key]
         parts = key.split("::")
         module = parts[1] if len(parts) > 1 else "root"
-        rcl_by_module[module].append(item)
+        wrapper_by_module[module].append(item)
     
-    for module in sorted(rcl_by_module.keys()):
-        items = rcl_by_module[module]
-        lines.append(f"### {module}")
+    for module in sorted(wrapper_by_module.keys()):
+        items = wrapper_by_module[module]
+        lines.append(f"### {clean_module_name(module)}")
         lines.append("")
         lines.append("```rust")
         for item in sorted(items, key=lambda x: x.name):
-            sig = item.signature.replace("oxidros_rcl::", "")
+            sig = item.signature.replace("oxidros_wrapper::", "")
             lines.append(sig)
         lines.append("```")
         lines.append("")
@@ -291,9 +307,14 @@ def main():
         help="Output Markdown file path"
     )
     parser.add_argument(
-        "--rcl-features",
-        default="jazzy",
-        help="Features for oxidros-rcl (default: jazzy)"
+        "--wrapper-features",
+        default="",
+        help="Features for oxidros-wrapper (default: none)"
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Generate output even if extraction fails"
     )
     args = parser.parse_args()
     
@@ -302,13 +323,31 @@ def main():
     zenoh_apis = extract_apis(zenoh_output, "oxidros_zenoh")
     print(f"  Found {len(zenoh_apis)} API items")
     
-    print("Extracting oxidros-rcl API...")
-    rcl_output = run_cargo_public_api("oxidros-rcl", args.rcl_features)
-    rcl_apis = extract_apis(rcl_output, "oxidros_rcl")
-    print(f"  Found {len(rcl_apis)} API items")
+    print("Extracting oxidros-wrapper API...")
+    wrapper_features = args.wrapper_features if args.wrapper_features else None
+    wrapper_output = run_cargo_public_api("oxidros-wrapper", wrapper_features)
+    wrapper_apis = extract_apis(wrapper_output, "oxidros_wrapper")
+    print(f"  Found {len(wrapper_apis)} API items")
+    
+    # Check for failures - successful extraction should have many items
+    MIN_EXPECTED_APIS = 20  # Both crates should have at least this many APIs
+    
+    if len(wrapper_apis) < MIN_EXPECTED_APIS and not args.force:
+        print(f"\nError: Only found {len(wrapper_apis)} API items for oxidros-wrapper (expected >= {MIN_EXPECTED_APIS}).")
+        print("This usually means ROS2 is not sourced in your environment.")
+        print("Please run: source /opt/ros/<distro>/setup.bash")
+        print("Or use --force to generate partial documentation.")
+        import sys
+        sys.exit(1)
+    
+    if len(zenoh_apis) < MIN_EXPECTED_APIS and not args.force:
+        print(f"\nError: Only found {len(zenoh_apis)} API items for oxidros-zenoh (expected >= {MIN_EXPECTED_APIS}).")
+        print("Or use --force to generate partial documentation.")
+        import sys
+        sys.exit(1)
     
     output_path = Path(__file__).parent.parent / args.output
-    generate_markdown(zenoh_apis, rcl_apis, output_path)
+    generate_markdown(zenoh_apis, wrapper_apis, output_path)
 
 
 if __name__ == "__main__":

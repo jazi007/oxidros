@@ -738,15 +738,3 @@ pub mod prelude {
     pub use futures_util::StreamExt;
     pub use std::sync::Arc;
 }
-
-/// Helper function to create a QoS profile.
-#[inline]
-pub fn create_qos(depth: usize) -> Profile {
-    Profile {
-        depth,
-        history: HistoryPolicy::KeepLast,
-        reliability: ReliabilityPolicy::Reliable,
-        durability: DurabilityPolicy::Volatile,
-        ..Profile::default()
-    }
-}

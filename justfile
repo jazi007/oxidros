@@ -53,12 +53,17 @@ type-hash-validation *ARGS:
 
 # Run all validation tests (IDL conformance + type hash)
 validate: idl-conformance type-hash-validation
+    @echo "All validation tests passed!"
 
-# Generate API reference documentation comparing rcl and zenoh backends
+# Generate API reference documentation comparing wrapper and zenoh backends
+# Requires: cargo-public-api, ROS2 sourced (for oxidros-wrapper)
 api-docs:
     python3 scripts/generate_api_docs.py
 
 # Generate API docs with custom output path
 api-docs-to FILE:
     python3 scripts/generate_api_docs.py --output {{FILE}}
-    @echo "All validation tests passed!"
+
+# Generate partial API docs (zenoh-only, no ROS2 required)
+api-docs-force:
+    python3 scripts/generate_api_docs.py --force
