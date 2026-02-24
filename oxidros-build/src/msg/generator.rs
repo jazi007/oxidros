@@ -8,10 +8,141 @@ use std::collections::HashSet;
 use std::env;
 use std::path::{Path, PathBuf};
 
-use crate::msg::is_ros2_env;
-
 use super::callbacks::RosCallbacks;
 use super::config::Config;
+
+/// Represents the availability state of a ROS2 installation.
+///
+/// This enum is used to determine how message generation should proceed:
+/// - Generate with full linking (sourced ROS)
+/// - Generate without linking (common install detected)
+/// - Skip generation and use pre-committed files (no ROS)
+#[derive(Debug, Clone)]
+pub enum RosAvailability {
+    /// ROS2 environment is sourced (AMENT_PREFIX_PATH is set).
+    /// Full generation with library linking is possible.
+    Sourced {
+        /// Share paths from AMENT_PREFIX_PATH
+        share_paths: Vec<PathBuf>,
+    },
+    /// A common ROS2 installation was found but not sourced.
+    /// Generation is possible but linking may not work.
+    CommonInstall {
+        /// Share paths from common installation locations
+        share_paths: Vec<PathBuf>,
+    },
+    /// No ROS2 installation detected.
+    /// Pre-generated (gitted) files should be used.
+    NotAvailable,
+}
+
+impl RosAvailability {
+    /// Returns true if ROS2 is available (either sourced or common install).
+    pub fn is_available(&self) -> bool {
+        !matches!(self, RosAvailability::NotAvailable)
+    }
+
+    /// Returns true if ROS2 is fully sourced with AMENT_PREFIX_PATH.
+    pub fn is_sourced(&self) -> bool {
+        matches!(self, RosAvailability::Sourced { .. })
+    }
+
+    /// Returns the share paths if ROS2 is available.
+    pub fn share_paths(&self) -> Option<&[PathBuf]> {
+        match self {
+            RosAvailability::Sourced { share_paths } => Some(share_paths),
+            RosAvailability::CommonInstall { share_paths } => Some(share_paths),
+            RosAvailability::NotAvailable => None,
+        }
+    }
+}
+
+/// Detects the availability of a ROS2 installation.
+///
+/// This function checks for ROS2 in the following order:
+///
+/// 1. **Sourced ROS2**: Checks if `AMENT_PREFIX_PATH` is set (standard sourced environment)
+/// 2. **Common Install**: Checks common installation paths (`/opt/ros/jazzy`, etc.)
+/// 3. **Not Available**: No ROS2 installation found
+///
+/// # Arguments
+///
+/// * `config` - Configuration that may contain extra search paths
+///
+/// # Returns
+///
+/// A [`RosAvailability`] enum indicating the detection result.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use oxidros_build::msg::{Config, detect_ros_availability, RosAvailability};
+///
+/// let config = Config::builder().build();
+/// match detect_ros_availability(&config) {
+///     RosAvailability::Sourced { share_paths } => {
+///         println!("ROS2 sourced, generating with linking");
+///     }
+///     RosAvailability::CommonInstall { share_paths } => {
+///         println!("ROS2 found but not sourced, generating without linking");
+///     }
+///     RosAvailability::NotAvailable => {
+///         println!("No ROS2 found, using pre-generated files");
+///     }
+/// }
+/// ```
+pub fn detect_ros_availability(config: &Config) -> RosAvailability {
+    // 1. Check AMENT_PREFIX_PATH (sourced ROS2)
+    if let Some(ament_paths) = Config::get_ament_prefix_paths() {
+        let share_paths: Vec<PathBuf> = ament_paths
+            .into_iter()
+            .map(|p| {
+                let share = p.join("share");
+                if share.exists() { share } else { p }
+            })
+            .collect();
+
+        if !share_paths.is_empty() {
+            return RosAvailability::Sourced { share_paths };
+        }
+    }
+
+    // 2. Check common installation paths
+    let default_paths = Config::get_default_ros2_paths();
+    if !default_paths.is_empty() {
+        let share_paths: Vec<PathBuf> = default_paths
+            .into_iter()
+            .map(|p| {
+                let share = p.join("share");
+                if share.exists() { share } else { p }
+            })
+            .collect();
+
+        if !share_paths.is_empty() {
+            return RosAvailability::CommonInstall { share_paths };
+        }
+    }
+
+    // 3. Check extra search paths from config (treated as common install)
+    if !config.extra_search_paths.is_empty() {
+        let share_paths: Vec<PathBuf> = config
+            .extra_search_paths
+            .iter()
+            .filter(|p| p.exists())
+            .map(|p| {
+                let share = p.join("share");
+                if share.exists() { share } else { p.clone() }
+            })
+            .collect();
+
+        if !share_paths.is_empty() {
+            return RosAvailability::CommonInstall { share_paths };
+        }
+    }
+
+    // 4. Nothing found
+    RosAvailability::NotAvailable
+}
 
 /// Collects all interface files from a ROS2 package directory.
 ///
@@ -128,14 +259,21 @@ pub(crate) fn emit_ros_idl(pkg: &str) {
 /// # Returns
 ///
 /// - `Some(Generator)` - A configured generator ready to generate code
-/// - `None` - If no interface files were found or paths are not configured
+/// - `None` - If no ROS2 installation is detected ([`RosAvailability::NotAvailable`])
+///
+/// # ROS2 Detection
+///
+/// The function uses [`detect_ros_availability`] to determine how to proceed:
+///
+/// - **Sourced**: Full generation with library linking directives
+/// - **CommonInstall**: Generation without linking (for pre-generating files)
+/// - **NotAvailable**: Returns `None` - use pre-committed gitted files
 ///
 /// # Cargo Directives
 ///
 /// This function emits several cargo directives:
-/// - `cargo:rustc-cfg=feature="rcl"` - If ROS_DISTRO is set
 /// - `cargo:rerun-if-env-changed` - For ROS_DISTRO, AMENT_PREFIX_PATH, CMAKE_PREFIX_PATH
-/// - Link directives for each package with interface files
+/// - Link directives for each package (only when ROS is sourced)
 ///
 /// # Example
 ///
@@ -148,6 +286,8 @@ pub(crate) fn emit_ros_idl(pkg: &str) {
 ///
 /// if let Some(generator) = get_base_generator(&config) {
 ///     generator.generate().expect("Failed to generate");
+/// } else {
+///     // No ROS2 available - use pre-generated files
 /// }
 /// ```
 pub fn get_base_generator(config: &Config) -> Option<Generator> {
@@ -160,17 +300,28 @@ pub fn get_base_generator(config: &Config) -> Option<Generator> {
 
     let out_dir = env::var("OUT_DIR").expect("OUT_DIR not set");
     let out_path = Path::new(&out_dir);
-    // Get search paths from config (handles AMENT_PREFIX_PATH fallback automatically)
-    let share_paths = config.get_share_paths();
 
-    if share_paths.is_empty() {
-        println!("cargo:warning=No ros2 message search paths found.");
-        println!(
-            "cargo:warning=Either source your ROS2 setup.bash (source /opt/ros/jazzy/setup.bash)"
-        );
-        println!("cargo:warning=or add paths using Config::builder().extra_search_path(...)");
-        return None;
-    }
+    // Detect ROS2 availability
+    let availability = detect_ros_availability(config);
+    let is_sourced = availability.is_sourced();
+
+    let share_paths = match availability {
+        RosAvailability::Sourced { share_paths } => {
+            println!("cargo:info=ROS2 environment sourced, generating with linking");
+            share_paths
+        }
+        RosAvailability::CommonInstall { share_paths } => {
+            println!("cargo:warning=ROS2 installation found but not sourced");
+            println!("cargo:warning=Generating messages without library linking");
+            println!("cargo:warning=Source your ROS2 environment for full functionality");
+            share_paths
+        }
+        RosAvailability::NotAvailable => {
+            println!("cargo:warning=No ROS2 installation detected");
+            println!("cargo:warning=Using pre-generated message files (if available)");
+            return None;
+        }
+    };
 
     // Collect ALL interface files from ALL packages
     let mut all_files = Vec::new();
@@ -208,8 +359,8 @@ pub fn get_base_generator(config: &Config) -> Option<Generator> {
 
                     let files = collect_interface_files(path);
                     if !files.is_empty() {
-                        // Only emit link directives for packages that have interface files
-                        if is_ros2_env() {
+                        // Only emit link directives when ROS is fully sourced
+                        if is_sourced {
                             emit_ros_idl(&pkg_name);
                         }
                         packages_found.push(pkg_name.to_string());
@@ -224,9 +375,7 @@ pub fn get_base_generator(config: &Config) -> Option<Generator> {
         println!("cargo:warning=No interface files found in search paths");
         return None;
     }
-    if is_ros2_env() {
-        config.print_packages_search_pathes();
-    }
+
     println!(
         "cargo:info=Found {} interface files from {} packages",
         all_files.len(),
@@ -236,6 +385,11 @@ pub fn get_base_generator(config: &Config) -> Option<Generator> {
     // Print some package names for visibility
     let preview: Vec<_> = packages_found.iter().take(10).collect();
     println!("cargo:info=Packages include: {:?}...", preview);
+
+    // Only print library search paths when sourced
+    if is_sourced {
+        config.print_packages_search_pathes();
+    }
 
     // Create output directory
     let generated_dir = out_path.join("generated");
