@@ -7,9 +7,8 @@
 //! ```
 //! use oxidros_rcl::{
 //!     context::Context,
-//!     logger::Logger,
+//!     info,
 //!     parameter::{ParameterServer, Value, Parameter, Descriptor},
-//!     pr_info,
 //! };
 //!
 //! // Create a context and a node.
@@ -57,8 +56,7 @@
 //!     );
 //! }
 //!
-//! // Create a logger and a selector.
-//! let logger = Logger::new("param_server");
+//! // Create a selector.
 //! let mut selector = ctx.create_selector().unwrap();
 //!
 //! // Add a callback function to the parameter server.
@@ -71,7 +69,7 @@
 //!             let value = &params.get_parameter(key).unwrap().value;
 //!             keys = format!("{keys}{key} = {}, ", value);
 //!         }
-//!         pr_info!(logger, "updated parameters: {keys}");
+//!         info!("updated parameters: {keys}");
 //!     }),
 //! );
 //!
@@ -86,9 +84,8 @@
 //! ```
 //! use oxidros_rcl::{
 //!     context::Context,
-//!     logger::Logger,
+//!     info,
 //!     parameter::{ParameterServer, Value, Parameter, Descriptor},
-//!     pr_info,
 //! };
 //!
 //! // Create a context and a node.
@@ -137,10 +134,8 @@
 //! }
 //!
 //! async fn run_wait(mut param_server: ParameterServer) {
+//!     use oxidros_rcl::info;
 //!     loop {
-//!         // Create a logger.
-//!         let logger = Logger::new("async_param_server");
-//!
 //!         // Wait update asynchronously.
 //!         let updated = param_server.wait().await.unwrap();
 //!
@@ -152,7 +147,7 @@
 //!             let value = &params.get_parameter(key).unwrap().value;
 //!             keys = format!("{keys}{key} = {}, ", value);
 //!         }
-//!         pr_info!(logger, "updated parameters: {keys}");
+//!         info!("updated parameters: {keys}");
 //!     }
 //! }
 //!
@@ -163,7 +158,6 @@
 use crate::{
     error::Result,
     is_halt,
-    logger::{Logger, pr_error_in, pr_fatal_in},
     msg::{
         RosString, RosStringSeq, U8Seq,
         interfaces::rcl_interfaces::{
@@ -355,8 +349,7 @@ fn param_server(
             selector.wait()?;
         }
     } else {
-        let logger = Logger::new("oxidros");
-        pr_error_in!(logger, "failed to start a parameter server");
+        tracing::error!(target: "oxidros", "failed to start a parameter server");
     }
 
     Ok(())
@@ -432,12 +425,11 @@ fn add_srv_set(
             }
 
             if updated > 0 && cond_callback.trigger().is_err() {
-                let logger = Logger::new("oxidros");
-                pr_fatal_in!(
-                    logger,
-                    "{}:{}: failed to trigger a condition variable",
-                    file!(),
-                    line!()
+                tracing::error!(
+                    target: "oxidros",
+                    file = file!(),
+                    line = line!(),
+                    "failed to trigger a condition variable"
                 );
             }
 
@@ -521,12 +513,11 @@ fn add_srv_set_atomic(
             }
 
             if updated > 0 && cond_callback.trigger().is_err() {
-                let logger = Logger::new("oxidros");
-                pr_fatal_in!(
-                    logger,
-                    "{}:{}: failed to trigger a condition variable",
-                    file!(),
-                    line!()
+                tracing::error!(
+                    target: "oxidros",
+                    file = file!(),
+                    line = line!(),
+                    "failed to trigger a condition variable"
                 );
             }
 

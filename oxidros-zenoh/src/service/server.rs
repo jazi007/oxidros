@@ -10,7 +10,7 @@ use crate::{
     keyexpr::{EntityKind, liveliness_entity_keyexpr, topic_keyexpr},
     node::Node,
 };
-use oxidros_core::{Message, TypeSupport, qos::Profile};
+use oxidros_core::{Message, TypeSupport, qos::Profile, targets};
 use std::{borrow::Cow, marker::PhantomData, sync::Arc};
 use zenoh::{Wait, bytes::ZBytes, query::Query};
 
@@ -183,6 +183,13 @@ where
             .declare_token(&token_key)
             .wait()?;
 
+        tracing::debug!(
+            target: targets::ZENOH,
+            service = %service_name,
+            fq_service = %fq_service_name,
+            "Service server created"
+        );
+
         Ok(Server {
             node,
             service_name: service_name.to_string(),
@@ -247,6 +254,13 @@ where
             sequence_number: attachment.sequence_number,
             _phantom: PhantomData,
         };
+
+        tracing::debug!(
+            target: targets::ZENOH,
+            service = %self.service_name,
+            seq = attachment.sequence_number,
+            "Service request received"
+        );
 
         Ok(ServiceRequest {
             request: Message::new(request, attachment.into()),

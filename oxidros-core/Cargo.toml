@@ -10,13 +10,13 @@ authors.workspace = true
 
 [features]
 default = []
-statistics = []
 
 [dependencies]
 futures-core = "0.3"
 parking_lot = "0.12"
 num-traits = "0.2"
 thiserror = "2"
+tracing = "0.1"
 ros2-types = { path = "../ros2-types" }
 
 [lib]

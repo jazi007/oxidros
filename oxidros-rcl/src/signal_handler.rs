@@ -1,11 +1,8 @@
 //! Receive signals on a thread for graceful shutdown.
 
-use crate::{
-    logger::{Logger, pr_info_in},
-    rcl,
-    selector::guard_condition::GuardCondition,
-};
+use crate::{rcl, selector::guard_condition::GuardCondition};
 use once_cell::sync::Lazy;
+use oxidros_core::targets;
 #[cfg(target_os = "windows")]
 use parking_lot::Condvar;
 use parking_lot::{Mutex, RawMutex, lock_api::MutexGuard};
@@ -145,8 +142,11 @@ fn handler(mut signals: SignalsInfo) {
                     c.trigger().unwrap();
                 }
 
-                let logger = Logger::new("oxidros");
-                pr_info_in!(logger, "Received signal: {signal}");
+                tracing::info!(
+                    target: targets::ROOT,
+                    signal = signal,
+                    "Received signal"
+                );
             }
             _ => unreachable!(),
         }
@@ -169,6 +169,8 @@ fn handler() {
         c.trigger().unwrap();
     }
 
-    let logger = Logger::new("oxidros");
-    pr_info_in!(logger, "Received signal");
+    tracing::info!(
+        target: targets::ROOT,
+        "Received signal"
+    );
 }

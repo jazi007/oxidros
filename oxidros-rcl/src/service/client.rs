@@ -7,8 +7,8 @@
 //!
 //! ```
 //! use oxidros_rcl::{
-//!     context::Context, logger::Logger, msg::common_interfaces::std_srvs, pr_error, pr_info,
-//!     pr_warn, service::client::Client,
+//!     context::Context, error, info, msg::common_interfaces::std_srvs, service::client::Client,
+//!     warn,
 //! };
 //! use std::time::Duration;
 //!
@@ -25,10 +25,8 @@
 //!     .create_client::<std_srvs::srv::Empty>("service_name1", None)
 //!     .unwrap();
 //!
-//! // Create a logger.
-//! let logger = Logger::new("client_rs");
-//!
-//! async fn run_client(mut client: Client<std_srvs::srv::Empty>, logger: Logger) {
+//! async fn run_client(mut client: Client<std_srvs::srv::Empty>) {
+//!     use oxidros_rcl::{error, info, warn};
 //!     let dur = Duration::from_millis(100);
 //!
 //!     for _ in 0..5 {
@@ -36,21 +34,21 @@
 //!         let receiver = client.send(&request).unwrap().recv();
 //!         match tokio::time::timeout(dur, receiver).await {
 //!             Ok(Ok(response)) => {
-//!                 pr_info!(logger, "received: {:?}", response);
+//!                 info!("received: {:?}", response);
 //!             }
 //!             Ok(Err(e)) => {
-//!                 pr_error!(logger, "error: {e}");
+//!                 error!("error: {e}");
 //!                 break;
 //!             }
 //!             Err(_) => {
-//!                 pr_warn!(logger, "timeout");
+//!                 warn!("timeout");
 //!             }
 //!         }
 //!     }
 //! }
 //!
 //! let rt = tokio::runtime::Runtime::new().unwrap();
-//! rt.block_on(run_client(client, logger)); // Spawn an asynchronous task.
+//! rt.block_on(run_client(client)); // Spawn an asynchronous task.
 //! ```
 
 use crate::{
@@ -129,11 +127,12 @@ impl<T: ServiceMsg> Client<T> {
     ///
     /// ```
     /// use oxidros_rcl::{
-    ///     logger::Logger, msg::common_interfaces::std_srvs, pr_error, pr_info, pr_warn, service::client::Client,
+    ///     error, info, msg::common_interfaces::std_srvs, service::client::Client, warn,
     /// };
     /// use std::time::Duration;
     ///
-    /// async fn run_client(mut client: Client<std_srvs::srv::Empty>, logger: Logger) {
+    /// async fn run_client(mut client: Client<std_srvs::srv::Empty>) {
+    ///     use oxidros_rcl::{error, info, warn};
     ///     let dur = Duration::from_millis(100);
     ///
     ///     loop {
@@ -141,14 +140,14 @@ impl<T: ServiceMsg> Client<T> {
     ///         let receiver = client.send(&request).unwrap().recv();
     ///         match tokio::time::timeout(dur, receiver).await {
     ///             Ok(Ok(response)) => {
-    ///                 pr_info!(logger, "received: {:?}", response);
+    ///                 info!("received: {:?}", response);
     ///             }
     ///             Ok(Err(e)) => {
-    ///                 pr_error!(logger, "error: {e}");
+    ///                 error!("error: {e}");
     ///                 break;
     ///             }
     ///             Err(_) => {
-    ///                 pr_warn!(logger, "timeout");
+    ///                 warn!("timeout");
     ///             }
     ///         }
     ///     }
@@ -188,28 +187,29 @@ impl<T: ServiceMsg> Client<T> {
     ///
     /// ```
     /// use oxidros_rcl::{
-    ///     logger::Logger, msg::common_interfaces::std_srvs, pr_error, pr_info, pr_warn, service::client::Client,
+    ///     error, info, msg::common_interfaces::std_srvs, service::client::Client, warn,
     /// };
     /// use std::time::Duration;
     ///
-    /// async fn run_client(mut client: Client<std_srvs::srv::Empty>, logger: Logger) {
+    /// async fn run_client(mut client: Client<std_srvs::srv::Empty>) {
+    ///     use oxidros_rcl::{error, info, warn};
     ///     let dur = Duration::from_millis(100);
     ///
     ///     loop {
     ///         let request = std_srvs::srv::Empty_Request::new().unwrap();
     ///         let (receiver, sequence) = client.send_ret_seq(&request).unwrap();
     ///         let receiver = receiver.recv();
-    ///         pr_info!(logger, "sent: sequence = {sequence}");
+    ///         info!("sent: sequence = {sequence}");
     ///         match tokio::time::timeout(dur, receiver).await {
     ///             Ok(Ok(response)) => {
-    ///                 pr_info!(logger, "received: {:?}", response);
+    ///                 info!("received: {:?}", response);
     ///             }
     ///             Ok(Err(e)) => {
-    ///                 pr_error!(logger, "error: {e}");
+    ///                 error!("error: {e}");
     ///                 break;
     ///             }
     ///             Err(_) => {
-    ///                 pr_warn!(logger, "timeout");
+    ///                 warn!("timeout");
     ///             }
     ///         }
     ///     }
@@ -290,11 +290,12 @@ impl<'a, T: ServiceMsg> ClientRecv<'a, T> {
     ///
     /// ```
     /// use oxidros_rcl::{
-    ///     logger::Logger, msg::common_interfaces::std_srvs, pr_error, pr_info, pr_warn, service::client::Client,
+    ///     error, info, msg::common_interfaces::std_srvs, service::client::Client, warn,
     /// };
     /// use std::time::Duration;
     ///
-    /// async fn run_client(mut client: Client<std_srvs::srv::Empty>, logger: Logger) {
+    /// async fn run_client(mut client: Client<std_srvs::srv::Empty>) {
+    ///     use oxidros_rcl::{error, info, warn};
     ///     let dur = Duration::from_millis(100);
     ///
     ///     loop {
@@ -302,14 +303,14 @@ impl<'a, T: ServiceMsg> ClientRecv<'a, T> {
     ///         let receiver = client.send(&request).unwrap().recv();
     ///         match tokio::time::timeout(dur, receiver).await {
     ///             Ok(Ok(response)) => {
-    ///                 pr_info!(logger, "received: response = {response:?}");
+    ///                 info!("received: response = {response:?}");
     ///             }
     ///             Ok(Err(e)) => {
-    ///                 pr_error!(logger, "error: {e}");
+    ///                 error!("error: {e}");
     ///                 break;
     ///             }
     ///             Err(_) => {
-    ///                 pr_warn!(logger, "timeout");
+    ///                 warn!("timeout");
     ///             }
     ///         }
     ///     }
@@ -335,10 +336,9 @@ impl<'a, T: ServiceMsg> ClientRecv<'a, T> {
     ///
     /// ```
     /// use oxidros_rcl::{
+    ///     error,
     ///     error::Result,
-    ///     logger::Logger,
     ///     msg::common_interfaces::{std_msgs, std_srvs},
-    ///     pr_fatal,
     ///     selector::Selector,
     ///     service::client::Client,
     ///     topic::subscriber::Subscriber,
@@ -351,8 +351,7 @@ impl<'a, T: ServiceMsg> ClientRecv<'a, T> {
     ///     subscriber: Subscriber<std_msgs::msg::Empty>,
     ///     mut client: Client<std_srvs::srv::Empty>,
     /// ) -> Result<()> {
-    ///     let logger = Logger::new("listen_client");
-    ///
+    ///     use oxidros_rcl::error;
     ///     selector.add_subscriber(
     ///         subscriber,
     ///         Box::new(move |_msg| {
@@ -364,7 +363,7 @@ impl<'a, T: ServiceMsg> ClientRecv<'a, T> {
     ///                 Ok(Some(_response)) => {},
     ///                 Ok(None) => {},
     ///                 Err(e) => {
-    ///                     pr_fatal!(logger, "{e}");
+    ///                     error!("{e}");
     ///                     panic!()
     ///                 }
     ///             }

@@ -1758,6 +1758,7 @@ dependencies = [
  "parking_lot",
  "ros2-types",
  "thiserror 2.0.17",
+ "tracing",
 ]
 
 [[package]]
@@ -1792,8 +1793,6 @@ dependencies = [
  "parking_lot",
  "rand 0.10.0",
  "regex",
- "serde",
- "serde_json",
  "signal-hook",
  "tokio",
  "tracing",

@@ -46,8 +46,7 @@
 //!
 //! ```
 //! use oxidros_rcl::{
-//!     context::Context, logger::Logger, msg::common_interfaces::std_srvs, pr_error,
-//!     service::server::Server,
+//!     context::Context, error, msg::common_interfaces::std_srvs, service::server::Server,
 //! };
 //! use std::time::Duration;
 //!
@@ -62,9 +61,8 @@
 //!     .create_server::<std_srvs::srv::Empty>("service_name1", None)
 //!     .unwrap();
 //!
-//! let logger = Logger::new("service_rs");
-//!
-//! async fn server_task(mut server: Server<std_srvs::srv::Empty>, logger: Logger) {
+//! async fn server_task(mut server: Server<std_srvs::srv::Empty>) {
+//!     use oxidros_rcl::error;
 //!     loop {
 //!         // Receive a request.
 //!         let req = server.recv().await;
@@ -77,7 +75,7 @@
 //!                 }
 //!             }
 //!             Err(e) => {
-//!                 pr_error!(logger, "error: {e}");
+//!                 error!("error: {e}");
 //!                 return;
 //!             }
 //!         }
@@ -86,7 +84,7 @@
 //!
 //! // We don't call `server_task` here because testing this code will block forever.
 //! // let rt = tokio::runtime::Runtime::new().unwrap(); --- IGNORE ---
-//! // rt.block_on(server_task(server, logger)); // Spawn an asynchronous task.
+//! // rt.block_on(server_task(server)); // Spawn an asynchronous task.
 //! ```
 
 #[cfg(ros_distro_jazzy)]
@@ -225,10 +223,11 @@ impl<T: ServiceMsg> Server<T> {
     ///
     /// ```
     /// use oxidros_rcl::{
-    ///     logger::Logger, msg::common_interfaces::std_srvs, pr_error, pr_info, service::server::Server,
+    ///     error, info, msg::common_interfaces::std_srvs, service::server::Server,
     /// };
     ///
-    /// fn server_fn(mut server: Server<std_srvs::srv::Empty>, logger: Logger) {
+    /// fn server_fn(mut server: Server<std_srvs::srv::Empty>) {
+    ///     use oxidros_rcl::{error, info};
     ///     loop {
     ///         match server.try_recv() {
     ///             Ok(Some(service_req)) => {
@@ -239,10 +238,10 @@ impl<T: ServiceMsg> Server<T> {
     ///                 }
     ///             }
     ///             Ok(None) => {
-    ///                 pr_info!(logger, "retry later");
+    ///                 info!("retry later");
     ///             }
     ///             Err(e) => {
-    ///                 pr_error!(logger, "error: {e}");
+    ///                 error!("error: {e}");
     ///                 break;
     ///             }
     ///         }
@@ -285,16 +284,17 @@ impl<T: ServiceMsg> Server<T> {
     ///
     /// ```
     /// use oxidros_rcl::{
-    ///     logger::Logger, msg::common_interfaces::std_srvs, pr_error, pr_info, service::server::Server,
+    ///     error, info, msg::common_interfaces::std_srvs, service::server::Server,
     /// };
     ///
-    /// async fn server_task(mut server: Server<std_srvs::srv::Empty>, logger: Logger) {
+    /// async fn server_task(mut server: Server<std_srvs::srv::Empty>) {
+    ///     use oxidros_rcl::{error, info};
     ///     loop {
     ///         // Receive a request.
     ///         let req = server.recv().await;
     ///         match req {
     ///             Ok(service_req) => {
-    ///                 pr_info!(logger, "recv: header = {:?}", service_req.request.info);
+    ///                 info!("recv: header = {:?}", service_req.request.info);
     ///                 let response = std_srvs::srv::Empty_Response::new().unwrap();
     ///                 match service_req.send(&response) {
     ///                     Ok(()) => {},                  // Get a new server to handle next request.
@@ -302,7 +302,7 @@ impl<T: ServiceMsg> Server<T> {
     ///                 }
     ///             }
     ///             Err(e) => {
-    ///                 pr_error!(logger, "error: {e}");
+    ///                 error!("error: {e}");
     ///                 return;
     ///             }
     ///         }
@@ -363,10 +363,11 @@ impl<T: ServiceMsg> ServerSend<T> {
     ///
     /// ```
     /// use oxidros_rcl::{
-    ///     logger::Logger, msg::common_interfaces::std_srvs, pr_error, service::server::Server,
+    ///     error, msg::common_interfaces::std_srvs, service::server::Server,
     /// };
     ///
-    /// async fn server_task(mut server: Server<std_srvs::srv::Empty>, logger: Logger) {
+    /// async fn server_task(mut server: Server<std_srvs::srv::Empty>) {
+    ///     use oxidros_rcl::error;
     ///     loop {
     ///         // Call recv() by using timeout.
     ///         let req = server.recv().await;
@@ -379,7 +380,7 @@ impl<T: ServiceMsg> ServerSend<T> {
     ///                 }
     ///             }
     ///             Err(e) => {
-    ///                 pr_error!(logger, "error: {e}");
+    ///                 error!("error: {e}");
     ///                 return;
     ///             }
     ///         }

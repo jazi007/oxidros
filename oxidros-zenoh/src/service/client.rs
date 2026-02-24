@@ -10,7 +10,7 @@ use crate::{
     keyexpr::{EntityKind, liveliness_entity_keyexpr, topic_keyexpr},
     node::Node,
 };
-use oxidros_core::{Message, TypeSupport, qos::Profile};
+use oxidros_core::{Message, TypeSupport, qos::Profile, targets};
 use std::{
     borrow::Cow,
     marker::PhantomData,
@@ -108,6 +108,13 @@ where
             .declare_token(&token_key)
             .wait()?;
 
+        tracing::debug!(
+            target: targets::ZENOH,
+            service = %service_name,
+            fq_service = %fq_service_name,
+            "Service client created"
+        );
+
         Ok(Client {
             node,
             service_name: service_name.to_string(),
@@ -198,6 +205,12 @@ where
             }
             let response_bytes = sample.payload().to_bytes();
             let response = T::Response::from_bytes(&response_bytes)?;
+            tracing::debug!(
+                target: targets::ZENOH,
+                service = %self.service_name,
+                seq = seq,
+                "Service call completed"
+            );
             return Ok(Message::new(response, attachment.into()));
         }
     }

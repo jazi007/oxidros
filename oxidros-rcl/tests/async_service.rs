@@ -8,9 +8,7 @@ use oxidros_rcl::msg::common_interfaces::example_interfaces::srv::{
 use oxidros_rcl::{
     context::Context,
     error::Result,
-    logger::Logger,
     msg::common_interfaces::std_srvs,
-    pr_error, pr_info,
     service::{client::Client, server::Server},
 };
 use std::time::Duration;
@@ -80,17 +78,14 @@ async fn run_client(mut client: Client<AddTwoInts>) -> Result<()> {
         println!("Client: request = {:?}", data);
         let receiver = client.send(&data)?.recv();
 
-        // Create a logger.
-        let logger = Logger::new("test_async_service::run_client");
-
         // receive a response
         match tokio::time::timeout(dur, receiver).await {
             Ok(Ok(response)) => {
-                pr_info!(logger, "received: {:?}", *response);
+                tracing::info!(target: "test_async_service", "received: {:?}", *response);
                 assert_eq!(response.sum, n + n * 10);
             }
             Ok(Err(e)) => {
-                pr_error!(logger, "error: {e}");
+                tracing::error!(target: "test_async_service", "error: {e}");
                 break;
             }
             Err(_) => {
@@ -120,10 +115,7 @@ async fn test_client_rs() {
         .create_client::<std_srvs::srv::Empty>("service_test_client_rs", None)
         .unwrap();
 
-    // Create a logger.
-    let logger = Logger::new("test_client_rs");
-
-    async fn run_client(mut client: Client<std_srvs::srv::Empty>, logger: Logger) {
+    async fn run_client(mut client: Client<std_srvs::srv::Empty>) {
         let dur = Duration::from_millis(100);
         let mut n_timeout = 0;
 
@@ -131,18 +123,18 @@ async fn test_client_rs() {
             let request = std_srvs::srv::Empty_Request::new().unwrap();
             let receiver = client.send(&request).unwrap().recv();
 
-            pr_info!(logger, "receiving");
+            tracing::info!(target: "test_client_rs", "receiving");
             match tokio::time::timeout(dur, receiver).await {
                 Ok(Ok(response)) => {
-                    pr_info!(logger, "received: {:?}", *response);
+                    tracing::info!(target: "test_client_rs", "received: {:?}", *response);
                 }
                 Ok(Err(e)) => {
-                    pr_error!(logger, "error: {e}");
+                    tracing::error!(target: "test_client_rs", "error: {e}");
                     break;
                 }
                 Err(_) => {
                     n_timeout += 1;
-                    pr_info!(logger, "timeout: n = {n_timeout}");
+                    tracing::info!(target: "test_client_rs", "timeout: n = {n_timeout}");
                     if n_timeout > 10 {
                         return;
                     }
@@ -151,7 +143,7 @@ async fn test_client_rs() {
         }
     }
 
-    run_client(client, logger).await; // Spawn an asynchronous task.
+    run_client(client).await; // Spawn an asynchronous task.
 
     println!("finished test_client_rs");
 }

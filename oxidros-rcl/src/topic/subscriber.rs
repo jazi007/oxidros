@@ -17,7 +17,7 @@
 //!
 //! ```
 //! use oxidros_rcl::{
-//!     context::Context, logger::Logger, msg::common_interfaces::std_msgs, pr_error, pr_info,
+//!     context::Context, error, info, msg::common_interfaces::std_msgs,
 //! };
 //!
 //! let ctx = Context::new().unwrap();
@@ -35,8 +35,6 @@
 //!     .create_publisher::<std_msgs::msg::UInt32>("subscriber_rs_try_recv_topic", None,
 //! ).unwrap();
 //!
-//! let logger = Logger::new("subscriber_rs");
-//!
 //! // Send a message.
 //! let mut msg = std_msgs::msg::UInt32::new().unwrap();
 //! msg.data = 10;
@@ -44,9 +42,9 @@
 //!
 //! // Receive the message.
 //! match subscriber.try_recv() {
-//!     Ok(Some(msg)) => pr_info!(logger, "msg = {}", msg.data),
-//!     Ok(None) => pr_info!(logger, "retry later"),
-//!     Err(e) => pr_error!(logger, "error = {}", e),
+//!     Ok(Some(msg)) => info!("msg = {}", msg.data),
+//!     Ok(None) => info!("retry later"),
+//!     Err(e) => error!("error = {}", e),
 //! }
 //! ```
 //!
@@ -54,8 +52,8 @@
 //!
 //! ```
 //! use oxidros_rcl::{
-//!     context::Context, logger::Logger, msg::common_interfaces::std_msgs, pr_info, pr_warn,
-//!     topic::subscriber::Subscriber,
+//!     context::Context, info, msg::common_interfaces::std_msgs, topic::subscriber::Subscriber,
+//!     warn,
 //! };
 //! use std::time::Duration;
 //!
@@ -82,19 +80,19 @@
 //!
 //! /// The subscriber.
 //! async fn run_subscriber(mut s: Subscriber<std_msgs::msg::String>) {
+//!     use oxidros_rcl::{info, warn};
 //!     let dur = Duration::from_millis(100);
-//!     let logger = Logger::new("subscriber_rs_recv");
 //!     for _ in 0..3 {
 //!         // receive a message specifying timeout of 100ms
 //!         match tokio::time::timeout(dur, s.recv()).await {
 //!             Ok(Ok(msg)) => {
 //!                 // received a message
-//!                 pr_info!(logger, "Received (async): msg = {}", msg.data);
+//!                 info!("Received (async): msg = {}", msg.data);
 //!             }
 //!             Ok(Err(e)) => panic!("{}", e), // fatal error
 //!             Err(_) => {
 //!                 // timeout
-//!                 pr_warn!(logger, "Subscribe (async): timeout");
+//!                 warn!("Subscribe (async): timeout");
 //!                 break;
 //!             }
 //!         }
@@ -164,7 +162,7 @@ use crate::{
     topic::subscriber_loaned_message::SubscriberLoanedMessage,
 };
 pub use oxidros_core::message::Message;
-use oxidros_core::{Error, MessageInfo, RclError, selector::CallbackResult};
+use oxidros_core::{Error, MessageInfo, RclError, selector::CallbackResult, targets};
 use std::{
     borrow::Cow,
     ffi::CString,
@@ -177,27 +175,9 @@ use std::{
     task::{self, Poll},
 };
 
-#[cfg(feature = "rcl_stat")]
-use crate::helper::statistics::{SerializableTimeStat, TimeStatistics};
-
-#[cfg(feature = "rcl_stat")]
-use parking_lot::Mutex;
-
 pub(crate) struct RCLSubscription {
     pub subscription: Box<rcl::rcl_subscription_t>,
-    #[cfg(feature = "rcl_stat")]
-    pub latency_take: Mutex<TimeStatistics<4096>>,
     pub node: Arc<Node>,
-}
-
-#[cfg(feature = "rcl_stat")]
-impl RCLSubscription {
-    fn measure_latency(&self, start: std::time::SystemTime) {
-        if let Ok(dur) = start.elapsed() {
-            let mut guard = self.latency_take.lock();
-            guard.add(dur);
-        }
-    }
 }
 
 impl Drop for RCLSubscription {
@@ -242,13 +222,14 @@ impl<T: TypeSupport> Subscriber<T> {
             )?;
         }
 
+        tracing::debug!(
+            target: targets::SUBSCRIBER,
+            topic = %topic_name,
+            "Subscriber created"
+        );
+
         Ok(Subscriber {
-            subscription: Arc::new(RCLSubscription {
-                subscription,
-                node,
-                #[cfg(feature = "rcl_stat")]
-                latency_take: Mutex::new(TimeStatistics::new()),
-            }),
+            subscription: Arc::new(RCLSubscription { subscription, node }),
             _phantom: Default::default(),
             _unsync: Default::default(),
         })
@@ -274,13 +255,14 @@ impl<T: TypeSupport> Subscriber<T> {
                 options.as_ptr(),
             )?;
         }
+        tracing::debug!(
+            target: targets::SUBSCRIBER,
+            topic = %topic_name,
+            "Subscriber created (loaned messages disabled)"
+        );
+
         Ok(Subscriber {
-            subscription: Arc::new(RCLSubscription {
-                subscription,
-                node,
-                #[cfg(feature = "rcl_stat")]
-                latency_take: Mutex::new(TimeStatistics::new()),
-            }),
+            subscription: Arc::new(RCLSubscription { subscription, node }),
             _phantom: Default::default(),
             _unsync: Default::default(),
         })
@@ -312,16 +294,16 @@ impl<T: TypeSupport> Subscriber<T> {
     ///
     /// ```
     /// use oxidros_rcl::{
-    ///     logger::Logger, msg::common_interfaces::std_msgs, pr_error, pr_info,
-    ///     topic::subscriber::Subscriber,
+    ///     error, info, msg::common_interfaces::std_msgs, topic::subscriber::Subscriber,
     /// };
     ///
-    /// fn pubsub(subscriber: Subscriber<std_msgs::msg::UInt32>, logger: Logger) {
+    /// fn pubsub(subscriber: Subscriber<std_msgs::msg::UInt32>) {
+    ///     use oxidros_rcl::{error, info};
     ///     // Receive the message.
     ///     match subscriber.try_recv() {
-    ///         Ok(Some(msg)) => pr_info!(logger, "msg = {}", msg.data),
-    ///         Ok(None) => pr_info!(logger, "retry later"),
-    ///         Err(e) => pr_error!(logger, "error = {}", e),
+    ///         Ok(Some(msg)) => info!("msg = {}", msg.data),
+    ///         Ok(None) => info!("retry later"),
+    ///         Err(e) => error!("error = {}", e),
     ///     }
     /// }
     /// ```
@@ -333,20 +315,25 @@ impl<T: TypeSupport> Subscriber<T> {
     /// - `RCLError::BadAlloc if allocating` memory failed, or
     /// - `RCLError::Error` if an unspecified error occurs.
     pub fn try_recv(&self) -> Result<Option<Message<T>>> {
-        #[cfg(feature = "rcl_stat")]
-        let start = std::time::SystemTime::now();
+        let start = std::time::Instant::now();
 
         let s = self.subscription.clone();
         match take::<T>(&s) {
             Ok(n) => {
-                #[cfg(feature = "rcl_stat")]
-                self.subscription.measure_latency(start);
+                tracing::debug!(
+                    target: targets::SUBSCRIBER,
+                    latency_us = start.elapsed().as_micros() as u64,
+                    "rcl_take completed"
+                );
 
                 Ok(Some(n))
             }
             Err(Error::Rcl(RclError::SubscriptionTakeFailed)) => {
-                #[cfg(feature = "rcl_stat")]
-                self.subscription.measure_latency(start);
+                tracing::debug!(
+                    target: targets::SUBSCRIBER,
+                    latency_us = start.elapsed().as_micros() as u64,
+                    "rcl_take: no message available"
+                );
 
                 Ok(None)
             }
@@ -385,25 +372,24 @@ impl<T: TypeSupport> Subscriber<T> {
     ///
     /// ```
     /// use oxidros_rcl::{
-    ///     logger::Logger, msg::common_interfaces::std_msgs, pr_info, pr_warn,
-    ///     topic::subscriber::Subscriber,
+    ///     info, msg::common_interfaces::std_msgs, topic::subscriber::Subscriber, warn,
     /// };
     /// use std::time::Duration;
     ///
     /// async fn run_subscriber(mut s: Subscriber<std_msgs::msg::String>) {
+    ///     use oxidros_rcl::{info, warn};
     ///     let dur = Duration::from_millis(100);
-    ///     let logger = Logger::new("subscriber_rs_recv");
     ///     for _ in 0..3 {
     ///         // receive a message specifying timeout of 100ms
     ///         match tokio::time::timeout(dur, s.recv()).await {
     ///             Ok(Ok(msg)) => {
     ///                 // received a message
-    ///                 pr_info!(logger, "Received (async): msg = {}", msg.data);
+    ///                 info!("Received (async): msg = {}", msg.data);
     ///             }
     ///             Ok(Err(e)) => panic!("{}", e), // fatal error
     ///             Err(_) => {
     ///                 // timeout
-    ///                 pr_warn!(logger, "Subscribe (async): timeout");
+    ///                 warn!("Subscribe (async): timeout");
     ///                 break;
     ///             }
     ///         }
@@ -423,14 +409,6 @@ impl<T: TypeSupport> Subscriber<T> {
             is_waiting: false,
         }
         .await
-    }
-
-    /// Get latency statistics information of `Mutex` and `rcl_take()`.
-    /// Because `rcl_take()` is MT-UNSAFE, a latency includes not only `rcl_take` but also `Mutex`.
-    #[cfg(feature = "rcl_stat")]
-    pub fn statistics(&self) -> SerializableTimeStat {
-        let guard = self.subscription.latency_take.lock();
-        guard.to_serializable()
     }
 }
 

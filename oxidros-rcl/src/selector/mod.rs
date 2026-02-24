@@ -6,7 +6,7 @@
 //!
 //! ```
 //! use oxidros_rcl::{
-//!     context::Context, logger::Logger, msg::common_interfaces::std_msgs, pr_info,
+//!     context::Context, msg::common_interfaces::std_msgs, info,
 //! };
 //! use std::time::Duration;
 //!
@@ -26,9 +26,6 @@
 //! // Create a selector, which is for IO multiplexing.
 //! let mut selector = ctx.create_selector().unwrap();
 //!
-//! // Create a logger.
-//! let logger_sub = Logger::new("selector_rs");
-//!
 //! // Add subscriber to the selector.
 //! // The 2nd argument is a callback function.
 //! // If data arrive, the callback will be invoked.
@@ -36,7 +33,7 @@
 //!     subscriber,
 //!     Box::new(move |msg| {
 //!         // Print the message
-//!         pr_info!(logger_sub, "Received: msg = {}", msg.data); // Print a message.
+//!         info!("Received: msg = {}", msg.data);
 //!     }),
 //! );
 //!
@@ -61,7 +58,6 @@ use crate::{
     context::Context,
     error::Result,
     get_allocator,
-    logger::{Logger, pr_error_in, pr_fatal_in},
     msg::{ActionMsg, GetUUID, ServiceMsg, TypeSupport, interfaces::action_msgs::msg::GoalInfo},
     parameter::ParameterServer,
     rcl::{self, rcl_action_client_t},
@@ -79,6 +75,7 @@ use oxidros_core::{
     selector::{
         ActionHandler, CallbackResult, ConditionHandler, ParameterCallback, ServerCallback,
     },
+    targets,
 };
 use std::{
     cell::Cell,
@@ -89,21 +86,12 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use parking_lot::Mutex;
-
-#[cfg(not(feature = "statistics"))]
 use crate::rcl::rcl_action_server_t;
-
-#[cfg(feature = "statistics")]
-use serde::Serialize;
-
-#[cfg(feature = "statistics")]
-use crate::helper::statistics::{SerializableTimeStat, TimeStatistics};
+use parking_lot::Mutex;
 
 pub(crate) mod async_selector;
 pub(crate) mod guard_condition;
 
-#[cfg_attr(feature = "statistics", allow(dead_code))]
 struct ActionClientConditionHandler {
     client: *const rcl_action_client_t,
     feedback_handler: Option<ActionHandler>,
@@ -113,7 +101,6 @@ struct ActionClientConditionHandler {
     result_handler: Option<ActionHandler>,
 }
 
-#[cfg_attr(feature = "statistics", allow(dead_code))]
 struct ActionServerConditionHandler {
     goal_handler: Option<ActionHandler>,
     cancel_goal_handler: Option<ActionHandler>,
@@ -123,29 +110,6 @@ struct ActionServerConditionHandler {
 enum TimerType {
     WallTimer(Rc<String>, Duration),
     OneShot,
-}
-
-#[cfg(feature = "statistics")]
-#[derive(Debug)]
-struct TimeStat {
-    #[cfg(feature = "rcl_stat")]
-    rcl_wait: TimeStatistics<4096>,
-
-    callback: BTreeMap<*const (), (String, TimeStatistics<4096>)>,
-    wall_timer: BTreeMap<String, TimeStatistics<4096>>,
-}
-
-#[cfg(feature = "statistics")]
-#[derive(Serialize, Debug)]
-pub struct Statistics {
-    #[cfg(feature = "rcl_stat")]
-    pub rcl_wait: SerializableTimeStat,
-
-    #[cfg(feature = "rcl_stat")]
-    pub rcl_take: Vec<SerializableTimeStat>,
-
-    pub callback: BTreeMap<String, SerializableTimeStat>, // callback functions of subscribers and servers
-    pub wall_timer: BTreeMap<String, SerializableTimeStat>, // wall timers
 }
 
 #[derive(Debug)]
@@ -186,9 +150,6 @@ pub struct Selector {
     timer_id: u64,
     context: Arc<Context>,
 
-    #[cfg(feature = "statistics")]
-    time_stat: TimeStat,
-
     _unused: (PhantomUnsync, PhantomUnsend),
 }
 
@@ -211,15 +172,6 @@ impl Selector {
             )?;
         }
 
-        #[cfg(feature = "statistics")]
-        let time_stat = TimeStat {
-            #[cfg(feature = "rcl_stat")]
-            rcl_wait: TimeStatistics::new(),
-
-            callback: BTreeMap::new(),
-            wall_timer: BTreeMap::new(),
-        };
-
         let signal_cond = GuardCondition::new(context.clone())?;
         let mut selector = Selector {
             param_server: None,
@@ -238,54 +190,18 @@ impl Selector {
 
             context,
 
-            #[cfg(feature = "statistics")]
-            time_stat,
-
             _unused: (Default::default(), Default::default()),
         };
 
         selector.add_guard_condition(&signal_cond, None, false);
         signal_handler::register_guard_condition(signal_cond);
 
+        tracing::debug!(
+            target: targets::SELECTOR,
+            "Selector created"
+        );
+
         Ok(selector)
-    }
-
-    #[cfg(feature = "statistics")]
-    pub fn statistics(&self) -> Statistics {
-        let callback = self
-            .time_stat
-            .callback
-            .iter()
-            .map(|(_, (k, v))| (k.clone(), v.to_serializable()))
-            .collect();
-
-        let wall_timer = self
-            .time_stat
-            .wall_timer
-            .iter()
-            .map(|(k, v)| (k.clone(), v.to_serializable()))
-            .collect();
-
-        #[cfg(feature = "rcl_stat")]
-        let mut rcl_take = Vec::new();
-
-        #[cfg(feature = "rcl_stat")]
-        for (_, v) in self.subscriptions.iter() {
-            let guard = v.event.latency_take.lock();
-            let s = guard.to_serializable();
-            rcl_take.push(s);
-        }
-
-        Statistics {
-            #[cfg(feature = "rcl_stat")]
-            rcl_wait: self.time_stat.rcl_wait.to_serializable(),
-
-            #[cfg(feature = "rcl_stat")]
-            rcl_take,
-
-            callback,
-            wall_timer,
-        }
     }
 
     /// Register a subscriber with callback function.
@@ -322,17 +238,17 @@ impl Selector {
         let sub = subscriber.subscription.clone();
         let context_ptr = subscriber.subscription.node.context.as_ptr();
 
-        #[cfg(feature = "statistics")]
-        let symbol = {
-            let node_name = subscriber.subscription.node.get_name().unwrap_or_default();
-            let node_namespace = subscriber
-                .subscription
-                .node
-                .get_namespace()
-                .unwrap_or_default();
-            let topic_name = subscriber.get_topic_name();
-            format!("{node_namespace}:{node_name}:subscriber:{topic_name}")
-        };
+        let topic_name = subscriber.fully_qualified_topic_name().ok();
+
+        if self.context.as_ptr() != context_ptr {
+            return false;
+        }
+
+        tracing::debug!(
+            target: targets::SELECTOR,
+            topic = ?topic_name,
+            "Added subscriber"
+        );
 
         let f = move || {
             let start = SystemTime::now();
@@ -345,8 +261,11 @@ impl Selector {
                     }
                     Ok(None) => return CallbackResult::Ok,
                     Err(e) => {
-                        let logger = Logger::new("oxidros");
-                        pr_error_in!(logger, "failed try_recv() of subscriber: {}", e);
+                        tracing::error!(
+                            target: targets::SELECTOR,
+                            error = %e,
+                            "Failed try_recv() of subscriber"
+                        );
                         return CallbackResult::Remove;
                     }
                 }
@@ -361,20 +280,8 @@ impl Selector {
             }
         };
 
-        if self.context.as_ptr() == context_ptr {
-            #[cfg(feature = "statistics")]
-            {
-                self.time_stat.callback.insert(
-                    sub.subscription.as_ref() as *const _ as *const (),
-                    (symbol, TimeStatistics::new()),
-                );
-            }
-
-            self.add_rcl_subscription(sub, Some(Box::new(f)), false);
-            true
-        } else {
-            false
-        }
+        self.add_rcl_subscription(sub, Some(Box::new(f)), false);
+        true
     }
 
     pub(crate) fn add_rcl_subscription(
@@ -463,8 +370,11 @@ impl Selector {
                         match service_req.sender.send(&result) {
                             Ok(()) => {}
                             Err(e) => {
-                                let logger = Logger::new("oxidros");
-                                pr_error_in!(logger, "{e}");
+                                tracing::error!(
+                                    target: targets::SELECTOR,
+                                    error = %e,
+                                    "Failed to send server response"
+                                );
                                 return CallbackResult::Ok;
                             }
                         }
@@ -473,8 +383,11 @@ impl Selector {
                         return CallbackResult::Ok;
                     }
                     Err(e) => {
-                        let logger = Logger::new("oxidros");
-                        pr_fatal_in!(logger, "failed try_recv() of server: {}", e);
+                        tracing::error!(
+                            target: targets::SELECTOR,
+                            error = %e,
+                            "Failed try_recv() of server"
+                        );
                         return CallbackResult::Remove;
                     }
                 }
@@ -608,19 +521,21 @@ impl Selector {
                             } {
                                 Ok(_) => return CallbackResult::Ok,
                                 Err(e) => {
-                                    let logger = Logger::new("oxidros");
-                                    pr_error_in!(logger, "Failed to send goal response: {}", e);
+                                    tracing::error!(
+                                        target: targets::SELECTOR,
+                                        error = %e,
+                                        "Failed to send goal response"
+                                    );
                                     return CallbackResult::Remove;
                                 }
                             }
                         }
                         Ok(None) => {}
                         Err(e) => {
-                            let logger = Logger::new("oxidros");
-                            pr_error_in!(
-                                logger,
-                                "failed try_recv_goal_request() of action server: {}",
-                                e
+                            tracing::error!(
+                                target: targets::SELECTOR,
+                                error = %e,
+                                "Failed try_recv_goal_request() of action server"
                             );
                             return CallbackResult::Remove;
                         }
@@ -655,10 +570,10 @@ impl Selector {
                             match sender.send(accepted_goals) {
                                 Ok(_) => return CallbackResult::Ok,
                                 Err(e) => {
-                                    let logger = Logger::new("oxidros");
-                                    pr_error_in!(
-                                        logger,
-                                        "failed to send cancel responses from action server: {e}",
+                                    tracing::error!(
+                                        target: targets::SELECTOR,
+                                        error = %e,
+                                        "Failed to send cancel responses from action server"
                                     );
                                     return CallbackResult::Remove;
                                 }
@@ -666,11 +581,10 @@ impl Selector {
                         }
                         Ok(None) => {}
                         Err(e) => {
-                            let logger = Logger::new("oxidros");
-                            pr_error_in!(
-                                logger,
-                                "failed try_recv_cancel_request() of action server: {}",
-                                e
+                            tracing::error!(
+                                target: targets::SELECTOR,
+                                error = %e,
+                                "Failed try_recv_cancel_request() of action server"
                             );
                             return CallbackResult::Remove;
                         }
@@ -699,21 +613,20 @@ impl Selector {
                         Ok(Some((sender, request))) => match sender.send(request.get_uuid()) {
                             Ok(_) => return CallbackResult::Ok,
                             Err(e) => {
-                                let logger = Logger::new("oxidros");
-                                pr_error_in!(
-                                    logger,
-                                    "failed to send cancel responses from action server: {e}",
+                                tracing::error!(
+                                    target: targets::SELECTOR,
+                                    error = %e,
+                                    "Failed to send result response from action server"
                                 );
                                 return CallbackResult::Remove;
                             }
                         },
                         Ok(None) => {}
                         Err(e) => {
-                            let logger = Logger::new("oxidros");
-                            pr_error_in!(
-                                logger,
-                                "failed try_recv_result_request() of action server: {}",
-                                e
+                            tracing::error!(
+                                target: targets::SELECTOR,
+                                error = %e,
+                                "Failed try_recv_result_request() of action server"
                             );
                             return CallbackResult::Remove;
                         }
@@ -916,10 +829,12 @@ impl Selector {
         t: Duration,
         mut handler: Box<dyn FnMut()>,
     ) -> u64 {
-        #[cfg(feature = "statistics")]
-        self.time_stat
-            .wall_timer
-            .insert(name.to_string(), TimeStatistics::new());
+        tracing::debug!(
+            target: targets::SELECTOR,
+            timer_name = %name,
+            interval_ms = t.as_millis() as u64,
+            "Added wall timer"
+        );
 
         self.add_timer_inner(
             t,
@@ -1113,42 +1028,20 @@ impl Selector {
         // notify timers
         self.notify_timer();
 
-        #[cfg(feature = "statistics")]
-        {
-            // notify subscriptions
-            let (target, time_stat) = (&mut self.subscriptions, &mut self.time_stat);
-            notify(target, self.wait_set.subscriptions, time_stat);
+        // notify subscriptions
+        notify(&mut self.subscriptions, self.wait_set.subscriptions);
 
-            // notify services
-            let (target, time_stat) = (&mut self.services, &mut self.time_stat);
-            notify(target, self.wait_set.services, time_stat);
+        // notify services
+        notify(&mut self.services, self.wait_set.services);
 
-            // notify clients
-            let (target, time_stat) = (&mut self.clients, &mut self.time_stat);
-            notify(target, self.wait_set.clients, time_stat);
+        // notify clients
+        notify(&mut self.clients, self.wait_set.clients);
 
-            // notify guard conditions
-            let (target, time_stat) = (&mut self.cond, &mut self.time_stat);
-            notify(target, self.wait_set.guard_conditions, time_stat);
-        }
+        // notify guard conditions
+        notify(&mut self.cond, self.wait_set.guard_conditions);
 
-        #[cfg(not(feature = "statistics"))]
-        {
-            // notify subscriptions
-            notify(&mut self.subscriptions, self.wait_set.subscriptions);
-
-            // notify services
-            notify(&mut self.services, self.wait_set.services);
-
-            // notify clients
-            notify(&mut self.clients, self.wait_set.clients);
-
-            // notify guard conditions
-            notify(&mut self.cond, self.wait_set.guard_conditions);
-
-            notify_action_server(&mut self.action_servers, &self.wait_set)?;
-            notify_action_client(&mut self.action_clients, &self.wait_set)?;
-        }
+        notify_action_server(&mut self.action_servers, &self.wait_set)?;
+        notify_action_client(&mut self.action_clients, &self.wait_set)?;
 
         Ok(())
     }
@@ -1159,18 +1052,16 @@ impl Selector {
         }
 
         if self.timer.is_empty() {
-            #[cfg(feature = "rcl_stat")]
-            let wait_start = SystemTime::now();
+            let wait_start = std::time::Instant::now();
 
             // wait forever until arriving events
             rcl::MTSafeFn::rcl_wait(&mut self.wait_set, -1)?;
 
-            #[cfg(feature = "rcl_stat")]
-            {
-                if let Ok(wait_time) = wait_start.elapsed() {
-                    self.time_stat.rcl_wait.add(wait_time);
-                }
-            }
+            tracing::debug!(
+                target: targets::SELECTOR,
+                latency_us = wait_start.elapsed().as_micros() as u64,
+                "rcl_wait completed (no timer)"
+            );
         } else {
             // insert timer
             let now_time = SystemTime::now();
@@ -1188,29 +1079,27 @@ impl Selector {
 
             let timeout_nanos = timeout.as_nanos();
             let timeout_nanos = if timeout_nanos > i64::MAX as u128 {
-                let logger = Logger::new("oxidros");
-                pr_error_in!(
-                    logger,
-                    "timeout value became too big (overflow): timeout = {timeout_nanos}"
+                tracing::error!(
+                    target: targets::SELECTOR,
+                    timeout_nanos = timeout_nanos as u64,
+                    "Timeout value overflow"
                 );
                 i64::MAX
             } else {
                 timeout_nanos as i64
             };
 
-            #[cfg(feature = "rcl_stat")]
-            let wait_start = SystemTime::now();
+            let wait_start = std::time::Instant::now();
 
             match rcl::MTSafeFn::rcl_wait(&mut self.wait_set, timeout_nanos) {
                 Err(Error::Rcl(RclError::Timeout)) => (),
                 Err(e) => return Err(e),
                 _ => {
-                    #[cfg(feature = "rcl_stat")]
-                    {
-                        if let Ok(wait_time) = wait_start.elapsed() {
-                            self.time_stat.rcl_wait.add(wait_time);
-                        }
-                    }
+                    tracing::debug!(
+                        target: targets::SELECTOR,
+                        latency_us = wait_start.elapsed().as_micros() as u64,
+                        "rcl_wait completed (with timer)"
+                    );
                 }
             }
         }
@@ -1236,8 +1125,7 @@ impl Selector {
 
                     let handler = head.1.0.handler.take();
                     if let Some(mut handler) = handler {
-                        #[cfg(feature = "statistics")]
-                        let start = std::time::SystemTime::now();
+                        let start = std::time::Instant::now();
 
                         handler(); // invoke the callback function
 
@@ -1245,17 +1133,17 @@ impl Selector {
                         if let TimerType::WallTimer(name, period) = &head.1.0.event {
                             let elapsed = now_time.elapsed().unwrap();
 
+                            tracing::debug!(
+                                target: targets::SELECTOR,
+                                timer_name = %name,
+                                latency_us = start.elapsed().as_micros() as u64,
+                                "Wall timer callback completed"
+                            );
+
                             // Calculate the delay until next fire, compensating for elapsed time
                             let delay = period.saturating_sub(elapsed);
                             // Store (name, delay, original_period, handler)
                             reload.push((name.clone(), delay, *period, handler));
-
-                            #[cfg(feature = "statistics")]
-                            if let Ok(elapsed) = start.elapsed() {
-                                if let Some(v) = self.time_stat.wall_timer.get_mut(name.as_ref()) {
-                                    v.add(elapsed);
-                                }
-                            }
                         } else {
                             self.timer_ids.remove(&head.1.1);
                         }
@@ -1342,44 +1230,6 @@ impl Drop for Selector {
     }
 }
 
-#[cfg(feature = "statistics")]
-fn notify<K, V>(
-    m: &mut BTreeMap<*const K, ConditionHandler<V>>,
-    array: *const *const K,
-    time_stat: &mut TimeStat,
-) {
-    for i in 0..m.len() {
-        unsafe {
-            let p = *array.add(i);
-            if !p.is_null() {
-                debug_assert!(m.contains_key(&p));
-                if let Some(h) = m.get_mut(&p) {
-                    let mut is_rm = false;
-                    if let Some(hdl) = &mut h.handler {
-                        let start = std::time::SystemTime::now();
-
-                        let result = hdl();
-                        if let Ok(dur) = start.elapsed() {
-                            if let Some((_, t)) = time_stat.callback.get_mut(&(p as *const ())) {
-                                t.add(dur);
-                            }
-                        }
-
-                        if result == CallbackResult::Remove {
-                            is_rm = true;
-                        }
-                    }
-                    if h.is_once || is_rm {
-                        m.remove(&p);
-                        time_stat.callback.remove(&(p as *const ()));
-                    }
-                }
-            }
-        }
-    }
-}
-
-#[cfg(not(feature = "statistics"))]
 fn notify<K, V>(m: &mut BTreeMap<*const K, ConditionHandler<V>>, array: *const *const K) {
     for i in 0..m.len() {
         unsafe {
@@ -1402,7 +1252,6 @@ fn notify<K, V>(m: &mut BTreeMap<*const K, ConditionHandler<V>>, array: *const *
     }
 }
 
-#[cfg(not(feature = "statistics"))]
 /// Scan the waitset to see if there are any updates for action servers.
 fn notify_action_server(
     m: &mut BTreeMap<*const rcl_action_server_t, Vec<ActionServerConditionHandler>>,
@@ -1458,7 +1307,6 @@ fn notify_action_server(
     ret
 }
 
-#[cfg(not(feature = "statistics"))]
 /// Scan the waitset to see if there are any updates for action clients.
 fn notify_action_client(
     m: &mut BTreeMap<*const rcl_action_client_t, ActionClientConditionHandler>,
