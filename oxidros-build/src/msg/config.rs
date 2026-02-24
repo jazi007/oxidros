@@ -120,7 +120,7 @@ impl Config {
     ///
     /// Returns `None` if the variable is not set or is empty.
     /// Preserves the original order from AMENT_PREFIX_PATH (overlay workspaces first).
-    fn get_ament_prefix_paths() -> Option<Vec<PathBuf>> {
+    pub fn get_ament_prefix_paths() -> Option<Vec<PathBuf>> {
         let path = env::var("AMENT_PREFIX_PATH").ok()?;
         if path.is_empty() {
             return None;
@@ -141,7 +141,7 @@ impl Config {
     ///
     /// Checks for the existence of standard installation directories on both
     /// Linux and Windows platforms, returning only the first one found.
-    fn get_default_ros2_paths() -> Vec<PathBuf> {
+    pub fn get_default_ros2_paths() -> Vec<PathBuf> {
         if cfg!(target_os = "linux") {
             // Linux: /opt/ros/<distro> - return first found
             for distro in SUPPORTED_DISTROS {
