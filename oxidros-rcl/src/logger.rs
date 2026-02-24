@@ -1,75 +1,46 @@
-//! Logger of ROS2.
+//! ROS2 logging integration with tracing.
 //!
-//! # Examples
+//! This module provides integration between the `tracing` crate and ROS2's
+//! rcutils logging system.
 //!
-//! ## Basics
+//! # Usage
 //!
-//! ```
-//! use oxidros_rcl::{logger::Logger, pr_debug, pr_error, pr_fatal, pr_info, pr_warn};
+//! Initialize logging once at startup, then use standard `tracing` macros:
 //!
-//! let logger = Logger::new("my_logger");
-//! let some_value = 100;
+//! ```ignore
+//! use oxidros_rcl::logger::init_ros_logging;
+//! use tracing::{info, warn, error, debug};
 //!
-//! pr_debug!(logger, "debug: {some_value}");
-//! pr_info!(logger, "information: {some_value}");
-//! pr_warn!(logger, "warning: {some_value}");
-//! pr_error!(logger, "error: {some_value}");
-//! pr_fatal!(logger, "fatal: {some_value}");
-//! ```
+//! init_ros_logging("my_node");
 //!
-//! ## Callback Functions of Single Threaded Execution
-//!
-//! ```
-//! use std::{rc::Rc, time::Duration};
-//! use oxidros_rcl::{context::Context, logger::Logger, pr_error, pr_info};
-//!
-//! let ctx = Context::new().unwrap();
-//! let mut selector = ctx.create_selector().unwrap();
-//!
-//! // Use Rc to share the logger by multiple callback functions.
-//! let logger = Logger::new("my_logger");
-//! let logger = Rc::new(logger);
-//! let logger1 = logger.clone();
-//!
-//! selector.add_wall_timer(
-//!     "timer1", // name of the timer
-//!     Duration::from_millis(100),
-//!     Box::new(move || pr_info!(logger1, "some information")),
-//! );
-//!
-//! selector.add_wall_timer(
-//!     "timer2", // name of the timer
-//!     Duration::from_millis(150),
-//!     Box::new(move || pr_error!(logger, "some error")),
-//! );
+//! info!("Hello from ROS2!");
+//! debug!("Debug message");
+//! warn!("Warning message");
+//! error!("Error message");
 //! ```
 //!
-//! ## Multi Threaded
+//! # log crate support
 //!
-//! ```
-//! use oxidros_rcl::{logger::Logger, pr_info, pr_warn};
-//! use std::sync::Arc;
+//! The `log` crate macros are automatically forwarded to tracing:
 //!
-//! let logger = Logger::new("my_logger");
+//! ```ignore
+//! use oxidros_rcl::logger::init_ros_logging;
 //!
-//! // Use Arc to share a logger by multiple threads.
-//! let logger = Arc::new(logger);
-//! let logger1 = logger.clone();
+//! init_ros_logging("my_node");
 //!
-//! let th1 = std::thread::spawn(move || pr_info!(logger1, "some information"));
-//! let th2 = std::thread::spawn(move || pr_warn!(logger, "some warning"));
-//!
-//! th1.join().unwrap();
-//! th2.join().unwrap();
+//! log::info!("This also works!");
 //! ```
 
 use crate::{error::Result, rcl};
 use num_derive::{FromPrimitive, ToPrimitive};
 use oxidros_core::{Error, RclError};
 use std::ffi::CString;
+use std::sync::OnceLock;
+use tracing::Subscriber;
+use tracing_subscriber::{EnvFilter, Layer, layer::SubscriberExt, util::SubscriberInitExt};
 
-static INITIALIZER: std::sync::OnceLock<std::result::Result<(), RclError>> =
-    std::sync::OnceLock::new();
+static INITIALIZER: OnceLock<std::result::Result<(), RclError>> = OnceLock::new();
+static TRACING_INITIALIZED: OnceLock<()> = OnceLock::new();
 
 /// Get the function name called this macro.
 #[macro_export]
@@ -82,81 +53,6 @@ macro_rules! function {
         let name = type_name_of(f);
         &name[..name.len() - 3]
     }};
-}
-
-/// Print information.
-#[macro_export]
-macro_rules! pr_info {
-    ($logger:expr, $($arg:tt)*) => {{
-        let res = format!($($arg)*);
-        let _ = $logger.write_info(&res, $crate::function!(), file!(), line!() as u64);
-    }}
-}
-
-macro_rules! pr_info_in {
-    ($logger:expr, $($arg:tt)*) => {{
-        let res = std::format!($($arg)*);
-        let _ = $logger.write_info(&res, $crate::function!(), std::file!(), std::line!() as u64);
-    }}
-}
-pub(crate) use pr_info_in;
-
-/// Print warning.
-#[macro_export]
-macro_rules! pr_warn {
-    ($logger:expr, $($arg:tt)*) => {{
-        let res = format!($($arg)*);
-        let _ = $logger.write_warn(&res, $crate::function!(), file!(), line!() as u64);
-    }}
-}
-
-/// Print error.
-#[macro_export]
-macro_rules! pr_error {
-    ($logger:expr, $($arg:tt)*) => {{
-        let res = format!($($arg)*);
-        let _ = $logger.write_error(&res, $crate::function!(), file!(), line!() as u64);
-    }}
-}
-
-macro_rules! pr_error_in {
-    ($logger:expr, $($arg:tt)*) => {{
-        let res = std::format!($($arg)*);
-        let _ = $logger.write_error(&res, crate::function!(), std::file!(), std::line!() as u64);
-    }}
-}
-pub(crate) use pr_error_in;
-
-/// Print fatal.
-#[macro_export]
-macro_rules! pr_fatal {
-    ($logger:expr, $($arg:tt)*) => {{
-        let res = format!($($arg)*);
-        let _ = $logger.write_fatal(&res, $crate::function!(), file!(), line!() as u64);
-    }}
-}
-
-macro_rules! pr_fatal_in {
-    ($logger:expr, $($arg:tt)*) => {{
-        let res = std::format!($($arg)*);
-        let _ = $logger.write_error(&res, crate::function!(), std::file!(), std::line!() as u64);
-    }}
-}
-pub(crate) use pr_fatal_in;
-
-/// Print debug.
-/// Debug messages is not printed by default.
-/// To enable debug print, type as follows.
-///
-/// ```text
-/// ros2 run logging_demo logging_demo_main --ros-args --log-level debug
-/// ```
-#[macro_export]
-macro_rules! pr_debug {
-    ($logger:expr, $($arg:tt)*) => {{
-        let res = format!($($arg)*);
-        let _ = $logger.write_debug(&res, $crate::function!(), file!(), line!() as u64);
-    }}
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive, ToPrimitive)]
@@ -188,17 +84,14 @@ impl Severity {
     }
 }
 
-/// Logger of ROS2.
-/// The methods of Logger are called by pr_* macros.
-/// Use these macros instead of the methods.
+/// Internal logger that writes to ROS2's rcutils logging.
 #[derive(Debug)]
-pub struct Logger {
+struct Logger {
     name: CString,
 }
 
 impl Logger {
-    /// Create a new logger.
-    pub fn new(name: &str) -> Self {
+    fn new(name: &str) -> Self {
         Logger {
             name: CString::new(name).unwrap(),
         }
@@ -212,7 +105,7 @@ impl Logger {
         file_name: &str,
         line_number: u64,
     ) -> Result<()> {
-        init_once()?; // first of all, initialize the logging system
+        init_once()?;
 
         if !self.is_enable_for(severity) {
             let msg = format!(
@@ -243,66 +136,6 @@ impl Logger {
         Ok(())
     }
 
-    /// Print information.
-    /// Use `pr_info!` macro instead of this.
-    pub fn write_info(
-        &self,
-        msg: &str,
-        function_name: &str,
-        file_name: &str,
-        line_number: u64,
-    ) -> Result<()> {
-        self.write(msg, Severity::Info, function_name, file_name, line_number)
-    }
-
-    /// Print warning.
-    /// Use `pr_warn!` macro instead of this.
-    pub fn write_warn(
-        &self,
-        msg: &str,
-        function_name: &str,
-        file_name: &str,
-        line_number: u64,
-    ) -> Result<()> {
-        self.write(msg, Severity::Warn, function_name, file_name, line_number)
-    }
-
-    /// Print error.
-    /// Use `pr_error!` macro instead of this.
-    pub fn write_error(
-        &self,
-        msg: &str,
-        function_name: &str,
-        file_name: &str,
-        line_number: u64,
-    ) -> Result<()> {
-        self.write(msg, Severity::Error, function_name, file_name, line_number)
-    }
-
-    /// Print fatal.
-    /// Use `pr_fatal!` macro instead of this.
-    pub fn write_fatal(
-        &self,
-        msg: &str,
-        function_name: &str,
-        file_name: &str,
-        line_number: u64,
-    ) -> Result<()> {
-        self.write(msg, Severity::Fatal, function_name, file_name, line_number)
-    }
-
-    /// Print debug.
-    /// Use `pr_debug!` macro instead of this.
-    pub fn write_debug(
-        &self,
-        msg: &str,
-        function_name: &str,
-        file_name: &str,
-        line_number: u64,
-    ) -> Result<()> {
-        self.write(msg, Severity::Debug, function_name, file_name, line_number)
-    }
-
     fn is_enable_for(&self, severity: Severity) -> bool {
         let guard = rcl::MT_UNSAFE_LOG_FN.lock();
         guard.rcutils_logging_logger_is_enabled_for(self.name.as_ptr(), severity.to_i32())
@@ -311,7 +144,6 @@ impl Logger {
 
 fn init_once() -> std::result::Result<(), RclError> {
     *INITIALIZER.get_or_init(|| {
-        // initialize
         let guard = rcl::MT_UNSAFE_LOG_FN.lock();
         match guard.rcutils_logging_initialize() {
             Ok(v) => Ok(v),
@@ -322,14 +154,8 @@ fn init_once() -> std::result::Result<(), RclError> {
 }
 
 // ============================================================================
-// Tracing-based logging (modern API)
+// Tracing-based logging (public API)
 // ============================================================================
-
-use std::sync::OnceLock;
-use tracing::Subscriber;
-use tracing_subscriber::{EnvFilter, Layer, layer::SubscriberExt, util::SubscriberInitExt};
-
-static TRACING_INITIALIZED: OnceLock<()> = OnceLock::new();
 
 /// Initialize ROS2 logging with tracing integration.
 ///

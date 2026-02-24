@@ -15,6 +15,7 @@ pub mod parameter;
 pub mod qos;
 pub mod selector;
 pub mod time;
+pub mod tracing;
 
 // Re-export commonly used error types
 pub use error::{ActionError, Error, RclError, Result};
@@ -35,3 +36,4 @@ pub use parameter::{Descriptor, FloatingPointRange, IntegerRange, Parameter, Val
 pub use qos::{DurabilityPolicy, HistoryPolicy, LivelinessPolicy, Profile, ReliabilityPolicy};
 pub use ros2_types::*;
 pub use time::{UnsafeDuration, UnsafeTime};
+pub use tracing::targets;

@@ -11,7 +11,7 @@ use crate::{
     node::Node,
     qos::QosMapping,
 };
-pub use oxidros_core::{Message, TypeSupport, qos::Profile};
+pub use oxidros_core::{Message, TypeSupport, qos::Profile, targets};
 use std::{borrow::Cow, marker::PhantomData, sync::Arc};
 use zenoh::Wait;
 use zenoh_ext::AdvancedSubscriberBuilderExt;
@@ -139,6 +139,13 @@ impl<T: TypeSupport> Subscriber<T> {
 
         let liveliness_token = session.liveliness().declare_token(&token_key).wait()?;
 
+        tracing::debug!(
+            target: targets::ZENOH_SUBSCRIBER,
+            topic = %fq_topic_name,
+            type_name = %type_name,
+            "Subscriber created"
+        );
+
         Ok(Subscriber {
             node,
             topic_name: topic_name.to_string(),
@@ -182,8 +189,16 @@ impl<T: TypeSupport> Subscriber<T> {
             .map_err(|_| Error::ChannelClosed)?;
         let data = T::from_bytes(&sample.payload().to_bytes())?;
         let attachment_bytes = sample.attachment().ok_or(Error::MissingAttachment)?;
-        let info = Attachment::from_bytes(&attachment_bytes.to_bytes())?.into();
-        Ok(Message::new(data, info))
+        let attachment = Attachment::from_bytes(&attachment_bytes.to_bytes())?;
+
+        tracing::debug!(
+            target: targets::ZENOH_SUBSCRIBER,
+            topic = %self.fq_topic_name,
+            seq = attachment.sequence_number,
+            "Received message"
+        );
+
+        Ok(Message::new(data, attachment.into()))
     }
 
     /// Try to receive a message without blocking.

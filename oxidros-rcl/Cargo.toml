@@ -20,8 +20,6 @@ num-derive = "0.4"
 once_cell = "1.14"
 parking_lot.workspace = true
 regex = "1.10"
-serde = { workspace = true, optional = true }
-serde_json = { workspace = true, optional = true }
 signal-hook = "0.4"
 futures-util.workspace = true
 
@@ -42,8 +40,6 @@ oxidros-build = { path = "../oxidros-build" }
 [features]
 default = []
 custom_alloc = []
-rcl_stat = ["statistics"]
-statistics = ["serde", "serde_json"]
 rcl = ["oxidros-msg/rcl"]
 
 [package.metadata.docs.rs]

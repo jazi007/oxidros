@@ -65,7 +65,7 @@
 //!
 //! ```
 //! use oxidros_rcl::{
-//!     context::Context, logger::Logger, msg::common_interfaces::std_msgs, pr_info,
+//!     context::Context, msg::common_interfaces::std_msgs,
 //! };
 //! use std::time::Duration;
 //!
@@ -97,10 +97,6 @@
 //! // Create a selector, which is for IO multiplexing.
 //! let mut selector = ctx.create_selector().unwrap();
 //!
-//! // Create loggers.
-//! let logger_pub = Logger::new("example_publisher");
-//! let logger_sub = Logger::new("example_subscriber");
-//!
 //! // Add subscriber to the selector.
 //! // The 2nd argument is a callback function.
 //! // If data arrive, the callback will be invoked.
@@ -110,7 +106,7 @@
 //!     subscriber,
 //!     Box::new(move |msg| {
 //!         // Print the message
-//!         pr_info!(logger_sub, "Received: msg = {}", msg.data); // Print a message.
+//!         tracing::info!("Received: msg = {}", msg.data);
 //!     }),
 //! );
 //!
@@ -121,7 +117,7 @@
 //!     Box::new(move || {
 //!         let mut msg = std_msgs::msg::String::new().unwrap();
 //!         msg.data.assign("Hello, World!");
-//!         pr_info!(logger_pub, "Send: msg = {}", msg.data); // Print a message.
+//!         tracing::info!("Send: msg = {}", msg.data);
 //!         publisher.send(&msg).unwrap();
 //!     }),
 //! );
@@ -140,9 +136,7 @@
 //! ```
 //! use oxidros_rcl::{
 //!     context::Context,
-//!     logger::Logger,
 //!     msg::common_interfaces::std_msgs,
-//!     pr_info, pr_warn,
 //!     topic::{publisher::Publisher, subscriber::Subscriber},
 //! };
 //! use std::time::Duration;
@@ -180,13 +174,12 @@
 //! /// The publisher.
 //! async fn run_publisher(publisher: Publisher<std_msgs::msg::String>) {
 //!     let dur = Duration::from_millis(100);
-//!     let logger = Logger::new("example_publisher_async");
 //!     let mut msg = std_msgs::msg::String::new().unwrap();
 //!     for _ in 0..10 {
 //!         // Publish a message periodically.
 //!         msg.data.assign("Hello, World!");
 //!
-//!         pr_info!(logger, "Send (async): msg = {}", msg.data);
+//!         tracing::info!("Send (async): msg = {}", msg.data);
 //!         publisher.send(&msg).unwrap();
 //!
 //!         // Sleep 100[ms].
@@ -197,18 +190,17 @@
 //! /// The subscriber
 //! async fn run_subscriber(mut s: Subscriber<std_msgs::msg::String>) {
 //!     let dur = Duration::from_millis(500);
-//!     let logger = Logger::new("example_subscriber_async");
 //!     loop {
 //!         // receive a message specifying timeout of 500ms
 //!         match tokio::time::timeout(dur, s.recv()).await {
 //!             Ok(Ok(msg)) => {
 //!                 // received a message
-//!                 pr_info!(logger, "Received (async): msg = {}", msg.data);
+//!                 tracing::info!("Received (async): msg = {}", msg.data);
 //!             }
 //!             Ok(Err(e)) => panic!("{}", e), // fatal error
 //!             Err(_) => {
 //!                 // timeout
-//!                 pr_warn!(logger, "Subscribe (async): timeout");
+//!                 tracing::warn!("Subscribe (async): timeout");
 //!                 break;
 //!             }
 //!         }
@@ -256,6 +248,9 @@ pub use oxidros_core;
 
 // Re-export error types at crate root for API parity with oxidros-zenoh
 pub use error::{ActionError, Error, RclError, Result};
+
+// Re-export tracing macros at crate root for convenience
+pub use logger::{debug, error, info, trace, warn};
 
 /// Single-threaded container.
 /// `ST<T>` cannot be send to another thread and shared by multiple threads.

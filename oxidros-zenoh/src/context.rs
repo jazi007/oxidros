@@ -12,6 +12,7 @@ use crate::{
     graph_cache::GraphCache,
     node::Node,
 };
+use oxidros_core::targets;
 use parking_lot::Mutex;
 use ros2args::Ros2Args;
 use std::{
@@ -175,6 +176,13 @@ impl Context {
 
         // Start liveliness subscription for graph discovery
         ctx.start_graph_discovery()?;
+
+        tracing::debug!(
+            target: targets::ZENOH,
+            domain_id = domain_id,
+            session_id = %ctx.session_id(),
+            "Context initialized"
+        );
 
         Ok(ctx)
     }

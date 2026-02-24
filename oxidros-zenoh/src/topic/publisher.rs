@@ -11,7 +11,7 @@ use crate::{
     node::Node,
     qos::QosMapping,
 };
-use oxidros_core::{TypeSupport, qos::Profile};
+use oxidros_core::{TypeSupport, qos::Profile, targets};
 use std::{
     borrow::Cow,
     marker::PhantomData,
@@ -129,6 +129,13 @@ impl<T: TypeSupport> Publisher<T> {
 
         let liveliness_token = session.liveliness().declare_token(&token_key).wait()?;
 
+        tracing::debug!(
+            target: targets::ZENOH_PUBLISHER,
+            topic = %fq_topic_name,
+            type_name = %type_name,
+            "Publisher created"
+        );
+
         Ok(Publisher {
             node,
             topic_name: topic_name.to_string(),
@@ -178,9 +185,20 @@ impl<T: TypeSupport> Publisher<T> {
     ///
     /// Returns an error if serialization fails or the Zenoh put fails.
     pub fn send(&self, msg: &T) -> Result<()> {
+        let start = std::time::Instant::now();
         // Serialize message to CDR
         let payload = msg.to_bytes()?;
-        self.send_internal(payload)
+        let result = self.send_internal(payload);
+
+        tracing::debug!(
+            target: targets::ZENOH_PUBLISHER,
+            topic = %self.fq_topic_name,
+            seq = self.sequence_number.load(Ordering::Relaxed) - 1,
+            latency_us = start.elapsed().as_micros() as u64,
+            "Published message"
+        );
+
+        result
     }
 
     /// Send a raw message.

@@ -11,7 +11,7 @@ use crate::{
     service::{client::Client, server::Server},
     topic::{publisher::Publisher, subscriber::Subscriber},
 };
-use oxidros_core::{TypeSupport, qos::Profile};
+use oxidros_core::{TypeSupport, qos::Profile, targets};
 use parking_lot::Mutex;
 use ros2args::names::NameKind;
 use std::sync::{
@@ -151,6 +151,13 @@ impl Node {
             next_entity_id: AtomicU32::new(10), // Start at 10 to match rmw_zenoh
             _liveliness_token: Mutex::new(Some(token)),
         });
+
+        tracing::debug!(
+            target: targets::ZENOH,
+            node = %name,
+            namespace = %namespace,
+            "Node created"
+        );
 
         Ok(Arc::new(Node { inner }))
     }

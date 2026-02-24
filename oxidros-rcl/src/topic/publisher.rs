@@ -57,13 +57,8 @@ use crate::{
     signal_handler::Signaled,
     topic::publisher_loaned_message::PublisherLoanedMessage,
 };
+use oxidros_core::targets;
 use std::{borrow::Cow, ffi::CString, marker::PhantomData, ptr::null_mut, sync::Arc};
-
-#[cfg(feature = "rcl_stat")]
-use crate::helper::statistics::{SerializableTimeStat, TimeStatistics};
-
-#[cfg(feature = "rcl_stat")]
-use parking_lot::Mutex;
 
 /// Publisher.
 ///
@@ -89,9 +84,6 @@ use parking_lot::Mutex;
 /// ```
 pub struct Publisher<T> {
     publisher: Arc<rcl::rcl_publisher_t>,
-    #[cfg(feature = "rcl_stat")]
-    latency_publish: Mutex<TimeStatistics<4096>>,
-
     _phantom: PhantomData<T>,
     node: Arc<Node>,
 }
@@ -120,11 +112,15 @@ impl<T: TypeSupport> Publisher<T> {
             )?;
         }
 
+        tracing::debug!(
+            target: targets::PUBLISHER,
+            topic = %topic_name,
+            "Publisher created"
+        );
+
         Ok(Publisher {
             publisher: Arc::new(publisher),
             node,
-            #[cfg(feature = "rcl_stat")]
-            latency_publish: Mutex::new(TimeStatistics::new()),
             _phantom: Default::default(),
         })
     }
@@ -153,11 +149,15 @@ impl<T: TypeSupport> Publisher<T> {
             )?;
         }
 
+        tracing::debug!(
+            target: targets::PUBLISHER,
+            topic = %topic_name,
+            "Publisher created (loaned messages disabled)"
+        );
+
         Ok(Publisher {
             publisher: Arc::new(publisher),
             node,
-            #[cfg(feature = "rcl_stat")]
-            latency_publish: Mutex::new(TimeStatistics::new()),
             _phantom: Default::default(),
         })
     }
@@ -216,18 +216,15 @@ impl<T: TypeSupport> Publisher<T> {
             return Err(Signaled.into());
         }
 
-        #[cfg(feature = "rcl_stat")]
-        let start = std::time::SystemTime::now();
+        let start = std::time::Instant::now();
 
         rcl::MTSafeFn::rcl_publish(self.publisher.as_ref(), msg as *const T as _, null_mut())?;
 
-        #[cfg(feature = "rcl_stat")]
-        {
-            if let Ok(dur) = start.elapsed() {
-                let mut guard = self.latency_publish.lock();
-                guard.add(dur);
-            }
-        }
+        tracing::debug!(
+            target: targets::PUBLISHER,
+            latency_us = start.elapsed().as_micros() as u64,
+            "rcl_publish completed"
+        );
 
         Ok(())
     }
@@ -240,18 +237,15 @@ impl<T: TypeSupport> Publisher<T> {
             return Err(Signaled.into());
         }
 
-        #[cfg(feature = "rcl_stat")]
-        let start = std::time::SystemTime::now();
+        let start = std::time::Instant::now();
 
         msg.send()?;
 
-        #[cfg(feature = "rcl_stat")]
-        {
-            if let Ok(dur) = start.elapsed() {
-                let mut guard = self.latency_publish.lock();
-                guard.add(dur);
-            }
-        }
+        tracing::debug!(
+            target: targets::PUBLISHER,
+            latency_us = start.elapsed().as_micros() as u64,
+            "rcl_publish_loaned completed"
+        );
 
         Ok(())
     }
@@ -266,26 +260,19 @@ impl<T: TypeSupport> Publisher<T> {
         if crate::is_halt() {
             return Err(Signaled.into());
         }
-        #[cfg(feature = "rcl_stat")]
-        let start = std::time::SystemTime::now();
+
+        let start = std::time::Instant::now();
 
         rcl::MTSafeFn::rcl_publish_serialized_message(self.publisher.as_ref(), msg, null_mut())?;
 
-        #[cfg(feature = "rcl_stat")]
-        {
-            if let Ok(dur) = start.elapsed() {
-                let mut guard = self.latency_publish.lock();
-                guard.add(dur);
-            }
-        }
+        tracing::debug!(
+            target: targets::PUBLISHER,
+            latency_us = start.elapsed().as_micros() as u64,
+            bytes = msg.len(),
+            "rcl_publish_serialized completed"
+        );
 
         Ok(())
-    }
-    /// Get latency statistics information of `rcl_publish()`.
-    #[cfg(feature = "rcl_stat")]
-    pub fn statistics(&self) -> SerializableTimeStat {
-        let guard = self.latency_publish.lock();
-        guard.to_serializable()
     }
 }
 

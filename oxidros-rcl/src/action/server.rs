@@ -4,7 +4,7 @@ use futures_util::try_join;
 use oxidros_core::selector::CallbackResult;
 use oxidros_core::{
     ActionError, DurabilityPolicy, Error, HistoryPolicy, LivelinessPolicy, ReliabilityPolicy,
-    TryClone,
+    TryClone, targets,
 };
 use oxidros_msg::interfaces::action_msgs::srv::CancelGoal_Response;
 use oxidros_msg::interfaces::unique_identifier_msgs::msg::UUID;
@@ -14,7 +14,6 @@ use std::{collections::BTreeMap, ffi::CString, sync::Arc, task::Poll, time::Dura
 
 use crate::PhantomUnsync;
 use crate::helper::is_unpin;
-use crate::logger::{Logger, pr_error_in};
 use crate::msg::GetUUID;
 use crate::selector::async_selector;
 use crate::{
@@ -574,11 +573,10 @@ impl<T: ActionMsg> ServerResultSend<T> {
                     &mut self.request_id,
                     &mut response as *const _ as *mut _,
                 ) {
-                    let logger = Logger::new("oxidros");
-                    pr_error_in!(
-                        logger,
-                        "failed to send result response from action server: {}",
-                        e
+                    tracing::error!(
+                        target: targets::ACTION,
+                        error = %e,
+                        "Failed to send result response from action server"
                     );
                     return Err(e);
                 }
@@ -844,11 +842,10 @@ fn rcl_recv_cancel_request(
         &request,
         &mut process_response as *const _ as *mut _,
     ) {
-        let logger = Logger::new("oxidros");
-        pr_error_in!(
-            logger,
-            "failed to send cancel responses from action server: {}",
-            e
+        tracing::error!(
+            target: targets::ACTION,
+            error = %e,
+            "Failed to send cancel responses from action server"
         );
         return Err(e);
     }

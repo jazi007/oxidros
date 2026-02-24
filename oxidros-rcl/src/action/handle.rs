@@ -1,16 +1,11 @@
 //! Goal handle representing each action goal.
 
-use oxidros_core::{RclError, TryClone};
+use oxidros_core::{RclError, TryClone, targets};
 use parking_lot::Mutex;
 use std::{collections::BTreeMap, rc::Rc, sync::Arc};
 
 use super::{GoalEvent, GoalStatus, server::ServerData};
-use crate::{
-    error::Result,
-    logger::{Logger, pr_error_in},
-    msg::ActionMsg,
-    rcl,
-};
+use crate::{error::Result, msg::ActionMsg, rcl};
 
 /// GoalHandle contains information about an action goal and is used by server worker threads to send feedback and results.
 pub struct GoalHandle<T: ActionMsg> {
@@ -124,11 +119,10 @@ where
                 ) {
                     Ok(()) => {}
                     Err(e) => {
-                        let logger = Logger::new("oxidros");
-                        pr_error_in!(
-                            logger,
-                            "failed to send result response from action server: {}",
-                            e
+                        tracing::error!(
+                            target: targets::ACTION,
+                            error = %e,
+                            "Failed to send result response from action server"
                         );
                         return Err(e);
                     }
