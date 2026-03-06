@@ -230,7 +230,7 @@ impl<T: TypeSupport> oxidros_core::api::RosPublisher<T> for Publisher<T> {
     }
 
     fn send(&self, msg: &T) -> crate::error::Result<()> {
-        self.send(msg)
+        Self::send(self, msg)
     }
 
     fn send_raw(&self, data: &[u8]) -> crate::error::Result<()> {
