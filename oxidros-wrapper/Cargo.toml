@@ -1,6 +1,6 @@
 [package]
 name = "oxidros-wrapper"
-version = "0.1.7"
+version = "0.5.0"
 description = "Ergonomic ROS2 API implementing oxidros-core traits for RCL backend"
 license-file.workspace = true
 edition.workspace = true
