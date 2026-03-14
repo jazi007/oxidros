@@ -138,7 +138,7 @@ impl From<Attachment> for oxidros_core::MessageInfo {
         Self {
             sequence_number: attachment.sequence_number,
             source_timestamp_ns: attachment.timestamp_ns,
-            publisher_gid: attachment.gid,
+            writer_gid: attachment.gid,
         }
     }
 }
@@ -148,7 +148,7 @@ impl From<&Attachment> for oxidros_core::MessageInfo {
         Self {
             sequence_number: attachment.sequence_number,
             source_timestamp_ns: attachment.timestamp_ns,
-            publisher_gid: attachment.gid,
+            writer_gid: attachment.gid,
         }
     }
 }

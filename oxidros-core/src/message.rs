@@ -7,8 +7,9 @@ pub struct MessageInfo {
     pub sequence_number: i64,
     /// Source timestamp in nanoseconds since UNIX epoch.
     pub source_timestamp_ns: i64,
-    /// Publisher's global identifier (GID).
-    pub publisher_gid: [u8; 16],
+    /// Writer's global identifier (GID). This identifies the DDS DataWriter
+    /// that sent the message (publisher for topics, client for service requests).
+    pub writer_gid: [u8; 16],
 }
 
 /// The underlying message data, which can be copied or loaned (zero-copy).

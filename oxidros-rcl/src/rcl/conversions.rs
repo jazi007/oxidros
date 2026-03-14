@@ -383,14 +383,14 @@ impl From<i32> for RclRetErr {
 impl From<rmw_message_info_t> for oxidros_core::message::MessageInfo {
     #[cfg(ros_distro_humble)]
     fn from(value: rmw_message_info_t) -> Self {
-        let mut publisher_gid = [0; 16];
-        for (o, i) in publisher_gid.iter_mut().zip(value.publisher_gid.data) {
+        let mut writer_gid = [0; 16];
+        for (o, i) in writer_gid.iter_mut().zip(value.publisher_gid.data) {
             *o = i;
         }
         Self {
             sequence_number: value.publication_sequence_number as i64,
             source_timestamp_ns: value.source_timestamp,
-            publisher_gid,
+            writer_gid,
         }
     }
     #[cfg(not(ros_distro_humble))]
@@ -398,7 +398,7 @@ impl From<rmw_message_info_t> for oxidros_core::message::MessageInfo {
         Self {
             sequence_number: value.publication_sequence_number as i64,
             source_timestamp_ns: value.source_timestamp,
-            publisher_gid: value.publisher_gid.data,
+            writer_gid: value.publisher_gid.data,
         }
     }
 }
@@ -406,14 +406,14 @@ impl From<rmw_message_info_t> for oxidros_core::message::MessageInfo {
 impl From<rmw_service_info_t> for oxidros_core::message::MessageInfo {
     #[cfg(ros_distro_humble)]
     fn from(value: rmw_service_info_t) -> Self {
-        let mut publisher_gid = [0; 16];
-        for (o, i) in publisher_gid.iter_mut().zip(value.request_id.writer_guid) {
+        let mut writer_gid = [0; 16];
+        for (o, i) in writer_gid.iter_mut().zip(value.request_id.writer_guid) {
             *o = i.try_into().unwrap_or_default();
         }
         Self {
             sequence_number: value.request_id.sequence_number,
             source_timestamp_ns: value.source_timestamp,
-            publisher_gid,
+            writer_gid,
         }
     }
     #[cfg(not(ros_distro_humble))]
@@ -421,7 +421,7 @@ impl From<rmw_service_info_t> for oxidros_core::message::MessageInfo {
         Self {
             sequence_number: value.request_id.sequence_number,
             source_timestamp_ns: value.source_timestamp,
-            publisher_gid: value.request_id.writer_guid,
+            writer_gid: value.request_id.writer_guid,
         }
     }
 }
