@@ -11,8 +11,8 @@ edition.workspace = true
 authors.workspace = true
 
 [dependencies]
-oxidros-core = { path = "../oxidros-core" }
-oxidros-msg = { path = "../oxidros-msg" }
+oxidros-core = { version = "0.5.0", path = "../oxidros-core" }
+oxidros-msg = { version = "0.5.1", path = "../oxidros-msg" }
 crossbeam-channel = "0.5"
 libc = "0.2"
 num-traits.workspace = true
@@ -35,7 +35,7 @@ rand = "0.10"
 log.workspace = true
 
 [build-dependencies]
-oxidros-build = { path = "../oxidros-build" }
+oxidros-build = { version = "0.5.0", path = "../oxidros-build" }
 
 [features]
 default = []

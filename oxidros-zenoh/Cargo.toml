@@ -23,11 +23,11 @@ uuid = { version = "1", features = ["v4"] }
 futures-core = "0.3"
 
 # Oxidros workspace crates
-oxidros-core = { path = "../oxidros-core" }
-ros2args = { path = "../ros2args" }
+oxidros-core = { version = "0.5.0", path = "../oxidros-core" }
+ros2args = { version = "0.5.1", path = "../ros2args" }
 
 # Optional: ROS2 message types (requires AMENT_PREFIX_PATH for building)
-oxidros-msg = { path = "../oxidros-msg" }
+oxidros-msg = { version = "0.5.1", path = "../oxidros-msg" }
 
 # Utilities
 thiserror.workspace = true

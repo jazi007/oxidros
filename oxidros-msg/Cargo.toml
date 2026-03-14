@@ -11,11 +11,11 @@ edition.workspace = true
 authors.workspace = true
 
 [dependencies]
-oxidros-core = { path = "../oxidros-core" }
+oxidros-core = { version = "0.5.0", path = "../oxidros-core" }
 log.workspace = true
 widestring = "1.2.1"
 # Re-export ros2-types traits for generated code
-ros2-types = { path = "../ros2-types", features = ["derive"] }
+ros2-types = { version = "0.5.1", path = "../ros2-types", features = ["derive"] }
 
 [features]
 default = []
@@ -23,7 +23,7 @@ default = []
 rcl = ["ros2-types/rcl"]
 
 [build-dependencies]
-ros2msg = { path = "../ros2msg" }
-oxidros-build = { path = "../oxidros-build" }
+ros2msg = { version = "0.5.1", path = "../ros2msg" }
+oxidros-build = { version = "0.5.0", path = "../oxidros-build" }
 quote = "1.0"
 proc-macro2 = "1.0"

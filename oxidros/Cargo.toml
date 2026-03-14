@@ -7,16 +7,16 @@ repository.workspace = true
 license-file.workspace = true
 
 [dependencies]
-oxidros-core = { path = "../oxidros-core" }
-oxidros-msg = { path = "../oxidros-msg" }
-oxidros-rcl = { path = "../oxidros-rcl" }
-oxidros-zenoh = { path = "../oxidros-zenoh"}
+oxidros-core = { version = "0.5.0", path = "../oxidros-core" }
+oxidros-msg = { version = "0.5.1", path = "../oxidros-msg" }
+oxidros-rcl = { version = "0.5.0", path = "../oxidros-rcl" }
+oxidros-zenoh = { version = "0.5.1", path = "../oxidros-zenoh" }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
 
 [build-dependencies]
-oxidros-build = { path = "../oxidros-build" }
+oxidros-build = { version = "0.5.0", path = "../oxidros-build" }
 
 [features]
 # No default - user must explicitly choose a backend

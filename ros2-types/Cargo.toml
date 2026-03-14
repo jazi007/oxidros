@@ -20,7 +20,7 @@ byteorder = "1.5"
 serde-big-array = "0.5"
 
 # Optional derive macro support
-ros2-types-derive = { path = "../ros2-types-derive", optional = true }
+ros2-types-derive = { version = "0.5.1", path = "../ros2-types-derive", optional = true }
 
 [features]
 default = []
@@ -31,6 +31,6 @@ derive = ["ros2-types-derive"]
 rcl = ["ros2-types-derive/rcl"]
 
 [dev-dependencies]
-ros2-types-derive = { path = "../ros2-types-derive" }
+ros2-types-derive = { version = "0.5.1", path = "../ros2-types-derive" }
 serde_json.workspace = true
-ros2msg = { path = "../ros2msg", features = ["serde"] }
+ros2msg = { version = "0.5.1", path = "../ros2msg", features = ["serde"] }
