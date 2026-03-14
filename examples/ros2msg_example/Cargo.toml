@@ -8,6 +8,7 @@ license-file.workspace = true
 
 # Build script for generating ROS2 message types
 build = "build.rs"
+publish = false
 
 
 [dependencies]
