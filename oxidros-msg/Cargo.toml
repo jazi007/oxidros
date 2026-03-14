@@ -24,6 +24,6 @@ rcl = ["ros2-types/rcl"]
 
 [build-dependencies]
 ros2msg = { version = "0.5.1", path = "../ros2msg" }
-oxidros-build = { version = "0.5.0", path = "../oxidros-build" }
+oxidros-build = { version = "0.5", path = "../oxidros-build" }
 quote = "1.0"
 proc-macro2 = "1.0"

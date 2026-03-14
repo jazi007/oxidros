@@ -35,7 +35,7 @@ rand = "0.10"
 log.workspace = true
 
 [build-dependencies]
-oxidros-build = { version = "0.5.0", path = "../oxidros-build" }
+oxidros-build = { version = "0.5", path = "../oxidros-build" }
 
 [features]
 default = []
