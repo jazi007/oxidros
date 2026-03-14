@@ -676,6 +676,7 @@ impl Generator {
 
                 // Generate type-specific mod.rs (e.g., msg/mod.rs)
                 if !module_names.is_empty() {
+                    module_names.sort();
                     let type_mod_rs =
                         self.generate_type_mod_rs(package_name, interface_kind, &module_names);
                     std::fs::write(type_dir.join("mod.rs"), type_mod_rs)?;
@@ -685,6 +686,7 @@ impl Generator {
 
             // Generate package mod.rs that includes msg, srv, action submodules
             if !submodule_names.is_empty() {
+                submodule_names.sort();
                 let package_mod_rs = self.generate_interface_mod_rs(package_name, &submodule_names);
                 std::fs::write(package_dir.join("mod.rs"), package_mod_rs)?;
             }

@@ -13,9 +13,9 @@
 //! Generated ROS2 message types for oxidros.
 //!
 //! This crate provides Rust bindings for ROS2 messages, services, and actions.
-//! Select the appropriate ROS2 distribution using features: `jazzy`, `iron`, `humble`, or `galactic`.
+//! Enable the `rcl` feature for FFI support with ROS2 C libraries.
 //!
-//! Messages are generated at compile time using ros2msg and ros2-types-derive for FFI.
+//! Messages are generated at compile time using ros2msg and ros2-types-derive.
 
 // Re-export rcl types for generated code (only available with rcl feature)
 #[cfg(feature = "rcl")]
