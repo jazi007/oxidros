@@ -1,6 +1,6 @@
 [package]
 name = "oxidros-build"
-version = "0.5.0"
+version = "0.5.1"
 description = "Build utilities for oxidros ROS2 message generation and FFI bindings"
 edition.workspace = true
 authors.workspace = true

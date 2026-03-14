@@ -92,16 +92,26 @@ impl RosAvailability {
 /// }
 /// ```
 pub fn detect_ros_availability(config: &Config) -> RosAvailability {
+    let extra_share_paths: Vec<PathBuf> = config
+        .extra_search_paths
+        .iter()
+        .filter(|p| p.exists())
+        .map(|p| {
+            let share = p.join("share");
+            if share.exists() { share } else { p.clone() }
+        })
+        .collect();
+
     // 1. Check AMENT_PREFIX_PATH (sourced ROS2)
     if let Some(ament_paths) = Config::get_ament_prefix_paths() {
-        let share_paths: Vec<PathBuf> = ament_paths
+        let mut share_paths: Vec<PathBuf> = ament_paths
             .into_iter()
             .map(|p| {
                 let share = p.join("share");
                 if share.exists() { share } else { p }
             })
             .collect();
-
+        share_paths.extend(extra_share_paths.clone());
         if !share_paths.is_empty() {
             return RosAvailability::Sourced { share_paths };
         }
@@ -110,34 +120,23 @@ pub fn detect_ros_availability(config: &Config) -> RosAvailability {
     // 2. Check common installation paths
     let default_paths = Config::get_default_ros2_paths();
     if !default_paths.is_empty() {
-        let share_paths: Vec<PathBuf> = default_paths
+        let mut share_paths: Vec<PathBuf> = default_paths
             .into_iter()
             .map(|p| {
                 let share = p.join("share");
                 if share.exists() { share } else { p }
             })
             .collect();
-
+        share_paths.extend(extra_share_paths.clone());
         if !share_paths.is_empty() {
             return RosAvailability::CommonInstall { share_paths };
         }
     }
-
-    // 3. Check extra search paths from config (treated as common install)
-    if !config.extra_search_paths.is_empty() {
-        let share_paths: Vec<PathBuf> = config
-            .extra_search_paths
-            .iter()
-            .filter(|p| p.exists())
-            .map(|p| {
-                let share = p.join("share");
-                if share.exists() { share } else { p.clone() }
-            })
-            .collect();
-
-        if !share_paths.is_empty() {
-            return RosAvailability::CommonInstall { share_paths };
-        }
+    // 3. Check extra search paths from config
+    if !extra_share_paths.is_empty() {
+        return RosAvailability::CommonInstall {
+            share_paths: extra_share_paths,
+        };
     }
 
     // 4. Nothing found
