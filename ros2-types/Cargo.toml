@@ -20,7 +20,7 @@ byteorder = "1.5"
 serde-big-array = "0.5"
 
 # Optional derive macro support
-ros2-types-derive = { version = "0.5.1", path = "../ros2-types-derive", optional = true }
+ros2-types-derive = { version = "0.5", path = "../ros2-types-derive", optional = true }
 
 [features]
 default = []
@@ -28,9 +28,9 @@ default = []
 derive = ["ros2-types-derive"]
 # Enable FFI code generation for ROS2 C libraries
 # When this feature is enabled, Ros2Msg derive generates extern "C" bindings
-rcl = ["ros2-types-derive/rcl"]
+rcl = []
 
 [dev-dependencies]
-ros2-types-derive = { version = "0.5.1", path = "../ros2-types-derive" }
+ros2-types-derive = { version = "0.5", path = "../ros2-types-derive" }
 serde_json.workspace = true
 ros2msg = { version = "0.5.1", path = "../ros2msg", features = ["serde"] }
