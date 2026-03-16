@@ -51,7 +51,7 @@
 //!     init_ros_logging("my_node");
 //!
 //!     let ctx = Context::new()?;
-//!     let node = ctx.new_node("my_node", None)?;
+//!     let node = ctx.create_node("my_node", None)?;
 //!
 //!     // Create publisher
 //!     let publisher = node.create_publisher::<std_msgs::msg::String>("chatter", None)?;
@@ -85,8 +85,8 @@
 //!     init_ros_logging("my_node");
 //!
 //!     let ctx = Context::new()?;
-//!     let node = ctx.new_node("my_node", None)?;
-//!     let mut selector = ctx.new_selector()?;
+//!     let node = ctx.create_node("my_node", None)?;
+//!     let mut selector = ctx.create_selector()?;
 //!
 //!     // Add subscriber with callback
 //!     let subscriber = node.create_subscriber::<std_msgs::msg::String>("chatter", None)?;
@@ -119,7 +119,7 @@
 //! #[tokio::main]
 //! async fn main() -> Result<(), DynError> {
 //!     let ctx = Context::new()?;
-//!     let node = ctx.new_node("my_node", None)?;
+//!     let node = ctx.create_node("my_node", None)?;
 //!
 //!     // Client
 //!     let mut client = node.create_client::<AddTwoInts>("add_two_ints", None)?;
@@ -142,7 +142,7 @@
 //!
 //! fn main() -> Result<(), DynError> {
 //!     let ctx = Context::new()?;
-//!     let node = ctx.new_node("my_node", None)?;
+//!     let node = ctx.create_node("my_node", None)?;
 //!     let param_server = node.create_parameter_server()?;
 //!
 //!     // Set initial parameters (name, value, read_only, description)
@@ -157,7 +157,7 @@
 //!     }
 //!
 //!     // Add to selector with update callback
-//!     let mut selector = ctx.new_selector()?;
+//!     let mut selector = ctx.create_selector()?;
 //!     selector.add_parameter_server(param_server, Box::new(|_params, updated| {
 //!         for name in updated {
 //!             tracing::info!("Parameter '{}' updated", name);
@@ -202,11 +202,15 @@ compile_error!("Features `rcl` and `zenoh` are mutually exclusive. Choose one ba
 pub mod prelude;
 
 // Re-export the selected backend (explicit feature or auto-detected)
-// RCL backend - requires `rcl` Cargo feature to be enabled (via humble/jazzy/kilted)
-// The backend_rcl cfg alone isn't enough because oxidros-rcl needs the Cargo feature
+// RCL backend - use oxidros-wrapper which implements core API traits on top of oxidros-rcl
 #[cfg(feature = "rcl")]
 #[cfg(not(feature = "zenoh"))]
-pub use oxidros_rcl::{self, action, clock, logger, parameter, service, topic};
+pub use oxidros_wrapper::{self, Clock, ParameterServer, action, logger};
+
+// Also re-export oxidros-rcl submodules for advanced/low-level access
+#[cfg(feature = "rcl")]
+#[cfg(not(feature = "zenoh"))]
+pub use oxidros_rcl::{clock, parameter, service, topic};
 
 // Zenoh backend - used when:
 // 1. Explicit `zenoh` feature is enabled, OR

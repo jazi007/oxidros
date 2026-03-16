@@ -107,6 +107,9 @@ pub use oxidros_msg as msg;
 // Re-export clock from rcl
 pub use oxidros_rcl::clock::Clock;
 
+// Re-export logger from rcl
+pub use oxidros_rcl::logger;
+
 // Re-export parameter types
 pub use oxidros_rcl::parameter::ParameterServer;
 
@@ -165,6 +168,11 @@ impl Node {
     /// Get the inner RCL node.
     pub fn inner(&self) -> &Arc<oxidros_rcl::node::Node> {
         &self.0
+    }
+
+    /// Create a parameter server for this node.
+    pub fn create_parameter_server(self: &Arc<Self>) -> Result<ParameterServer> {
+        self.0.create_parameter_server()
     }
 }
 

@@ -57,7 +57,7 @@ use oxidros::msg::common_interfaces::std_msgs::msg::String;
 #[tokio::main]
 async fn main() -> oxidros::error::Result<()> {
     let ctx = Context::new()?;
-    let node = ctx.new_node("my_node", None)?;
+    let node = ctx.create_node("my_node", None)?;
     
     // Publisher
     let publisher = node.create_publisher::<String>("chatter", None)?;
@@ -82,7 +82,7 @@ use oxidros::msg::common_interfaces::example_interfaces::srv::AddTwoInts;
 #[tokio::main]
 async fn main() -> oxidros::error::Result<()> {
     let ctx = Context::new()?;
-    let node = ctx.new_node("my_node", None)?;
+    let node = ctx.create_node("my_node", None)?;
     
     // Client
     let mut client = node.create_client::<AddTwoInts>("add_two_ints", None)?;
@@ -110,9 +110,9 @@ use std::time::Duration;
 
 fn main() -> oxidros::error::Result<()> {
     let ctx = Context::new()?;
-    let node = ctx.new_node("my_node", None)?;
+    let node = ctx.create_node("my_node", None)?;
     
-    let mut selector = ctx.new_selector()?;
+    let mut selector = ctx.create_selector()?;
     
     // Add subscriber with callback
     let subscriber = node.create_subscriber::<String>("chatter", None)?;

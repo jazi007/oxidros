@@ -255,8 +255,8 @@ Update feature flags and use `oxidros-build` for detection:
   }
   ```
 
-- [ ] Update `lib.rs` to conditionally re-export based on features
-- [ ] Ensure unified API regardless of backend
+- [x] Update `lib.rs` to conditionally re-export based on features
+- [x] Ensure unified API regardless of backend
 
 Then in `lib.rs`:
 

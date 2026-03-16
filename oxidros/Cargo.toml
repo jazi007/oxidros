@@ -11,6 +11,7 @@ license-file.workspace = true
 oxidros-core = { version = "0.5.0", path = "../oxidros-core" }
 oxidros-msg = { version = "0.5.1", path = "../oxidros-msg" }
 oxidros-rcl = { version = "0.5.0", path = "../oxidros-rcl" }
+oxidros-wrapper = { version = "0.5.0", path = "../oxidros-wrapper" }
 oxidros-zenoh = { version = "0.5.1", path = "../oxidros-zenoh" }
 
 [dev-dependencies]
