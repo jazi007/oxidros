@@ -60,4 +60,5 @@ mod backend {
     pub use oxidros_zenoh::topic::{publisher::Publisher, subscriber::Subscriber};
 }
 
+#[cfg(any(feature = "zenoh", feature = "rcl"))]
 pub use backend::*;
