@@ -163,7 +163,7 @@ impl Node {
     }
 
     /// Get the effective node name (after applying `__node` remapping).
-    pub fn name(&self) -> Result<String> {
+    pub fn z_name(&self) -> Result<String> {
         Ok(compute_effective_node_name(
             &self.inner.name,
             self.inner.context.ros2_args(),
@@ -171,7 +171,7 @@ impl Node {
     }
 
     /// Get the effective node namespace (after applying `__ns` remapping).
-    pub fn namespace(&self) -> Result<String> {
+    pub fn z_namespace(&self) -> Result<String> {
         Ok(compute_effective_namespace(
             &self.inner.name,
             &self.inner.namespace,
@@ -180,9 +180,9 @@ impl Node {
     }
 
     /// Get the fully qualified node name (using effective name/namespace).
-    pub fn fully_qualified_name(&self) -> Result<String> {
-        let effective_ns = self.namespace()?;
-        let effective_name = self.name()?;
+    pub fn z_fully_qualified_name(&self) -> Result<String> {
+        let effective_ns = self.z_namespace()?;
+        let effective_name = self.z_name()?;
         Ok(ros2args::names::build_node_fqn(
             if effective_ns.is_empty() {
                 "/"
@@ -246,8 +246,8 @@ impl Node {
 
         // Get the effective namespace and name for expansion
         // (topic names should expand using the remapped node identity)
-        let effective_ns = self.namespace()?;
-        let effective_name = self.name()?;
+        let effective_ns = self.z_namespace()?;
+        let effective_name = self.z_name()?;
         let namespace = if effective_ns.is_empty() {
             "/"
         } else {
@@ -339,7 +339,7 @@ impl Node {
     /// - Relative names are prefixed with the node's namespace
     /// - Private names (starting with `~`) are prefixed with the node's FQN
     /// - Remapping rules from command-line arguments are applied
-    pub fn create_publisher<T: TypeSupport>(
+    pub fn z_create_publisher<T: TypeSupport>(
         self: &Arc<Self>,
         topic_name: &str,
         qos: Option<Profile>,
@@ -370,7 +370,7 @@ impl Node {
     /// # Name Resolution
     ///
     /// The topic name is expanded and remapped (see `create_publisher`).
-    pub fn create_subscriber<T: TypeSupport>(
+    pub fn z_create_subscriber<T: TypeSupport>(
         self: &Arc<Self>,
         topic_name: &str,
         qos: Option<Profile>,
@@ -401,7 +401,7 @@ impl Node {
     /// # Name Resolution
     ///
     /// The service name is expanded and remapped (see `create_publisher`).
-    pub fn create_client<T: oxidros_core::ServiceMsg>(
+    pub fn z_create_client<T: oxidros_core::ServiceMsg>(
         self: &Arc<Self>,
         service_name: &str,
         qos: Option<Profile>,
@@ -435,7 +435,7 @@ impl Node {
     /// # Name Resolution
     ///
     /// The service name is expanded and remapped (see `create_publisher`).
-    pub fn create_server<T: oxidros_core::ServiceMsg>(
+    pub fn z_create_server<T: oxidros_core::ServiceMsg>(
         self: &Arc<Self>,
         service_name: &str,
         qos: Option<Profile>,
@@ -487,15 +487,15 @@ impl oxidros_core::api::RosNode for Node {
     type Server<T: oxidros_core::ServiceMsg> = Server<T>;
 
     fn name(&self) -> Result<String> {
-        Self::name(self)
+        self.z_name()
     }
 
     fn namespace(&self) -> Result<String> {
-        Self::namespace(self)
+        self.z_namespace()
     }
 
     fn fully_qualified_name(&self) -> Result<String> {
-        Self::fully_qualified_name(self)
+        self.z_fully_qualified_name()
     }
 
     fn create_publisher<T: TypeSupport>(
@@ -503,7 +503,7 @@ impl oxidros_core::api::RosNode for Node {
         topic_name: &str,
         qos: Option<Profile>,
     ) -> Result<Self::Publisher<T>> {
-        Self::create_publisher(self, topic_name, qos)
+        self.z_create_publisher(topic_name, qos)
     }
 
     fn create_subscriber<T: TypeSupport>(
@@ -511,7 +511,7 @@ impl oxidros_core::api::RosNode for Node {
         topic_name: &str,
         qos: Option<Profile>,
     ) -> Result<Self::Subscriber<T>> {
-        Self::create_subscriber(self, topic_name, qos)
+        self.z_create_subscriber(topic_name, qos)
     }
 
     fn create_client<T: oxidros_core::ServiceMsg>(
@@ -519,7 +519,7 @@ impl oxidros_core::api::RosNode for Node {
         service_name: &str,
         qos: Option<Profile>,
     ) -> Result<Self::Client<T>> {
-        Self::create_client(self, service_name, qos)
+        self.z_create_client(service_name, qos)
     }
 
     fn create_server<T: oxidros_core::ServiceMsg>(
@@ -527,7 +527,7 @@ impl oxidros_core::api::RosNode for Node {
         service_name: &str,
         qos: Option<Profile>,
     ) -> Result<Self::Server<T>> {
-        Self::create_server(self, service_name, qos)
+        self.z_create_server(service_name, qos)
     }
 }
 

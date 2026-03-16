@@ -41,7 +41,7 @@ type ParameterServerCallback = Box<dyn FnMut(&mut Parameters, BTreeSet<String>)>
 /// // Create a context.
 /// let ctx = Context::new().unwrap();
 ///
-/// let mut selector = ctx.create_selector().unwrap();
+/// let mut selector = ctx.z_create_selector().unwrap();
 /// // Add a subscriber
 /// selector.add_subscriber(subscriber, Box::new(|msg| {
 ///     println!("Received: {:?}", msg);
@@ -82,14 +82,14 @@ impl Selector {
     /// Add a subscriber with a callback handler.
     ///
     /// The handler will be called whenever a message arrives on the topic.
-    pub fn add_subscriber<T: TypeSupport + 'static>(
+    pub fn z_add_subscriber<T: TypeSupport + 'static>(
         &mut self,
         subscriber: Subscriber<T>,
         mut handler: Box<dyn FnMut(Message<T>)>,
     ) -> bool {
         // Create a closure that tries to receive and call the handler
         let poll_fn = Box::new(move || -> bool {
-            match subscriber.try_recv() {
+            match subscriber.z_try_recv() {
                 Ok(Some(msg)) => {
                     handler(msg);
                     true
@@ -107,7 +107,7 @@ impl Selector {
     /// Incoming requests are polled during `wait()` calls.
     ///
     /// Returns true if the server was added successfully.
-    pub fn add_server<T: oxidros_core::ServiceMsg + 'static>(
+    pub fn z_add_server<T: oxidros_core::ServiceMsg + 'static>(
         &mut self,
         mut server: crate::service::Server<T>,
         mut handler: oxidros_core::selector::ServerCallback<T>,
@@ -118,7 +118,7 @@ impl Selector {
     {
         // Create a closure that tries to receive and call the handler
         let poll_fn = Box::new(move || -> bool {
-            match server.try_recv() {
+            match server.z_try_recv() {
                 Ok(Some(service_req)) => {
                     let (sender, request) = service_req.split();
                     let response = handler(request);
@@ -145,7 +145,7 @@ impl Selector {
     ///
     /// Only one parameter server can be added per Selector. Calling this again
     /// will replace the previous parameter server.
-    pub fn add_parameter_server(
+    pub fn z_add_parameter_server(
         &mut self,
         mut param_server: ZenohParameterServer,
         mut handler: ParameterServerCallback,
@@ -172,7 +172,7 @@ impl Selector {
     /// Add a one-shot timer that fires once after the given duration.
     ///
     /// Returns a timer ID that can be used to remove the timer before it fires.
-    pub fn add_timer(&mut self, duration: Duration, handler: Box<dyn FnMut()>) -> u64 {
+    pub fn z_add_timer(&mut self, duration: Duration, handler: Box<dyn FnMut()>) -> u64 {
         let id = TIMER_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
         let timer = Timer {
             period: duration,
@@ -189,7 +189,7 @@ impl Selector {
     /// The timer will fire repeatedly at the given period until removed.
     ///
     /// Returns a timer ID that can be used to remove the timer.
-    pub fn add_wall_timer(
+    pub fn z_add_wall_timer(
         &mut self,
         _name: &str,
         period: Duration,
@@ -212,14 +212,14 @@ impl Selector {
     }
 
     /// Wait for events indefinitely.
-    pub fn wait(&mut self) -> Result<()> {
+    pub fn z_wait(&mut self) -> Result<()> {
         self.wait_timeout_internal(None)
     }
 
     /// Wait for events with a timeout.
     ///
     /// Returns `Ok(true)` if events were processed, `Ok(false)` if timeout occurred.
-    pub fn wait_timeout(&mut self, timeout: Duration) -> Result<bool> {
+    pub fn z_wait_timeout(&mut self, timeout: Duration) -> Result<bool> {
         self.wait_timeout_internal(Some(timeout)).map(|_| true)
     }
 
@@ -327,7 +327,7 @@ impl oxidros_core::api::RosSelector for Selector {
         subscriber: Self::Subscriber<T>,
         handler: Box<dyn FnMut(Message<T>)>,
     ) -> bool {
-        Self::add_subscriber(self, subscriber, handler)
+        self.z_add_subscriber(subscriber, handler)
     }
 
     fn add_server<T: oxidros_core::ServiceMsg + 'static>(
@@ -339,7 +339,7 @@ impl oxidros_core::api::RosSelector for Selector {
         T::Request: TypeSupport,
         T::Response: TypeSupport,
     {
-        Self::add_server(self, server, handler)
+        self.z_add_server(server, handler)
     }
 
     fn add_parameter_server(
@@ -347,19 +347,19 @@ impl oxidros_core::api::RosSelector for Selector {
         param_server: Self::ParameterServer,
         handler: Box<dyn FnMut(&mut Parameters, BTreeSet<String>)>,
     ) {
-        Self::add_parameter_server(self, param_server, handler)
+        self.z_add_parameter_server(param_server, handler)
     }
 
     fn add_timer(&mut self, duration: Duration, handler: Box<dyn FnMut()>) -> u64 {
-        Self::add_timer(self, duration, handler)
+        self.z_add_timer(duration, handler)
     }
 
     fn add_wall_timer(&mut self, name: &str, period: Duration, handler: Box<dyn FnMut()>) -> u64 {
-        Self::add_wall_timer(self, name, period, handler)
+        self.z_add_wall_timer(name, period, handler)
     }
 
     fn delete_timer(&mut self, id: u64) {
-        Self::remove_timer(self, id)
+        self.remove_timer(id)
     }
 
     fn add_action_server<T, GR, A, CR>(
@@ -393,10 +393,10 @@ impl oxidros_core::api::RosSelector for Selector {
     }
 
     fn wait(&mut self) -> oxidros_core::Result<()> {
-        Self::wait(self)
+        self.z_wait()
     }
 
     fn wait_timeout(&mut self, timeout: Duration) -> oxidros_core::Result<bool> {
-        Self::wait_timeout(self, timeout)
+        self.z_wait_timeout(timeout)
     }
 }

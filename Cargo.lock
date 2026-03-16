@@ -1735,7 +1735,6 @@ dependencies = [
  "oxidros-build",
  "oxidros-core",
  "oxidros-msg",
- "oxidros-rcl",
  "oxidros-wrapper",
  "oxidros-zenoh",
  "tokio",

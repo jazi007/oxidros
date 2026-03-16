@@ -129,8 +129,8 @@ impl<T: TypeSupport> Subscriber<T> {
             entity_id,
             entity_kind,
             node.enclave(),
-            &node.namespace()?,
-            &node.name()?,
+            &node.z_namespace()?,
+            &node.z_name()?,
             fq_topic_name,
             type_name,
             &type_hash,
@@ -161,7 +161,7 @@ impl<T: TypeSupport> Subscriber<T> {
 
 impl<T: TypeSupport> Subscriber<T> {
     /// Get the topic name.
-    pub fn topic_name(&self) -> Result<Cow<'_, String>> {
+    pub fn z_topic_name(&self) -> Result<Cow<'_, String>> {
         Ok(Cow::Borrowed(&self.topic_name))
     }
 
@@ -181,7 +181,7 @@ impl<T: TypeSupport> Subscriber<T> {
     ///
     /// Returns an error if deserialization fails, the channel is closed,
     /// or the message has a missing/invalid attachment.
-    pub async fn recv(&mut self) -> Result<Message<T>> {
+    pub async fn z_recv(&mut self) -> Result<Message<T>> {
         let sample = self
             .receiver
             .recv_async()
@@ -209,7 +209,7 @@ impl<T: TypeSupport> Subscriber<T> {
     ///
     /// Returns an error if deserialization fails or the message has a
     /// missing/invalid attachment.
-    pub fn try_recv(&self) -> Result<Option<Message<T>>> {
+    pub fn z_try_recv(&self) -> Result<Option<Message<T>>> {
         match self.receiver.try_recv() {
             Ok(sample) => {
                 let data = T::from_bytes(&sample.payload().to_bytes())?;
@@ -248,15 +248,15 @@ impl<T: TypeSupport> Subscriber<T> {
 
 impl<T: TypeSupport + Send + 'static> oxidros_core::api::RosSubscriber<T> for Subscriber<T> {
     fn topic_name(&self) -> Result<Cow<'_, String>> {
-        Subscriber::topic_name(self)
+        self.z_topic_name()
     }
 
     async fn recv(&mut self) -> Result<Message<T>> {
-        Self::recv(self).await
+        self.z_recv().await
     }
 
     fn try_recv(&mut self) -> Result<Option<Message<T>>> {
-        Self::try_recv(self)
+        self.z_try_recv()
     }
 
     fn into_stream(self) -> oxidros_core::MessageStream<T>

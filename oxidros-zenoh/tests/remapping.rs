@@ -25,11 +25,11 @@ fn test_node_name_remapping_via_node_methods() {
 
     let ctx = Context::with_args(args).expect("Failed to create context");
     let node = ctx
-        .create_node("original_node", None)
+        .z_create_node("original_node", None)
         .expect("Failed to create node");
 
     // name() should return the effective (remapped) name
-    assert_eq!(node.name().unwrap(), "remapped_node");
+    assert_eq!(node.z_name().unwrap(), "remapped_node");
 }
 
 #[test]
@@ -41,11 +41,11 @@ fn test_node_namespace_remapping_via_node_methods() {
 
     let ctx = Context::with_args(args).expect("Failed to create context");
     let node = ctx
-        .create_node("my_node", Some("/original_ns"))
+        .z_create_node("my_node", Some("/original_ns"))
         .expect("Failed to create node");
 
     // namespace() should return the effective (remapped) namespace
-    assert_eq!(node.namespace().unwrap(), "/remapped_ns");
+    assert_eq!(node.z_namespace().unwrap(), "/remapped_ns");
 }
 
 #[test]
@@ -57,12 +57,12 @@ fn test_node_fqn_with_both_remappings() {
 
     let ctx = Context::with_args(args).expect("Failed to create context");
     let node = ctx
-        .create_node("old_node", Some("/old_ns"))
+        .z_create_node("old_node", Some("/old_ns"))
         .expect("Failed to create node");
 
-    assert_eq!(node.name().unwrap(), "new_node");
-    assert_eq!(node.namespace().unwrap(), "/new_ns");
-    assert_eq!(node.fully_qualified_name().unwrap(), "/new_ns/new_node");
+    assert_eq!(node.z_name().unwrap(), "new_node");
+    assert_eq!(node.z_namespace().unwrap(), "/new_ns");
+    assert_eq!(node.z_fully_qualified_name().unwrap(), "/new_ns/new_node");
 }
 
 #[test]
@@ -71,12 +71,12 @@ fn test_node_no_remapping() {
 
     let ctx = Context::with_args(args).expect("Failed to create context");
     let node = ctx
-        .create_node("my_node", Some("/my_ns"))
+        .z_create_node("my_node", Some("/my_ns"))
         .expect("Failed to create node");
 
-    assert_eq!(node.name().unwrap(), "my_node");
-    assert_eq!(node.namespace().unwrap(), "/my_ns");
-    assert_eq!(node.fully_qualified_name().unwrap(), "/my_ns/my_node");
+    assert_eq!(node.z_name().unwrap(), "my_node");
+    assert_eq!(node.z_namespace().unwrap(), "/my_ns");
+    assert_eq!(node.z_fully_qualified_name().unwrap(), "/my_ns/my_node");
 }
 
 // ============================================================================
@@ -92,7 +92,7 @@ fn test_topic_remapping_absolute_name() {
 
     let ctx = Context::with_args(args).expect("Failed to create context");
     let node = ctx
-        .create_node("my_node", None)
+        .z_create_node("my_node", None)
         .expect("Failed to create node");
 
     let result = node
@@ -111,7 +111,7 @@ fn test_topic_remapping_relative_name() {
 
     let ctx = Context::with_args(args).expect("Failed to create context");
     let node = ctx
-        .create_node("my_node", Some("/my_ns"))
+        .z_create_node("my_node", Some("/my_ns"))
         .expect("Failed to create node");
 
     let result = node
@@ -131,7 +131,7 @@ fn test_topic_remapping_private_name() {
 
     let ctx = Context::with_args(args).expect("Failed to create context");
     let node = ctx
-        .create_node("my_node", Some("/my_ns"))
+        .z_create_node("my_node", Some("/my_ns"))
         .expect("Failed to create node");
 
     let result = node
@@ -147,7 +147,7 @@ fn test_topic_no_remapping() {
 
     let ctx = Context::with_args(args).expect("Failed to create context");
     let node = ctx
-        .create_node("my_node", Some("/my_ns"))
+        .z_create_node("my_node", Some("/my_ns"))
         .expect("Failed to create node");
 
     // Relative name expands to /my_ns/chatter
@@ -188,7 +188,7 @@ fn test_topic_node_specific_remapping() {
 
     // Create target_node - should get the remapping
     let target = ctx
-        .create_node("target_node", None)
+        .z_create_node("target_node", None)
         .expect("Failed to create node");
     let result = target
         .expand_and_remap_name("/topic_a", NameKind::Topic)
@@ -197,7 +197,7 @@ fn test_topic_node_specific_remapping() {
 
     // Create unrelated_node - should NOT get any remapping
     let unrelated = ctx
-        .create_node("unrelated_node", None)
+        .z_create_node("unrelated_node", None)
         .expect("Failed to create node");
     let result = unrelated
         .expand_and_remap_name("/topic_a", NameKind::Topic)
@@ -219,7 +219,7 @@ fn test_private_topic_uses_effective_node_name() {
 
     let ctx = Context::with_args(args).expect("Failed to create context");
     let node = ctx
-        .create_node("original_node", Some("/ns"))
+        .z_create_node("original_node", Some("/ns"))
         .expect("Failed to create node");
 
     // ~/data should expand using the effective name
@@ -244,11 +244,11 @@ fn test_topic_remapping_still_matches_original_node_name() {
 
     let ctx = Context::with_args(args).expect("Failed to create context");
     let node = ctx
-        .create_node("original_node", None)
+        .z_create_node("original_node", None)
         .expect("Failed to create node");
 
     // Node name should be remapped
-    assert_eq!(node.name().unwrap(), "renamed_node");
+    assert_eq!(node.z_name().unwrap(), "renamed_node");
 
     // But topic rule should still match (using original name for matching)
     let result = node

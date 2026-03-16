@@ -88,7 +88,7 @@ impl ParameterServer {
         // Use original name for matching node-specific parameter rules
         let ros2_args = node.context().ros2_args();
         let original_name = node.original_name();
-        let fqn = node.fully_qualified_name()?;
+        let fqn = node.z_fully_qualified_name()?;
 
         // Get parameters that apply to this node (using original name for matching)
         if let Ok(param_assignments) = ros2_args.get_params_for_node(original_name) {
@@ -119,22 +119,24 @@ impl ParameterServer {
         // The ~ prefix expands to /<namespace>/<node_name>, so the full path becomes
         // /<namespace>/<node_name>/list_parameters etc.
         let srv_list =
-            node.create_server::<ListParameters>("~/list_parameters", Some(qos.clone()))?;
+            node.z_create_server::<ListParameters>("~/list_parameters", Some(qos.clone()))?;
 
-        let srv_get = node.create_server::<GetParameters>("~/get_parameters", Some(qos.clone()))?;
+        let srv_get =
+            node.z_create_server::<GetParameters>("~/get_parameters", Some(qos.clone()))?;
 
-        let srv_set = node.create_server::<SetParameters>("~/set_parameters", Some(qos.clone()))?;
+        let srv_set =
+            node.z_create_server::<SetParameters>("~/set_parameters", Some(qos.clone()))?;
 
-        let srv_set_atomic = node.create_server::<SetParametersAtomically>(
+        let srv_set_atomic = node.z_create_server::<SetParametersAtomically>(
             "~/set_parameters_atomically",
             Some(qos.clone()),
         )?;
 
         let srv_describe =
-            node.create_server::<DescribeParameters>("~/describe_parameters", Some(qos.clone()))?;
+            node.z_create_server::<DescribeParameters>("~/describe_parameters", Some(qos.clone()))?;
 
         let srv_get_types =
-            node.create_server::<GetParameterTypes>("~/get_parameter_types", Some(qos))?;
+            node.z_create_server::<GetParameterTypes>("~/get_parameter_types", Some(qos))?;
 
         Ok(ParameterServer {
             params,
@@ -190,42 +192,42 @@ impl ParameterServer {
     /// on all parameter services.
     pub async fn process_once(&mut self) -> Result<()> {
         tokio::select! {
-            result = self.srv_list.recv() => {
+            result = self.srv_list.z_recv() => {
                 if let Ok(req) = result {
                     let response = self.handle_list_parameters(&req.request);
                     let _ = req.send(&response);
                 }
             }
 
-            result = self.srv_get.recv() => {
+            result = self.srv_get.z_recv() => {
                 if let Ok(req) = result {
                     let response = self.handle_get_parameters(&req.request);
                     let _ = req.send(&response);
                 }
             }
 
-            result = self.srv_set.recv() => {
+            result = self.srv_set.z_recv() => {
                 if let Ok(req) = result {
                     let response = self.handle_set_parameters(&req.request);
                     let _ = req.send(&response);
                 }
             }
 
-            result = self.srv_set_atomic.recv() => {
+            result = self.srv_set_atomic.z_recv() => {
                 if let Ok(req) = result {
                     let response = self.handle_set_parameters_atomically(&req.request);
                     let _ = req.send(&response);
                 }
             }
 
-            result = self.srv_describe.recv() => {
+            result = self.srv_describe.z_recv() => {
                 if let Ok(req) = result {
                     let response = self.handle_describe_parameters(&req.request);
                     let _ = req.send(&response);
                 }
             }
 
-            result = self.srv_get_types.recv() => {
+            result = self.srv_get_types.z_recv() => {
                 if let Ok(req) = result {
                     let response = self.handle_get_parameter_types(&req.request);
                     let _ = req.send(&response);
@@ -246,7 +248,7 @@ impl ParameterServer {
         let mut processed = false;
 
         // Try to receive from list_parameters
-        if let Ok(Some(req)) = self.srv_list.try_recv() {
+        if let Ok(Some(req)) = self.srv_list.z_try_recv() {
             tracing::info!("Received list_parameters request");
             let response = self.handle_list_parameters(&req.request);
             let _ = req.send(&response);
@@ -254,7 +256,7 @@ impl ParameterServer {
         }
 
         // Try to receive from get_parameters
-        if let Ok(Some(req)) = self.srv_get.try_recv() {
+        if let Ok(Some(req)) = self.srv_get.z_try_recv() {
             tracing::info!("Received get_parameters request");
             let response = self.handle_get_parameters(&req.request);
             let _ = req.send(&response);
@@ -262,28 +264,28 @@ impl ParameterServer {
         }
 
         // Try to receive from set_parameters
-        if let Ok(Some(req)) = self.srv_set.try_recv() {
+        if let Ok(Some(req)) = self.srv_set.z_try_recv() {
             let response = self.handle_set_parameters(&req.request);
             let _ = req.send(&response);
             processed = true;
         }
 
         // Try to receive from set_parameters_atomically
-        if let Ok(Some(req)) = self.srv_set_atomic.try_recv() {
+        if let Ok(Some(req)) = self.srv_set_atomic.z_try_recv() {
             let response = self.handle_set_parameters_atomically(&req.request);
             let _ = req.send(&response);
             processed = true;
         }
 
         // Try to receive from describe_parameters
-        if let Ok(Some(req)) = self.srv_describe.try_recv() {
+        if let Ok(Some(req)) = self.srv_describe.z_try_recv() {
             let response = self.handle_describe_parameters(&req.request);
             let _ = req.send(&response);
             processed = true;
         }
 
         // Try to receive from get_parameter_types
-        if let Ok(Some(req)) = self.srv_get_types.try_recv() {
+        if let Ok(Some(req)) = self.srv_get_types.z_try_recv() {
             let response = self.handle_get_parameter_types(&req.request);
             let _ = req.send(&response);
             processed = true;

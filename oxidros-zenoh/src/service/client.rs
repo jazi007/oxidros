@@ -93,8 +93,8 @@ where
             entity_id,
             EntityKind::ServiceClient,
             node.enclave(),
-            &node.namespace()?,
-            &node.name()?,
+            &node.z_namespace()?,
+            &node.z_name()?,
             fq_service_name,
             type_name,
             &type_hash,
@@ -134,7 +134,7 @@ where
     T::Response: TypeSupport,
 {
     /// Get the service name.
-    pub fn service_name(&self) -> Result<Cow<'_, String>> {
+    pub fn z_service_name(&self) -> Result<Cow<'_, String>> {
         Ok(Cow::Borrowed(&self.service_name))
     }
 
@@ -149,7 +149,7 @@ where
     }
 
     /// Check if the service is available.
-    pub fn is_service_available(&self) -> bool {
+    pub fn z_is_service_available(&self) -> bool {
         self.node
             .context()
             .graph_cache()
@@ -169,7 +169,7 @@ where
     /// - The query fails
     /// - No response is received
     /// - Deserialization fails
-    pub async fn call(&mut self, request: &T::Request) -> Result<Message<T::Response>> {
+    pub async fn z_call(&mut self, request: &T::Request) -> Result<Message<T::Response>> {
         // Serialize request
         let payload = request.to_bytes()?;
         // Increment sequence number
@@ -231,13 +231,13 @@ where
     T::Response: TypeSupport,
 {
     fn service_name(&self) -> Result<Cow<'_, String>> {
-        Self::service_name(self)
+        self.z_service_name()
     }
     fn is_service_available(&self) -> bool {
-        Self::is_service_available(self)
+        self.z_is_service_available()
     }
     async fn call(&mut self, request: &T::Request) -> Result<Message<T::Response>> {
-        Self::call(self, request).await
+        self.z_call(request).await
     }
     async fn call_with_retry(
         &mut self,
@@ -247,13 +247,13 @@ where
         use tokio::time;
 
         // Wait for service availability
-        while !Self::is_service_available(self) {
+        while !self.z_is_service_available() {
             time::sleep(std::time::Duration::from_millis(100)).await;
         }
 
         // Retry loop with timeout
         loop {
-            match time::timeout(timeout, Self::call(self, request)).await {
+            match time::timeout(timeout, Self::z_call(self, request)).await {
                 Ok(Ok(response)) => return Ok(response),
                 Ok(Err(e)) => return Err(e),
                 Err(_) => {

@@ -168,8 +168,8 @@ where
             entity_id,
             EntityKind::ServiceServer,
             node.enclave(),
-            &node.namespace()?,
-            &node.name()?,
+            &node.z_namespace()?,
+            &node.z_name()?,
             fq_service_name,
             type_name,
             &type_hash,
@@ -209,7 +209,7 @@ where
     T::Response: TypeSupport,
 {
     /// Get the service name.
-    pub fn service_name(&self) -> Result<Cow<'_, String>> {
+    pub fn z_service_name(&self) -> Result<Cow<'_, String>> {
         Ok(Cow::Borrowed(&self.service_name))
     }
 
@@ -234,7 +234,7 @@ where
     /// - Channel is closed
     /// - Request is missing attachment (protocol violation)
     /// - Request attachment is invalid
-    pub async fn recv(&mut self) -> Result<ServiceRequest<T>> {
+    pub async fn z_recv(&mut self) -> Result<ServiceRequest<T>> {
         let (query, payload, attachment_bytes) = self
             .receiver
             .recv_async()
@@ -283,7 +283,7 @@ where
     /// - Deserialization fails
     /// - Request is missing attachment (protocol violation)
     /// - Request attachment is invalid
-    pub fn try_recv(&mut self) -> Result<Option<ServiceRequest<T>>>
+    pub fn z_try_recv(&mut self) -> Result<Option<ServiceRequest<T>>>
     where
         T::Request: TypeSupport,
     {
@@ -343,15 +343,15 @@ where
     type Request = ServiceRequest<T>;
 
     fn service_name(&self) -> Result<Cow<'_, String>> {
-        Server::service_name(self)
+        self.z_service_name()
     }
 
     async fn recv(&mut self) -> Result<Self::Request> {
-        Self::recv(self).await
+        self.z_recv().await
     }
 
     fn try_recv(&mut self) -> Result<Option<Self::Request>> {
-        Self::try_recv(self)
+        self.z_try_recv()
     }
 
     async fn serve<F>(mut self, mut handler: F) -> Result<()>
@@ -360,7 +360,7 @@ where
         F: FnMut(oxidros_core::message::Message<T::Request>) -> T::Response + Send,
     {
         loop {
-            match Self::recv(&mut self).await {
+            match Self::z_recv(&mut self).await {
                 Ok(service_req) => {
                     let (sender, request) = service_req.split();
                     let response = handler(request);

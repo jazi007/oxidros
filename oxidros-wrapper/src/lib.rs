@@ -105,17 +105,17 @@ pub use oxidros_core::selector::CallbackResult;
 pub use oxidros_msg as msg;
 
 // Re-export clock from rcl
-pub use oxidros_rcl::clock::Clock;
+pub use oxidros_rcl::clock::{self, Clock};
 
 // Re-export logger from rcl
 pub use oxidros_rcl::logger;
 
 // Re-export parameter types
-pub use oxidros_rcl::parameter::ParameterServer;
+pub use oxidros_rcl::parameter::{self, ParameterServer};
 
 // Re-export action types
 use oxidros_msg::interfaces::action_msgs::msg::GoalInfo;
-pub use oxidros_rcl::action;
+pub use oxidros_rcl::{action, service, topic};
 
 // ============================================================================
 // Newtype Wrappers

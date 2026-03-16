@@ -11,7 +11,7 @@ use std::time::Duration;
 fn test_parameter_storage_direct() {
     let ctx = Context::new().expect("Failed to create context");
     let node = Arc::new(
-        ctx.create_node("param_test_node", None)
+        ctx.z_create_node("param_test_node", None)
             .expect("Failed to create node"),
     );
 
@@ -75,7 +75,7 @@ fn test_parameter_storage_direct() {
 fn test_parameter_update_tracking() {
     let ctx = Context::new().expect("Failed to create context");
     let node = Arc::new(
-        ctx.create_node("param_update_node", None)
+        ctx.z_create_node("param_update_node", None)
             .expect("Failed to create node"),
     );
 
@@ -134,7 +134,7 @@ fn test_parameter_server_with_selector_callback() {
 
     let ctx = Context::new().expect("Failed to create context");
     let node = Arc::new(
-        ctx.create_node("selector_param_node", None)
+        ctx.z_create_node("selector_param_node", None)
             .expect("Failed to create node"),
     );
 
@@ -154,10 +154,10 @@ fn test_parameter_server_with_selector_callback() {
     let callback_called = Arc::new(AtomicBool::new(false));
     let callback_called_clone = callback_called.clone();
 
-    let mut selector = ctx.create_selector();
+    let mut selector = ctx.z_create_selector();
 
     // Add parameter server with callback
-    selector.add_parameter_server(
+    selector.z_add_parameter_server(
         param_server,
         Box::new(
             move |_params: &mut oxidros_core::parameter::Parameters,
@@ -171,7 +171,7 @@ fn test_parameter_server_with_selector_callback() {
 
     // Wait briefly - parameter was set before adding to selector, so updated set
     // should be consumed in the first poll
-    let _ = selector.wait_timeout(Duration::from_millis(50));
+    let _ = selector.z_wait_timeout(Duration::from_millis(50));
 
     // The callback should have been called (initial parameter was in updated set)
     assert!(
@@ -185,7 +185,7 @@ fn test_parameter_server_with_selector_callback() {
 fn test_parameter_array_types() {
     let ctx = Context::new().expect("Failed to create context");
     let node = Arc::new(
-        ctx.create_node("array_param_node", None)
+        ctx.z_create_node("array_param_node", None)
             .expect("Failed to create node"),
     );
 
@@ -268,7 +268,7 @@ fn test_parameter_array_types() {
 fn test_read_only_parameter() {
     let ctx = Context::new().expect("Failed to create context");
     let node = Arc::new(
-        ctx.create_node("readonly_param_node", None)
+        ctx.z_create_node("readonly_param_node", None)
             .expect("Failed to create node"),
     );
 
@@ -319,7 +319,7 @@ async fn test_parameter_service_get_set() {
 
     let ctx = Context::new().expect("Failed to create context");
     let node = Arc::new(
-        ctx.create_node("param_svc_node", None)
+        ctx.z_create_node("param_svc_node", None)
             .expect("Failed to create node"),
     );
 
@@ -339,7 +339,7 @@ async fn test_parameter_service_get_set() {
     use oxidros_msg::interfaces::rcl_interfaces::srv::list_parameters::ListParameters;
 
     let mut list_client = node
-        .create_client::<ListParameters>("/param_svc_node/list_parameters", None)
+        .z_create_client::<ListParameters>("/param_svc_node/list_parameters", None)
         .expect("Failed to create list_parameters client");
 
     // Counter for processed requests
@@ -378,7 +378,7 @@ async fn test_parameter_service_get_set() {
     let list_request =
         <ListParameters as oxidros_core::ServiceMsg>::Request::new().unwrap_or_default();
 
-    let list_result = timeout(Duration::from_secs(3), list_client.call(&list_request)).await;
+    let list_result = timeout(Duration::from_secs(3), list_client.z_call(&list_request)).await;
     match list_result {
         Ok(Ok(response)) => {
             println!("list_parameters response received!");

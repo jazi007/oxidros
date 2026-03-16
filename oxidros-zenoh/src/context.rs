@@ -222,7 +222,11 @@ impl Context {
     /// # Errors
     ///
     /// Returns an error if the name or namespace is invalid.
-    pub fn create_node(self: &Arc<Self>, name: &str, namespace: Option<&str>) -> Result<Arc<Node>> {
+    pub fn z_create_node(
+        self: &Arc<Self>,
+        name: &str,
+        namespace: Option<&str>,
+    ) -> Result<Arc<Node>> {
         // Get enclave from ROS2 args
         let enclave = self.inner.ros2_args.enclave.as_deref().unwrap_or("");
 
@@ -247,7 +251,7 @@ impl Context {
     ///
     /// The selector is used to wait on events and invoke callbacks
     /// for single-threaded execution.
-    pub fn create_selector(&self) -> crate::selector::Selector {
+    pub fn z_create_selector(&self) -> crate::selector::Selector {
         crate::selector::Selector::new()
     }
 
@@ -302,11 +306,11 @@ impl oxidros_core::api::RosContext for Context {
         name: &str,
         namespace: Option<&str>,
     ) -> crate::error::Result<Arc<Self::Node>> {
-        Self::create_node(self, name, namespace)
+        self.z_create_node(name, namespace)
     }
 
     fn create_selector(self: &Arc<Self>) -> crate::error::Result<Self::Selector> {
-        Ok(crate::selector::Selector::new())
+        Ok(self.z_create_selector())
     }
 
     fn ros_domain_id(&self) -> u32 {

@@ -119,8 +119,8 @@ impl<T: TypeSupport> Publisher<T> {
             entity_id,
             entity_kind,
             node.enclave(),
-            &node.namespace()?,
-            &node.name()?,
+            &node.z_namespace()?,
+            &node.z_name()?,
             fq_topic_name,
             type_name,
             &type_hash,
@@ -151,7 +151,7 @@ impl<T: TypeSupport> Publisher<T> {
 
 impl<T: TypeSupport> Publisher<T> {
     /// Get the topic name.
-    pub fn topic_name(&self) -> Result<Cow<'_, String>> {
+    pub fn z_topic_name(&self) -> Result<Cow<'_, String>> {
         Ok(Cow::Borrowed(&self.topic_name))
     }
 
@@ -184,7 +184,7 @@ impl<T: TypeSupport> Publisher<T> {
     /// # Errors
     ///
     /// Returns an error if serialization fails or the Zenoh put fails.
-    pub fn send(&self, msg: &T) -> Result<()> {
+    pub fn z_send(&self, msg: &T) -> Result<()> {
         let start = std::time::Instant::now();
         // Serialize message to CDR
         let payload = msg.to_bytes()?;
@@ -208,7 +208,7 @@ impl<T: TypeSupport> Publisher<T> {
     /// This function is marked unsafe as the user is reponsable for CDR serialization
     ///
     #[allow(unsafe_code)]
-    pub unsafe fn send_raw(&self, msg: &[u8]) -> Result<()> {
+    pub unsafe fn z_send_raw(&self, msg: &[u8]) -> Result<()> {
         // Serialize message to CDR
         use oxidros_core::CdrSerde;
         let payload = msg.to_vec().serialize()?;
@@ -226,11 +226,11 @@ impl<T: TypeSupport> Publisher<T> {
 
 impl<T: TypeSupport> oxidros_core::api::RosPublisher<T> for Publisher<T> {
     fn topic_name(&self) -> Result<Cow<'_, String>> {
-        Publisher::topic_name(self)
+        self.z_topic_name()
     }
 
     fn send(&self, msg: &T) -> crate::error::Result<()> {
-        Self::send(self, msg)
+        self.z_send(msg)
     }
 
     fn send_raw(&self, data: &[u8]) -> crate::error::Result<()> {

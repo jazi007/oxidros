@@ -209,13 +209,10 @@ pub use oxidros_wrapper::{self, Clock, ParameterServer, action, logger};
 
 // Also re-export oxidros-rcl submodules for advanced/low-level access
 #[cfg(feature = "rcl")]
-#[cfg(not(feature = "zenoh"))]
-pub use oxidros_rcl::{clock, parameter, service, topic};
+pub use oxidros_wrapper::{clock, parameter, service, topic};
 
-// Zenoh backend - used when:
-// 1. Explicit `zenoh` feature is enabled, OR
-// 2. `rcl` feature is NOT enabled (includes `auto` without ROS2 distro feature)
-#[cfg(any(feature = "zenoh", not(feature = "rcl")))]
+// Zenoh backend - used when `zenoh` feature is enabled
+#[cfg(feature = "zenoh")]
 pub use oxidros_zenoh::{self, clock, logger, parameter, service, topic};
 
 // Always re-export core types and traits
