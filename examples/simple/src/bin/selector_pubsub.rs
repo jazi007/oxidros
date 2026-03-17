@@ -8,7 +8,7 @@
 //! ```
 
 use oxidros::error::Result;
-use oxidros::oxidros_msg::common_interfaces::std_msgs;
+use oxidros::msg::common_interfaces::std_msgs;
 use oxidros::prelude::*;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};

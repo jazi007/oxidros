@@ -1,6 +1,6 @@
 use oxidros::{
     error::Result,
-    oxidros_msg::common_interfaces::example_interfaces::srv::{AddTwoInts, AddTwoInts_Response},
+    msg::common_interfaces::example_interfaces::srv::{AddTwoInts, AddTwoInts_Response},
     prelude::*,
 };
 

@@ -1,4 +1,4 @@
-use oxidros::oxidros_msg::common_interfaces::std_msgs::msg::String;
+use oxidros::msg::common_interfaces::std_msgs::msg::String;
 use oxidros::{error::Result, prelude::*};
 
 #[tokio::main]

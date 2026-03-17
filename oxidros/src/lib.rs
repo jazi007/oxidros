@@ -201,25 +201,20 @@ compile_error!("Features `rcl` and `zenoh` are mutually exclusive. Choose one ba
 // Prelude module for convenient imports
 pub mod prelude;
 
-// Re-export the selected backend (explicit feature or auto-detected)
-// RCL backend - use oxidros-wrapper which implements core API traits on top of oxidros-rcl
-#[cfg(feature = "rcl")]
-#[cfg(not(feature = "zenoh"))]
-pub use oxidros_wrapper::{self, Clock, ParameterServer, action, logger};
+// Explicit modules that re-export types uniformly regardless of backend
+pub mod clock;
+pub mod logger;
+pub mod parameter;
+pub mod service;
+pub mod topic;
 
-// Also re-export oxidros-rcl submodules for advanced/low-level access
-#[cfg(feature = "rcl")]
-pub use oxidros_wrapper::{clock, parameter, service, topic};
+// Re-export core types and traits (common to both backends)
+pub use oxidros_core as core;
+pub use oxidros_core::error;
 
-// Zenoh backend - used when `zenoh` feature is enabled
-#[cfg(feature = "zenoh")]
-pub use oxidros_zenoh::{self, clock, logger, parameter, service, topic};
+// Re-export message types (common to both backends)
+pub use oxidros_msg as msg;
 
-// Always re-export core types and traits
-pub use oxidros_core::{self, error};
-
-// Re-export message types
-pub use oxidros_msg::{self, msg};
 pub mod qos {
     pub use oxidros_core::qos::*;
 }

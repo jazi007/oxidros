@@ -13,7 +13,7 @@
 //! ```
 
 use oxidros::error::Result;
-use oxidros::oxidros_msg::common_interfaces::example_interfaces;
+use oxidros::msg::common_interfaces::example_interfaces;
 use oxidros::prelude::*;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};

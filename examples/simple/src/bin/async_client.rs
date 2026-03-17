@@ -1,9 +1,7 @@
 use std::{sync::atomic::AtomicUsize, time::Duration};
 
 use oxidros::error::Result;
-use oxidros::oxidros_msg::common_interfaces::example_interfaces::srv::{
-    AddTwoInts, AddTwoInts_Request,
-};
+use oxidros::msg::common_interfaces::example_interfaces::srv::{AddTwoInts, AddTwoInts_Request};
 use oxidros::prelude::*;
 
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
