@@ -1777,7 +1777,7 @@ dependencies = [
 
 [[package]]
 name = "oxidros-rcl"
-version = "0.5.0"
+version = "0.5.4"
 dependencies = [
  "crossbeam-channel",
  "futures-util",
@@ -1802,7 +1802,7 @@ dependencies = [
 
 [[package]]
 name = "oxidros-wrapper"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "futures-core",
  "futures-util",
