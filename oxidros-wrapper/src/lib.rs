@@ -185,22 +185,22 @@ impl Deref for Node {
 }
 
 /// A ROS2 publisher wrapper implementing [`RosPublisher`].
-pub struct Publisher<T: TypeSupport>(pub oxidros_rcl::topic::publisher::Publisher<T>);
+pub struct Publisher<T>(pub oxidros_rcl::topic::publisher::Publisher<T>);
 
-impl<T: TypeSupport> std::fmt::Debug for Publisher<T> {
+impl<T> std::fmt::Debug for Publisher<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Publisher").finish_non_exhaustive()
     }
 }
 
-impl<T: TypeSupport> Publisher<T> {
+impl<T> Publisher<T> {
     /// Get the inner RCL publisher.
     pub fn inner(&self) -> &oxidros_rcl::topic::publisher::Publisher<T> {
         &self.0
     }
 }
 
-impl<T: TypeSupport> Deref for Publisher<T> {
+impl<T> Deref for Publisher<T> {
     type Target = oxidros_rcl::topic::publisher::Publisher<T>;
 
     fn deref(&self) -> &Self::Target {
@@ -209,22 +209,22 @@ impl<T: TypeSupport> Deref for Publisher<T> {
 }
 
 /// A ROS2 subscriber wrapper implementing [`RosSubscriber`].
-pub struct Subscriber<T: TypeSupport>(pub oxidros_rcl::topic::subscriber::Subscriber<T>);
+pub struct Subscriber<T>(pub oxidros_rcl::topic::subscriber::Subscriber<T>);
 
-impl<T: TypeSupport> std::fmt::Debug for Subscriber<T> {
+impl<T> std::fmt::Debug for Subscriber<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Subscriber").finish_non_exhaustive()
     }
 }
 
-impl<T: TypeSupport> Subscriber<T> {
+impl<T> Subscriber<T> {
     /// Get the inner RCL subscriber.
     pub fn inner(&self) -> &oxidros_rcl::topic::subscriber::Subscriber<T> {
         &self.0
     }
 }
 
-impl<T: TypeSupport> Deref for Subscriber<T> {
+impl<T> Deref for Subscriber<T> {
     type Target = oxidros_rcl::topic::subscriber::Subscriber<T>;
 
     fn deref(&self) -> &Self::Target {
@@ -232,29 +232,29 @@ impl<T: TypeSupport> Deref for Subscriber<T> {
     }
 }
 
-impl<T: TypeSupport> DerefMut for Subscriber<T> {
+impl<T> DerefMut for Subscriber<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
 /// A ROS2 service client wrapper implementing [`RosClient`].
-pub struct Client<T: ServiceMsg>(pub oxidros_rcl::service::client::Client<T>);
+pub struct Client<T>(pub oxidros_rcl::service::client::Client<T>);
 
-impl<T: ServiceMsg> std::fmt::Debug for Client<T> {
+impl<T> std::fmt::Debug for Client<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Client").finish_non_exhaustive()
     }
 }
 
-impl<T: ServiceMsg> Client<T> {
+impl<T> Client<T> {
     /// Get the inner RCL client.
     pub fn inner(&self) -> &oxidros_rcl::service::client::Client<T> {
         &self.0
     }
 }
 
-impl<T: ServiceMsg> Deref for Client<T> {
+impl<T> Deref for Client<T> {
     type Target = oxidros_rcl::service::client::Client<T>;
 
     fn deref(&self) -> &Self::Target {
@@ -262,29 +262,29 @@ impl<T: ServiceMsg> Deref for Client<T> {
     }
 }
 
-impl<T: ServiceMsg> DerefMut for Client<T> {
+impl<T> DerefMut for Client<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
 /// A ROS2 service server wrapper implementing [`RosServer`].
-pub struct Server<T: ServiceMsg>(pub oxidros_rcl::service::server::Server<T>);
+pub struct Server<T>(pub oxidros_rcl::service::server::Server<T>);
 
-impl<T: ServiceMsg> std::fmt::Debug for Server<T> {
+impl<T> std::fmt::Debug for Server<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Server").finish_non_exhaustive()
     }
 }
 
-impl<T: ServiceMsg> Server<T> {
+impl<T> Server<T> {
     /// Get the inner RCL server.
     pub fn inner(&self) -> &oxidros_rcl::service::server::Server<T> {
         &self.0
     }
 }
 
-impl<T: ServiceMsg> Deref for Server<T> {
+impl<T> Deref for Server<T> {
     type Target = oxidros_rcl::service::server::Server<T>;
 
     fn deref(&self) -> &Self::Target {
@@ -292,7 +292,7 @@ impl<T: ServiceMsg> Deref for Server<T> {
     }
 }
 
-impl<T: ServiceMsg> DerefMut for Server<T> {
+impl<T> DerefMut for Server<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }

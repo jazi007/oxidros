@@ -83,7 +83,7 @@ unsafe impl Sync for ClientData {}
 unsafe impl Send for ClientData {}
 
 /// Client.
-pub struct Client<T: ServiceMsg> {
+pub struct Client<T> {
     pub(crate) data: Arc<ClientData>,
     _phantom: PhantomData<T>,
 }
