@@ -614,6 +614,29 @@ where
             }
         }
     }
+
+    async fn serve_async<F, Fut>(mut self, mut handler: F) -> Result<()>
+    where
+        Self: Sized,
+        F: FnMut(Message<T::Request>) -> Fut + Send,
+        Fut: std::future::Future<Output = T::Response> + Send,
+    {
+        loop {
+            match self.0.recv().await {
+                Ok(service_req) => {
+                    let (sender, request) = service_req.split();
+                    let response = handler(request).await;
+                    if let Err(e) = sender.send(&response) {
+                        tracing::error!("Failed to send response: {:?}", e);
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Error receiving request: {:?}", e);
+                    return Err(e);
+                }
+            }
+        }
+    }
 }
 
 impl RosSelector for Selector {

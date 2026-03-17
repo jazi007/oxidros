@@ -360,10 +360,33 @@ where
         F: FnMut(oxidros_core::message::Message<T::Request>) -> T::Response + Send,
     {
         loop {
-            match Self::z_recv(&mut self).await {
+            match self.z_recv().await {
                 Ok(service_req) => {
                     let (sender, request) = service_req.split();
                     let response = handler(request);
+                    if let Err(e) = sender.send(&response) {
+                        tracing::error!("Failed to send response: {:?}", e);
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Error receiving request: {:?}", e);
+                    return Err(e);
+                }
+            }
+        }
+    }
+
+    async fn serve_async<F, Fut>(mut self, mut handler: F) -> Result<()>
+    where
+        Self: Sized,
+        F: FnMut(oxidros_core::message::Message<T::Request>) -> Fut + Send,
+        Fut: std::future::Future<Output = T::Response> + Send,
+    {
+        loop {
+            match Self::z_recv(&mut self).await {
+                Ok(service_req) => {
+                    let (sender, request) = service_req.split();
+                    let response = handler(request).await;
                     if let Err(e) = sender.send(&response) {
                         tracing::error!("Failed to send response: {:?}", e);
                     }

@@ -336,6 +336,28 @@ pub trait RosServer<T: ServiceMsg>: Send {
     where
         Self: Sized,
         F: FnMut(Message<T::Request>) -> T::Response + Send;
+
+    /// Run a serving loop with an async handler.
+    ///
+    /// Like [`serve`](RosServer::serve), but the handler returns a future,
+    /// allowing async work (e.g. calling another service) while processing each request.
+    ///
+    /// # Arguments
+    ///
+    /// * `handler` - An async function that takes a request and returns a response
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if the server shuts down gracefully, or an error if
+    /// receiving or sending fails.
+    fn serve_async<F, Fut>(
+        self,
+        handler: F,
+    ) -> impl std::future::Future<Output = Result<()>> + Send
+    where
+        Self: Sized,
+        F: FnMut(Message<T::Request>) -> Fut + Send,
+        Fut: std::future::Future<Output = T::Response> + Send;
 }
 
 // ============================================================================
