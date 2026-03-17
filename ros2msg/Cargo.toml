@@ -1,6 +1,6 @@
 [package]
 name = "ros2msg"
-version.workspace = true
+version = "0.5.3"
 edition.workspace = true
 authors.workspace = true
 license-file.workspace = true
