@@ -1751,7 +1751,7 @@ dependencies = [
 
 [[package]]
 name = "oxidros-core"
-version = "0.5.0"
+version = "0.5.5"
 dependencies = [
  "futures-core",
  "num-traits",
@@ -1777,7 +1777,7 @@ dependencies = [
 
 [[package]]
 name = "oxidros-rcl"
-version = "0.5.4"
+version = "0.5.5"
 dependencies = [
  "crossbeam-channel",
  "futures-util",
@@ -1802,7 +1802,7 @@ dependencies = [
 
 [[package]]
 name = "oxidros-wrapper"
-version = "0.5.4"
+version = "0.5.5"
 dependencies = [
  "futures-core",
  "futures-util",
@@ -1817,7 +1817,7 @@ dependencies = [
 
 [[package]]
 name = "oxidros-zenoh"
-version = "0.5.3"
+version = "0.5.5"
 dependencies = [
  "flume 0.12.0",
  "futures-core",
