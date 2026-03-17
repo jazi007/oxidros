@@ -39,12 +39,19 @@ pub use oxidros_core::selector::CallbackResult;
 pub use oxidros_core::{Parameter, Value};
 
 // Backend-specific types from our own modules
+#[cfg(any(feature = "rcl", feature = "zenoh"))]
 pub use crate::clock::Clock;
+#[cfg(any(feature = "rcl", feature = "zenoh"))]
 pub use crate::logger::init_ros_logging;
+#[cfg(any(feature = "rcl", feature = "zenoh"))]
 pub use crate::parameter::ParameterServer;
+#[cfg(any(feature = "rcl", feature = "zenoh"))]
 pub use crate::service::client::Client;
+#[cfg(any(feature = "rcl", feature = "zenoh"))]
 pub use crate::service::server::Server;
+#[cfg(any(feature = "rcl", feature = "zenoh"))]
 pub use crate::topic::publisher::Publisher;
+#[cfg(any(feature = "rcl", feature = "zenoh"))]
 pub use crate::topic::subscriber::Subscriber;
 
 // Context, Node, Selector come from the backend
