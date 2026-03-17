@@ -383,7 +383,7 @@ where
         Fut: std::future::Future<Output = T::Response> + Send,
     {
         loop {
-            match Self::z_recv(&mut self).await {
+            match self.z_recv().await {
                 Ok(service_req) => {
                     let (sender, request) = service_req.split();
                     let response = handler(request).await;
