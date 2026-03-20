@@ -93,7 +93,7 @@ impl ParameterServer {
         // Get parameters that apply to this node (using original name for matching)
         if let Ok(param_assignments) = ros2_args.get_params_for_node(original_name) {
             for param in param_assignments {
-                if let Some(value) = yaml_to_value(&param.value) {
+                if let Ok(value) = Value::try_from(&param.value) {
                     let _ = params.set_parameter(param.name.clone(), value, false, None);
                 }
             }
@@ -102,7 +102,7 @@ impl ParameterServer {
         // Also check with FQN (some params might be specified with full path)
         if let Ok(param_assignments) = ros2_args.get_params_for_node(&fqn) {
             for param in param_assignments {
-                if let Some(value) = yaml_to_value(&param.value) {
+                if let Ok(value) = Value::try_from(&param.value) {
                     let _ = params.set_parameter(param.name.clone(), value, false, None);
                 }
             }
@@ -480,45 +480,6 @@ impl ParameterServer {
 }
 
 // --- Helper functions ---
-
-/// Convert YAML value to oxidros_core Value.
-fn yaml_to_value(yaml: &yaml_rust2::Yaml) -> Option<Value> {
-    use yaml_rust2::Yaml;
-    match yaml {
-        Yaml::Boolean(b) => Some(Value::Bool(*b)),
-        Yaml::Integer(i) => Some(Value::I64(*i)),
-        Yaml::Real(s) => s.parse::<f64>().ok().map(Value::F64),
-        Yaml::String(s) => Some(Value::String(s.clone())),
-        Yaml::Array(arr) => {
-            // Try to determine array type from first element
-            if let Some(first) = arr.first() {
-                match first {
-                    Yaml::Boolean(_) => {
-                        let vals: Option<Vec<_>> = arr.iter().map(|v| v.as_bool()).collect();
-                        vals.map(Value::VecBool)
-                    }
-                    Yaml::Integer(_) => {
-                        let vals: Option<Vec<_>> = arr.iter().map(|v| v.as_i64()).collect();
-                        vals.map(Value::VecI64)
-                    }
-                    Yaml::Real(_) => {
-                        let vals: Option<Vec<_>> = arr.iter().map(|v| v.as_f64()).collect();
-                        vals.map(Value::VecF64)
-                    }
-                    Yaml::String(_) => {
-                        let vals: Option<Vec<_>> =
-                            arr.iter().map(|v| v.as_str().map(String::from)).collect();
-                        vals.map(Value::VecString)
-                    }
-                    _ => None,
-                }
-            } else {
-                Some(Value::VecI64(vec![]))
-            }
-        }
-        _ => None,
-    }
-}
 
 /// Convert oxidros_core Value to ParameterValue message.
 fn value_to_parameter_value(value: &Value) -> ParameterValue {

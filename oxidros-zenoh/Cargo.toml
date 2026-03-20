@@ -18,12 +18,11 @@ tokio = { workspace = true, features = ["time", "rt"] }
 flume = "0.12"
 serde_json.workspace = true
 parking_lot.workspace = true
-yaml-rust2.workspace = true
 uuid = { version = "1", features = ["v4"] }
 futures-core = "0.3"
 
 # Oxidros workspace crates
-oxidros-core = { version = "0.5.0", path = "../oxidros-core" }
+oxidros-core = { version = "0.5.0", path = "../oxidros-core", features = ["yaml"] }
 ros2args = { version = "0.5.1", path = "../ros2args" }
 
 # Optional: ROS2 message types (requires AMENT_PREFIX_PATH for building)

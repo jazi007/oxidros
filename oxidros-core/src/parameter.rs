@@ -451,3 +451,52 @@ impl Parameters {
         }
     }
 }
+
+#[cfg(feature = "yaml")]
+impl TryFrom<&yaml_rust2::Yaml> for Value {
+    type Error = crate::error::Error;
+
+    fn try_from(yaml: &yaml_rust2::Yaml) -> std::result::Result<Self, Self::Error> {
+        use yaml_rust2::Yaml;
+        match yaml {
+            Yaml::Boolean(b) => Ok(Value::Bool(*b)),
+            Yaml::Integer(i) => Ok(Value::I64(*i)),
+            Yaml::Real(s) => s
+                .parse::<f64>()
+                .map(Value::F64)
+                .map_err(|e| format!("invalid float: {e}").into()),
+            Yaml::String(s) => Ok(Value::String(s.clone())),
+            Yaml::Array(arr) => {
+                if let Some(first) = arr.first() {
+                    match first {
+                        Yaml::Boolean(_) => {
+                            let vals: Option<Vec<_>> = arr.iter().map(|v| v.as_bool()).collect();
+                            vals.map(Value::VecBool)
+                                .ok_or_else(|| "mixed types in boolean array".into())
+                        }
+                        Yaml::Integer(_) => {
+                            let vals: Option<Vec<_>> = arr.iter().map(|v| v.as_i64()).collect();
+                            vals.map(Value::VecI64)
+                                .ok_or_else(|| "mixed types in integer array".into())
+                        }
+                        Yaml::Real(_) => {
+                            let vals: Option<Vec<_>> = arr.iter().map(|v| v.as_f64()).collect();
+                            vals.map(Value::VecF64)
+                                .ok_or_else(|| "mixed types in float array".into())
+                        }
+                        Yaml::String(_) => {
+                            let vals: Option<Vec<_>> =
+                                arr.iter().map(|v| v.as_str().map(String::from)).collect();
+                            vals.map(Value::VecString)
+                                .ok_or_else(|| "mixed types in string array".into())
+                        }
+                        _ => Err("unsupported array element type".into()),
+                    }
+                } else {
+                    Ok(Value::VecI64(vec![]))
+                }
+            }
+            _ => Err("unsupported YAML type".into()),
+        }
+    }
+}

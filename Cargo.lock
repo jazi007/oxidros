@@ -1759,6 +1759,7 @@ dependencies = [
  "ros2-types",
  "thiserror 2.0.17",
  "tracing",
+ "yaml-rust2",
 ]
 
 [[package]]
@@ -1834,7 +1835,6 @@ dependencies = [
  "tracing-log",
  "tracing-subscriber",
  "uuid",
- "yaml-rust2",
  "zenoh",
  "zenoh-ext",
 ]
