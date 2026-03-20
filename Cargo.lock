@@ -1730,7 +1730,7 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
 name = "oxidros"
-version = "0.5.4"
+version = "0.5.6"
 dependencies = [
  "oxidros-build",
  "oxidros-core",
@@ -1751,7 +1751,7 @@ dependencies = [
 
 [[package]]
 name = "oxidros-core"
-version = "0.5.5"
+version = "0.5.6"
 dependencies = [
  "futures-core",
  "num-traits",
@@ -1818,7 +1818,7 @@ dependencies = [
 
 [[package]]
 name = "oxidros-zenoh"
-version = "0.5.5"
+version = "0.5.6"
 dependencies = [
  "flume 0.12.0",
  "futures-core",

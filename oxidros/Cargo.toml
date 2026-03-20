@@ -1,6 +1,6 @@
 [package]
 name = "oxidros"
-version = "0.5.4"
+version = "0.5.6"
 description = "A safe, idiomatic Rust client library for ROS 2"
 edition.workspace = true
 authors.workspace = true
