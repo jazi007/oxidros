@@ -389,6 +389,26 @@ impl Ros2Args {
         Ok(params)
     }
 
+    /// Get all parameter assignments regardless of node name
+    ///
+    /// This includes both command-line parameter assignments and parameters from YAML files,
+    /// without filtering by node. Each `ParamAssignment` retains its `node_name` field so
+    /// callers can inspect which node a parameter targets (or `None` for global params).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any parameter file cannot be read or parsed.
+    pub fn get_all_params(&self) -> crate::Ros2ArgsResult<Vec<ParamAssignment>> {
+        let mut params: Vec<ParamAssignment> = self.param_assignments.clone();
+
+        for param_file in &self.param_files {
+            let file_params = crate::param_file::parse_param_file(param_file)?;
+            params.extend(file_params);
+        }
+
+        Ok(params)
+    }
+
     /// Merge another `Ros2Args` into this one
     pub fn merge(&mut self, other: Ros2Args) {
         self.remap_rules.extend(other.remap_rules);

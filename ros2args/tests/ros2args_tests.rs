@@ -451,6 +451,82 @@ node2:
     assert!(param_names.contains(&"yaml_param3"));
 }
 
+#[test]
+fn test_get_all_params() {
+    let args = vec![
+        "program".to_string(),
+        "--ros-args".to_string(),
+        "-p".to_string(),
+        "global_param:=1".to_string(),
+        "-p".to_string(),
+        "node1:specific_param:=2".to_string(),
+        "-p".to_string(),
+        "node2:other_param:=3".to_string(),
+    ];
+
+    let (ros_args, _) = parse_ros2_args(&args).unwrap();
+
+    let all_params = ros_args.get_all_params().unwrap();
+    assert_eq!(all_params.len(), 3);
+
+    let names: Vec<_> = all_params.iter().map(|p| p.name.as_str()).collect();
+    assert!(names.contains(&"global_param"));
+    assert!(names.contains(&"specific_param"));
+    assert!(names.contains(&"other_param"));
+
+    // global_param has no node name
+    let global = all_params
+        .iter()
+        .find(|p| p.name == "global_param")
+        .unwrap();
+    assert_eq!(global.node_name, None);
+
+    // node-specific params retain their node_name
+    let node1 = all_params
+        .iter()
+        .find(|p| p.name == "specific_param")
+        .unwrap();
+    assert_eq!(node1.node_name, Some("node1".to_string()));
+}
+
+#[test]
+fn test_get_all_params_with_yaml_file() {
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    let yaml_content = r#"
+node1:
+  ros__parameters:
+    yaml_param1: 100
+node2:
+  ros__parameters:
+    yaml_param2: "hello"
+"#;
+
+    let mut temp_file = NamedTempFile::new().unwrap();
+    temp_file.write_all(yaml_content.as_bytes()).unwrap();
+    temp_file.flush().unwrap();
+
+    let args = vec![
+        "program".to_string(),
+        "--ros-args".to_string(),
+        "-p".to_string(),
+        "global_param:=1".to_string(),
+        "--params-file".to_string(),
+        temp_file.path().to_str().unwrap().to_string(),
+    ];
+
+    let (ros_args, _) = parse_ros2_args(&args).unwrap();
+
+    let all_params = ros_args.get_all_params().unwrap();
+    assert_eq!(all_params.len(), 3); // global_param + yaml_param1 + yaml_param2
+
+    let names: Vec<_> = all_params.iter().map(|p| p.name.as_str()).collect();
+    assert!(names.contains(&"global_param"));
+    assert!(names.contains(&"yaml_param1"));
+    assert!(names.contains(&"yaml_param2"));
+}
+
 // Parameter file tests
 
 #[test]
