@@ -339,16 +339,6 @@ pub fn get_base_generator(config: &Config) -> Option<Generator> {
                         .unwrap_or("")
                         .to_string();
 
-                    // Skip ament-specific directories and non-package directories
-                    if pkg_name.starts_with("ament_")
-                        || pkg_name.starts_with("ros2")
-                        || pkg_name == "cmake"
-                        || pkg_name == "colcon-core"
-                        || pkg_name.is_empty()
-                    {
-                        continue;
-                    }
-
                     // Filter by requested packages if specified
                     if !packages_filter.is_empty()
                         && !packages_filter.iter().any(|p| p == &pkg_name)
