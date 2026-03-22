@@ -14,4 +14,3 @@ serde-big-array = "0.5"
 ros2msg = { path = "../../ros2msg", features = ["serde"] }
 ros2-types = { path = "../../ros2-types" }
 heck = "0.5"
-

@@ -9,5 +9,7 @@ license-file.workspace = true
 
 [dependencies]
 bindgen = "0.72"
-ros2-types = { version = "0.5.1", path = "../ros2-types", features = ["derive"] }
+ros2-types = { version = "0.5.1", path = "../ros2-types", features = [
+    "derive",
+] }
 ros2msg = { version = "0.5.1", path = "../ros2msg" }
