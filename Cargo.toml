@@ -7,6 +7,8 @@ members = [
     "oxidros-wrapper",
     "oxidros-build",
     "oxidros",
+    "oxidros-cli",
+    "oxidros-dynamic",
     "ros2-types-derive",
     "ros2-types",
     "ros2args",

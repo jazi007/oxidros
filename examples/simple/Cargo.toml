@@ -9,6 +9,8 @@ publish = false
 
 [features]
 default = []
+rcl = ["oxidros/rcl"]
+zenoh = ["oxidros/zenoh"]
 
 [dependencies]
 oxidros = { path = "../../oxidros/" }

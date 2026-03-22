@@ -237,6 +237,19 @@ pub trait RosSubscriber<T: TypeSupport>: Send {
     /// Returns an error if deserialization fails or the subscription is closed.
     fn try_recv(&mut self) -> Result<Option<Message<T>>>;
 
+    /// Receive a raw CDR-encoded message asynchronously without deserializing.
+    ///
+    /// Returns the raw CDR bytes (including encapsulation header) and message metadata.
+    /// Useful for message forwarding, recording, and dynamic decoding scenarios.
+    fn recv_raw(
+        &mut self,
+    ) -> impl std::future::Future<Output = Result<(Vec<u8>, crate::message::MessageInfo)>> + Send;
+
+    /// Try to receive a raw CDR-encoded message without blocking or deserializing.
+    ///
+    /// Returns `Ok(None)` if no message is currently available.
+    fn try_recv_raw(&mut self) -> Result<Option<(Vec<u8>, crate::message::MessageInfo)>>;
+
     /// Receive up to `limit` messages without blocking.
     ///
     /// Returns immediately with available messages, up to `limit`.
