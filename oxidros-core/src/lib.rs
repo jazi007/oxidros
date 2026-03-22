@@ -17,6 +17,9 @@ pub mod selector;
 pub mod time;
 pub mod tracing;
 
+#[cfg(feature = "logging")]
+pub mod logging;
+
 // Re-export commonly used error types
 pub use error::{ActionError, Error, RclError, Result};
 

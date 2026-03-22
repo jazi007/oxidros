@@ -23,16 +23,9 @@
 //! log::info!("This also works!");
 //! ```
 
-use std::sync::OnceLock;
+use oxidros_core::logging::LoggingBuilder;
 use tracing::Subscriber;
-use tracing_subscriber::{
-    EnvFilter, Layer,
-    fmt::{self, format::FmtSpan},
-    layer::SubscriberExt,
-    util::SubscriberInitExt,
-};
-
-static LOGGER_INITIALIZED: OnceLock<()> = OnceLock::new();
+use tracing_subscriber::Layer;
 
 /// Initialize ROS2 logging with tracing integration.
 ///
@@ -56,29 +49,15 @@ static LOGGER_INITIALIZED: OnceLock<()> = OnceLock::new();
 /// info!("Hello from ROS2!");
 /// ```
 pub fn init_ros_logging(name: &str) {
-    LOGGER_INITIALIZED.get_or_init(|| {
-        // Set up log -> tracing bridge
-        tracing_log::LogTracer::init().ok();
+    with_default_layers(LoggingBuilder::new(name)).init();
+}
 
-        // Create the subscriber with our custom layer
-        let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-
-        let fmt_layer = fmt::layer()
-            .with_target(true)
-            .with_thread_ids(false)
-            .with_thread_names(false)
-            .with_file(false)
-            .with_line_number(false)
-            .with_span_events(FmtSpan::NONE)
-            .with_writer(std::io::stderr);
-
-        tracing_subscriber::registry()
-            .with(filter)
-            .with(ZenohLayer::new(name))
-            .with(fmt_layer)
-            .try_init()
-            .ok();
-    });
+/// Add the default Zenoh logging layers to the given builder.
+///
+/// This adds the [`ZenohLayer`] and a stderr `fmt` layer.
+pub fn with_default_layers(builder: LoggingBuilder) -> LoggingBuilder {
+    let name = builder.name().to_string();
+    builder.with_layer(ZenohLayer::new(&name)).with_fmt_layer()
 }
 
 /// Custom tracing layer for Zenoh ROS2 logging.

@@ -33,14 +33,14 @@
 
 use crate::{error::Result, rcl};
 use num_derive::{FromPrimitive, ToPrimitive};
+use oxidros_core::logging::LoggingBuilder;
 use oxidros_core::{Error, RclError};
 use std::ffi::CString;
 use std::sync::OnceLock;
 use tracing::Subscriber;
-use tracing_subscriber::{EnvFilter, Layer, layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::Layer;
 
 static INITIALIZER: OnceLock<std::result::Result<(), RclError>> = OnceLock::new();
-static TRACING_INITIALIZED: OnceLock<()> = OnceLock::new();
 
 /// Get the function name called this macro.
 #[macro_export]
@@ -176,22 +176,16 @@ fn init_once() -> std::result::Result<(), RclError> {
 /// debug!("Debug message");
 /// ```
 pub fn init_ros_logging(name: &str) {
-    TRACING_INITIALIZED.get_or_init(|| {
-        // Initialize rcutils logging first
-        let _ = init_once();
+    with_default_layers(LoggingBuilder::new(name)).init();
+}
 
-        // Set up log -> tracing bridge
-        tracing_log::LogTracer::init().ok();
-
-        // Create the subscriber with our RCL layer
-        let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-
-        tracing_subscriber::registry()
-            .with(filter)
-            .with(RclLayer::new(name))
-            .try_init()
-            .ok();
-    });
+/// Add the default RCL logging layers to the given builder.
+///
+/// This adds the [`RclLayer`] which routes tracing events to ROS2's
+/// rcutils logging system.
+pub fn with_default_layers(builder: LoggingBuilder) -> LoggingBuilder {
+    let name = builder.name().to_string();
+    builder.with_layer(RclLayer::new(&name))
 }
 
 /// Custom tracing layer that routes to ROS2's rcutils logging.

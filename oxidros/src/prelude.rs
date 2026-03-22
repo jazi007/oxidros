@@ -43,6 +43,7 @@ pub use oxidros_core::{Parameter, Value};
 pub use crate::clock::Clock;
 #[cfg(any(feature = "rcl", feature = "zenoh"))]
 pub use crate::logger::init_ros_logging;
+pub use crate::logger::{LoggingBuilder, LoggingBuilderExt};
 #[cfg(any(feature = "rcl", feature = "zenoh"))]
 pub use crate::parameter::ParameterServer;
 #[cfg(any(feature = "rcl", feature = "zenoh"))]
