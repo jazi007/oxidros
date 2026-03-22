@@ -92,55 +92,54 @@ impl RosAvailability {
 /// }
 /// ```
 pub fn detect_ros_availability(config: &Config) -> RosAvailability {
-    let extra_share_paths: Vec<PathBuf> = config
-        .extra_search_paths
-        .iter()
-        .filter(|p| p.exists())
-        .map(|p| {
+    // Collect all share paths from all sources, deduplicating
+    let mut share_paths: Vec<PathBuf> = Vec::new();
+    let mut is_sourced = false;
+
+    fn push_prefix_paths(share_paths: &mut Vec<PathBuf>, paths: Vec<PathBuf>) {
+        for p in paths {
             let share = p.join("share");
-            if share.exists() { share } else { p.clone() }
-        })
-        .collect();
+            let resolved = if share.exists() { share } else { p };
+            if !share_paths.contains(&resolved) {
+                share_paths.push(resolved);
+            }
+        }
+    }
 
-    // 1. Check AMENT_PREFIX_PATH (sourced ROS2)
+    // 1. AMENT_PREFIX_PATH (sourced ROS2)
     if let Some(ament_paths) = Config::get_ament_prefix_paths() {
-        let mut share_paths: Vec<PathBuf> = ament_paths
-            .into_iter()
-            .map(|p| {
-                let share = p.join("share");
-                if share.exists() { share } else { p }
-            })
-            .collect();
-        share_paths.extend(extra_share_paths.clone());
-        if !share_paths.is_empty() {
-            return RosAvailability::Sourced { share_paths };
+        is_sourced = true;
+        push_prefix_paths(&mut share_paths, ament_paths);
+    }
+
+    // 2. CMAKE_PREFIX_PATH (Windows)
+    if cfg!(target_os = "windows")
+        && let Some(cmake_paths) = Config::get_cmake_prefix_paths()
+    {
+        push_prefix_paths(&mut share_paths, cmake_paths);
+    }
+
+    // 3. Common installation paths (fallback when no sourced/cmake paths found)
+    if share_paths.is_empty() {
+        push_prefix_paths(&mut share_paths, Config::get_default_ros2_paths());
+    }
+
+    // 4. Extra search paths from config
+    for extra in &config.extra_search_paths {
+        if extra.exists() {
+            let share = extra.join("share");
+            let resolved = if share.exists() { share } else { extra.clone() };
+            if !share_paths.contains(&resolved) {
+                share_paths.push(resolved);
+            }
         }
     }
 
-    // 2. Check common installation paths
-    let default_paths = Config::get_default_ros2_paths();
-    if !default_paths.is_empty() {
-        let mut share_paths: Vec<PathBuf> = default_paths
-            .into_iter()
-            .map(|p| {
-                let share = p.join("share");
-                if share.exists() { share } else { p }
-            })
-            .collect();
-        share_paths.extend(extra_share_paths.clone());
-        if !share_paths.is_empty() {
-            return RosAvailability::CommonInstall { share_paths };
-        }
+    match (share_paths.is_empty(), is_sourced) {
+        (true, _) => RosAvailability::NotAvailable,
+        (false, true) => RosAvailability::Sourced { share_paths },
+        (false, false) => RosAvailability::CommonInstall { share_paths },
     }
-    // 3. Check extra search paths from config
-    if !extra_share_paths.is_empty() {
-        return RosAvailability::CommonInstall {
-            share_paths: extra_share_paths,
-        };
-    }
-
-    // 4. Nothing found
-    RosAvailability::NotAvailable
 }
 
 /// Collects all interface files from a ROS2 package directory.

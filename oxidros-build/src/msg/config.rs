@@ -272,7 +272,7 @@ impl Config {
     ///
     /// Returns `None` if the variable is not set or is empty.
     /// Preserves the original order from CMAKE_PREFIX_PATH.
-    fn get_cmake_prefix_paths() -> Option<Vec<PathBuf>> {
+    pub(crate) fn get_cmake_prefix_paths() -> Option<Vec<PathBuf>> {
         let path = env::var("CMAKE_PREFIX_PATH").ok()?;
         if path.is_empty() {
             return None;
