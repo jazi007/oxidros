@@ -180,6 +180,47 @@ impl GraphCache {
             e.kind == EntityKind::ServiceServer && e.topic_name.as_deref() == Some(service_name)
         })
     }
+
+    /// Get all unique topic names with at least one publisher or subscriber.
+    pub fn get_topic_names_and_types(&self) -> Vec<(String, String)> {
+        let mut result: HashMap<String, String> = HashMap::new();
+        for e in self.entities.values() {
+            if matches!(e.kind, EntityKind::Publisher | EntityKind::Subscriber)
+                && let (Some(topic), Some(type_name)) = (&e.topic_name, &e.type_name)
+            {
+                result
+                    .entry(topic.clone())
+                    .or_insert_with(|| type_name.clone());
+            }
+        }
+        let mut v: Vec<_> = result.into_iter().collect();
+        v.sort();
+        v
+    }
+
+    /// Get all unique service names with their types.
+    pub fn get_service_names_and_types(&self) -> Vec<(String, String)> {
+        let mut result: HashMap<String, String> = HashMap::new();
+        for e in self.entities.values() {
+            if matches!(
+                e.kind,
+                EntityKind::ServiceServer | EntityKind::ServiceClient
+            ) && let (Some(svc), Some(type_name)) = (&e.topic_name, &e.type_name)
+            {
+                result
+                    .entry(svc.clone())
+                    .or_insert_with(|| type_name.clone());
+            }
+        }
+        let mut v: Vec<_> = result.into_iter().collect();
+        v.sort();
+        v
+    }
+
+    /// Get all entities (useful for node info filtering).
+    pub fn get_all_entities(&self) -> Vec<&EntityInfo> {
+        self.entities.values().collect()
+    }
 }
 
 #[cfg(test)]

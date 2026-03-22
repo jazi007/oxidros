@@ -51,7 +51,8 @@ pub mod parameter;
 // Re-exports
 pub use context::Context;
 pub use error::{Error, Result};
-pub use graph_cache::GraphCache;
+pub use graph_cache::{EntityInfo, GraphCache};
+pub use keyexpr::EntityKind;
 pub use node::Node;
 pub use qos::QosMapping;
 pub use selector::Selector;

@@ -236,6 +236,43 @@ impl<T: TypeSupport> Subscriber<T> {
         Ok(Message::new(data, info))
     }
 
+    /// Receive raw CDR bytes asynchronously without deserializing.
+    ///
+    /// Returns the raw CDR payload and message metadata.
+    pub async fn z_recv_raw(&mut self) -> Result<(Vec<u8>, oxidros_core::message::MessageInfo)> {
+        let sample = self
+            .receiver
+            .recv_async()
+            .await
+            .map_err(|_| Error::ChannelClosed)?;
+        let raw_bytes = sample.payload().to_bytes().to_vec();
+        let attachment_bytes = sample.attachment().ok_or(Error::MissingAttachment)?;
+        let attachment = Attachment::from_bytes(&attachment_bytes.to_bytes())?;
+
+        tracing::debug!(
+            target: targets::ZENOH_SUBSCRIBER,
+            topic = %self.fq_topic_name,
+            seq = attachment.sequence_number,
+            "Received raw message"
+        );
+
+        Ok((raw_bytes, attachment.into()))
+    }
+
+    /// Try to receive raw CDR bytes without blocking or deserializing.
+    pub fn z_try_recv_raw(&self) -> Result<Option<(Vec<u8>, oxidros_core::message::MessageInfo)>> {
+        match self.receiver.try_recv() {
+            Ok(sample) => {
+                let raw_bytes = sample.payload().to_bytes().to_vec();
+                let attachment_bytes = sample.attachment().ok_or(Error::MissingAttachment)?;
+                let info = Attachment::from_bytes(&attachment_bytes.to_bytes())?.into();
+                Ok(Some((raw_bytes, info)))
+            }
+            Err(flume::TryRecvError::Empty) => Ok(None),
+            Err(flume::TryRecvError::Disconnected) => Err(Error::ChannelClosed),
+        }
+    }
+
     /// Get the parent node.
     pub fn node(&self) -> &Arc<Node> {
         &self.node
@@ -257,6 +294,14 @@ impl<T: TypeSupport + Send + 'static> oxidros_core::api::RosSubscriber<T> for Su
 
     fn try_recv(&mut self) -> Result<Option<Message<T>>> {
         self.z_try_recv()
+    }
+
+    async fn recv_raw(&mut self) -> Result<(Vec<u8>, oxidros_core::message::MessageInfo)> {
+        self.z_recv_raw().await
+    }
+
+    fn try_recv_raw(&mut self) -> Result<Option<(Vec<u8>, oxidros_core::message::MessageInfo)>> {
+        self.z_try_recv_raw()
     }
 
     fn into_stream(self) -> oxidros_core::MessageStream<T>
