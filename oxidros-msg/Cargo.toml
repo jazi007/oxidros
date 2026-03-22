@@ -15,7 +15,9 @@ oxidros-core = { version = "0.5.0", path = "../oxidros-core" }
 log.workspace = true
 widestring = "1.2.1"
 # Re-export ros2-types traits for generated code
-ros2-types = { version = "0.5.1", path = "../ros2-types", features = ["derive"] }
+ros2-types = { version = "0.5.1", path = "../ros2-types", features = [
+    "derive",
+] }
 
 [features]
 default = []

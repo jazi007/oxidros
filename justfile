@@ -18,10 +18,12 @@ clippy:
 # Format code with rustfmt (check only)
 fmt:
     cargo fmt --all -- --check
+    taplo fmt --check
 
 # Format code with rustfmt (apply changes)
 fmt-fix:
     cargo fmt --all
+    taplo fmt
 
 # Run all checks (fmt, clippy, test)
 check: fmt clippy test
