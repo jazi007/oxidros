@@ -24,9 +24,8 @@
 //! ```
 
 use std::sync::OnceLock;
-use tracing_subscriber::{
-    EnvFilter, Layer, Registry, fmt, layer::SubscriberExt, util::SubscriberInitExt,
-};
+use tracing::Dispatch;
+use tracing_subscriber::{EnvFilter, Layer, Registry, fmt, layer::SubscriberExt};
 
 static TRACING_INITIALIZED: OnceLock<()> = OnceLock::new();
 
@@ -106,12 +105,7 @@ impl LoggingBuilder {
                 }
             };
 
-            // Collect everything into a single Vec<Box<dyn Layer<Registry>>>
-            // so that .with(layers) produces Registry -> Layered<Vec<...>, Registry>
-            // which implements Subscriber + Into<Dispatch>.
             let mut layers: Vec<Box<dyn Layer<Registry> + Send + Sync>> = Vec::new();
-
-            layers.push(Box::new(filter));
 
             for layer in self.layers {
                 layers.push(layer);
@@ -128,7 +122,12 @@ impl LoggingBuilder {
                 layers.push(Box::new(fmt));
             }
 
-            tracing_subscriber::registry().with(layers).try_init().ok();
+            // Apply user layers first, then EnvFilter as the outermost layer
+            // so it acts as a proper global filter. EnvFilter loses filtering
+            // behavior when type-erased into Box<dyn Layer> inside a Vec.
+            let subscriber = tracing_subscriber::registry().with(layers).with(filter);
+
+            tracing::dispatcher::set_global_default(Dispatch::new(subscriber)).ok();
         });
     }
 }
