@@ -2,7 +2,7 @@ use clap::Subcommand;
 use mcap::WriteOptions;
 use mcap::records::MessageHeader;
 use oxidros_zenoh::{Context, GraphCache};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::io::BufWriter;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -89,25 +89,7 @@ async fn record(
         return Err("Specify topics to record, or use --all (-a) for all topics".into());
     }
 
-    let graph = ctx.graph_cache();
     let max_duration = duration_str.map(parse_duration).transpose()?;
-
-    // Discover topics to record
-    let discovered = discover_topics(&graph, &topics, all)?;
-    if discovered.is_empty() {
-        return Err("No topics found to record".into());
-    }
-
-    eprintln!(
-        "Recording {} topic(s) to {}",
-        discovered.len(),
-        output.display()
-    );
-    for (topic, dds_type, _hash) in &discovered {
-        let ros_type =
-            crate::type_resolve::dds_to_ros_type_name(dds_type).unwrap_or_else(|| dds_type.clone());
-        eprintln!("  {topic} [{ros_type}]");
-    }
 
     // Open MCAP writer
     let file = std::fs::File::create(&output)?;
@@ -130,65 +112,11 @@ async fn record(
 
     let mut writer = opts.create(buf_writer)?;
 
-    // Register schemas and channels for each topic, track channel IDs
-    let mut channel_ids: Vec<u16> = Vec::new();
-
-    for (topic_name, dds_type, type_hash) in &discovered {
-        let ros_type =
-            crate::type_resolve::dds_to_ros_type_name(dds_type).unwrap_or_else(|| dds_type.clone());
-
-        // Try to resolve type description for schema
-        let schema_data = match crate::type_resolve::resolve(dds_type, type_hash, ctx, &graph).await
-        {
-            Some(type_desc) => type_desc.to_msg_definition(),
-            None => {
-                eprintln!(
-                    "  Warning: no type description for {dds_type}, recording without schema"
-                );
-                String::new()
-            }
-        };
-
-        let schema_id = if schema_data.is_empty() {
-            0u16
-        } else {
-            writer.add_schema(&ros_type, "ros2msg", schema_data.as_bytes())?
-        };
-
-        let mut metadata = BTreeMap::new();
-        metadata.insert("dds_type".to_string(), dds_type.clone());
-        metadata.insert("type_hash".to_string(), type_hash.clone());
-        let channel_id = writer.add_channel(schema_id, topic_name, "cdr", &metadata)?;
-        channel_ids.push(channel_id);
-    }
-
     // Fan all subscribers into a single mpsc channel
     let (tx, mut rx) = tokio::sync::mpsc::channel::<(u16, Vec<u8>, i64)>(256);
 
-    for (i, (topic_name, dds_type, type_hash)) in discovered.iter().enumerate() {
-        let name = topic_name.strip_prefix('/').unwrap_or(topic_name);
-        let key_expr = format!("{}/{}/{}/{}", ctx.domain_id(), name, dds_type, type_hash,);
-        let sub = ctx
-            .session()
-            .declare_subscriber(&key_expr)
-            .await
-            .map_err(|e| format!("subscribe to {topic_name} failed: {e}"))?;
-
-        let ch_id = channel_ids[i];
-        let tx = tx.clone();
-
-        tokio::spawn(async move {
-            while let Ok(sample) = sub.recv_async().await {
-                let payload = sample.payload().to_bytes().to_vec();
-                let timestamp_ns = extract_timestamp(&sample);
-                if tx.send((ch_id, payload, timestamp_ns)).await.is_err() {
-                    break; // receiver dropped
-                }
-            }
-        });
-    }
-    // Drop the original sender so rx closes when all spawn tasks end
-    drop(tx);
+    // Track which topics are already subscribed (by topic name)
+    let mut subscribed: HashSet<String> = HashSet::new();
 
     // Install Ctrl+C handler
     let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel::<()>();
@@ -206,10 +134,23 @@ async fn record(
     let mut message_count: u64 = 0;
     let mut sequence: u32 = 0;
 
-    eprintln!("Recording... Press Ctrl+C to stop.");
+    eprintln!(
+        "Recording to {} ... Press Ctrl+C to stop.",
+        output.display()
+    );
+    if all {
+        eprintln!("Waiting for topics (--all mode, discovering dynamically)...");
+    } else {
+        eprintln!("Waiting for {} topic(s) to appear...", topics.len());
+    }
+
+    // Poll interval for discovering new topics
+    let mut poll_interval = tokio::time::interval(Duration::from_secs(1));
+    poll_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
     loop {
         tokio::select! {
+            // Receive recorded messages
             msg = rx.recv() => {
                 match msg {
                     Some((channel_id, payload, timestamp_ns)) => {
@@ -229,10 +170,72 @@ async fn record(
                     }
                 }
             }
+            // Periodically discover new topics
+            _ = poll_interval.tick() => {
+                let graph = ctx.graph_cache();
+                let newly_discovered = discover_new_topics(&graph, &topics, all, &subscribed);
+
+                for (topic_name, dds_type, type_hash) in newly_discovered {
+                    // Register schema + channel in MCAP
+                    let ros_type = crate::type_resolve::dds_to_ros_type_name(&dds_type)
+                        .unwrap_or_else(|| dds_type.clone());
+
+                    let schema_data =
+                        match crate::type_resolve::resolve(&dds_type, &type_hash, ctx, &graph).await
+                        {
+                            Some(type_desc) => type_desc.to_msg_definition(),
+                            None => {
+                                eprintln!(
+                                    "  Warning: no type description for {dds_type}, recording without schema"
+                                );
+                                String::new()
+                            }
+                        };
+
+                    let schema_id = if schema_data.is_empty() {
+                        0u16
+                    } else {
+                        writer.add_schema(&ros_type, "ros2msg", schema_data.as_bytes())?
+                    };
+
+                    let mut metadata = BTreeMap::new();
+                    metadata.insert("dds_type".to_string(), dds_type.clone());
+                    metadata.insert("type_hash".to_string(), type_hash.clone());
+                    let channel_id =
+                        writer.add_channel(schema_id, &topic_name, "cdr", &metadata)?;
+
+                    // Subscribe to the Zenoh key expression
+                    let name = topic_name.strip_prefix('/').unwrap_or(&topic_name);
+                    let key_expr =
+                        format!("{}/{}/{}/{}", ctx.domain_id(), name, dds_type, type_hash);
+                    match ctx.session().declare_subscriber(&key_expr).await {
+                        Ok(sub) => {
+                            let tx = tx.clone();
+                            tokio::spawn(async move {
+                                while let Ok(sample) = sub.recv_async().await {
+                                    let payload = sample.payload().to_bytes().to_vec();
+                                    let timestamp_ns = extract_timestamp(&sample);
+                                    if tx.send((channel_id, payload, timestamp_ns)).await.is_err() {
+                                        break;
+                                    }
+                                }
+                            });
+                            eprintln!("  + {topic_name} [{ros_type}]");
+                        }
+                        Err(e) => {
+                            eprintln!("  Warning: subscribe to {topic_name} failed: {e}");
+                        }
+                    }
+
+                    subscribed.insert(topic_name);
+                }
+            }
+            // Ctrl+C
             _ = &mut shutdown_rx => {
                 eprintln!("\nStopping recording...");
                 break;
             }
+            // Duration limit
             _ = async {
                 match max_duration {
                     Some(d) => tokio::time::sleep(d.saturating_sub(start_time.elapsed())).await,
@@ -250,9 +253,10 @@ async fn record(
 
     let elapsed = start_time.elapsed();
     eprintln!(
-        "Recorded {message_count} messages in {:.1}s to {}",
+        "Recorded {message_count} messages in {:.1}s to {} ({} topic(s))",
         elapsed.as_secs_f64(),
-        output.display()
+        output.display(),
+        subscribed.len()
     );
 
     Ok(())
@@ -274,36 +278,38 @@ fn extract_timestamp(sample: &zenoh::sample::Sample) -> i64 {
         .unwrap_or(0)
 }
 
-/// Discover topics to record from the graph cache.
+/// Discover topics that are not yet subscribed.
 #[allow(clippy::type_complexity)]
-fn discover_topics(
+fn discover_new_topics(
     graph: &GraphCache,
     topic_filter: &[String],
     all: bool,
-) -> Result<Vec<(String, String, String)>, Box<dyn std::error::Error>> {
+    already_subscribed: &HashSet<String>,
+) -> Vec<(String, String, String)> {
     let mut result = Vec::new();
 
     if all {
         let topics = graph.get_topic_names_and_types();
         for (topic, _type_name) in topics {
+            if already_subscribed.contains(&topic) {
+                continue;
+            }
             if let Some((dds_type, hash)) = find_topic_type(graph, &topic) {
                 result.push((topic, dds_type, hash));
             }
         }
     } else {
         for topic in topic_filter {
-            match find_topic_type(graph, topic) {
-                Some((dds_type, hash)) => {
-                    result.push((topic.clone(), dds_type, hash));
-                }
-                None => {
-                    eprintln!("Warning: topic '{topic}' not found, skipping");
-                }
+            if already_subscribed.contains(topic) {
+                continue;
+            }
+            if let Some((dds_type, hash)) = find_topic_type(graph, topic) {
+                result.push((topic.clone(), dds_type, hash));
             }
         }
     }
 
-    Ok(result)
+    result
 }
 
 /// Find DDS type name and hash for a topic (prefers publishers).
