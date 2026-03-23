@@ -1,0 +1,21 @@
+[package]
+name = "oxidros-dynamic"
+version = "0.5.0"
+edition.workspace = true
+authors.workspace = true
+license-file.workspace = true
+repository.workspace = true
+description = "Dynamic CDR decoding and encoding using ROS2 type descriptions"
+keywords = ["ros2", "robotics", "cdr", "dynamic"]
+categories = ["encoding", "parser-implementations"]
+publish = false
+
+[dependencies]
+ros2-types = { version = "0.5.1", path = "../ros2-types" }
+serde_json = { workspace = true }
+byteorder = "1.5"
+thiserror = "2"
+
+[dev-dependencies]
+ros2-types = { version = "0.5", path = "../ros2-types", features = ["derive"] }
+serde.workspace = true

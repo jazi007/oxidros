@@ -512,6 +512,14 @@ impl<T: TypeSupport + Send + 'static> RosSubscriber<T> for Subscriber<T> {
         self.0.try_recv()
     }
 
+    async fn recv_raw(&mut self) -> Result<(Vec<u8>, oxidros_core::message::MessageInfo)> {
+        self.0.recv_raw().await
+    }
+
+    fn try_recv_raw(&mut self) -> Result<Option<(Vec<u8>, oxidros_core::message::MessageInfo)>> {
+        self.0.try_recv_raw()
+    }
+
     fn into_stream(self) -> MessageStream<T>
     where
         Self: Sized + 'static,

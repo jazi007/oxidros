@@ -372,3 +372,299 @@ impl TypeDescriptionMsg {
         }
     }
 }
+
+// ============================================================================
+// IDL and MSG definition generation
+// ============================================================================
+
+use std::collections::BTreeSet;
+use std::fmt::Write;
+
+/// Extract base type_id from array/sequence type_id.
+/// Returns (base_type_id, kind) where kind is 'p' (plain), 'a' (array),
+/// 'b' (bounded sequence), 'u' (unbounded sequence).
+fn decompose_type_id(type_id: u8) -> (u8, char) {
+    match type_id {
+        0..=48 => (type_id, 'p'),
+        49..=96 => (type_id - 48, 'a'),
+        97..=144 => (type_id - 96, 'b'),
+        145..=192 => (type_id - 144, 'u'),
+        _ => (type_id, 'p'),
+    }
+}
+
+/// Map a base type_id to its IDL primitive type name.
+fn base_type_to_idl(base_type_id: u8) -> &'static str {
+    match base_type_id {
+        FIELD_TYPE_NESTED_TYPE => "", // handled separately
+        FIELD_TYPE_INT8 => "int8",
+        FIELD_TYPE_UINT8 => "uint8",
+        FIELD_TYPE_INT16 => "int16",
+        FIELD_TYPE_UINT16 => "uint16",
+        FIELD_TYPE_INT32 => "int32",
+        FIELD_TYPE_UINT32 => "uint32",
+        FIELD_TYPE_INT64 => "int64",
+        FIELD_TYPE_UINT64 => "uint64",
+        FIELD_TYPE_FLOAT => "float",
+        FIELD_TYPE_DOUBLE => "double",
+        FIELD_TYPE_LONG_DOUBLE => "long double",
+        FIELD_TYPE_CHAR => "uint8", // ROS2 char = uint8
+        FIELD_TYPE_WCHAR => "wchar",
+        FIELD_TYPE_BOOLEAN => "boolean",
+        FIELD_TYPE_BYTE => "octet",
+        FIELD_TYPE_STRING => "string",
+        FIELD_TYPE_WSTRING => "wstring",
+        FIELD_TYPE_FIXED_STRING => "string",
+        FIELD_TYPE_FIXED_WSTRING => "wstring",
+        FIELD_TYPE_BOUNDED_STRING => "string",
+        FIELD_TYPE_BOUNDED_WSTRING => "wstring",
+        _ => "unknown",
+    }
+}
+
+/// Map a base type_id to its .msg primitive type name.
+fn base_type_to_msg(base_type_id: u8) -> &'static str {
+    match base_type_id {
+        FIELD_TYPE_NESTED_TYPE => "", // handled separately
+        FIELD_TYPE_INT8 => "int8",
+        FIELD_TYPE_UINT8 => "uint8",
+        FIELD_TYPE_INT16 => "int16",
+        FIELD_TYPE_UINT16 => "uint16",
+        FIELD_TYPE_INT32 => "int32",
+        FIELD_TYPE_UINT32 => "uint32",
+        FIELD_TYPE_INT64 => "int64",
+        FIELD_TYPE_UINT64 => "uint64",
+        FIELD_TYPE_FLOAT => "float32",
+        FIELD_TYPE_DOUBLE => "float64",
+        FIELD_TYPE_LONG_DOUBLE => "float64",
+        FIELD_TYPE_CHAR => "char",
+        FIELD_TYPE_WCHAR => "char",
+        FIELD_TYPE_BOOLEAN => "bool",
+        FIELD_TYPE_BYTE => "byte",
+        FIELD_TYPE_STRING => "string",
+        FIELD_TYPE_WSTRING => "wstring",
+        FIELD_TYPE_FIXED_STRING => "string",
+        FIELD_TYPE_FIXED_WSTRING => "wstring",
+        FIELD_TYPE_BOUNDED_STRING => "string",
+        FIELD_TYPE_BOUNDED_WSTRING => "wstring",
+        _ => "unknown",
+    }
+}
+
+/// Split a fully-qualified type name like "pkg/msg/TypeName" into (pkg, msg_type, name).
+fn split_type_name(fqn: &str) -> (&str, &str, &str) {
+    let parts: Vec<&str> = fqn.splitn(3, '/').collect();
+    match parts.len() {
+        3 => (parts[0], parts[1], parts[2]),
+        2 => (parts[0], "msg", parts[1]),
+        _ => ("", "msg", fqn),
+    }
+}
+
+/// Convert a "pkg/msg/TypeName" to IDL module-qualified form "pkg::msg::TypeName".
+fn type_name_to_idl_qualified(fqn: &str) -> String {
+    fqn.replace('/', "::")
+}
+
+impl TypeDescriptionMsg {
+    /// Generate an OMG IDL representation of this type description.
+    ///
+    /// All referenced types are inlined into a single IDL string.
+    /// This is suitable for MCAP schema data with `schema_encoding = "ros2idl"`.
+    pub fn to_idl(&self) -> String {
+        let mut output = String::new();
+        let mut typedefs_needed = BTreeSet::new();
+
+        // Emit referenced types first (dependencies before dependents)
+        for ref_type in &self.referenced_type_descriptions {
+            Self::emit_idl_struct(&mut output, ref_type, &mut typedefs_needed);
+            output.push('\n');
+        }
+
+        // Emit main type
+        Self::emit_idl_struct(&mut output, &self.type_description, &mut typedefs_needed);
+        output
+    }
+
+    fn emit_idl_struct(
+        output: &mut String,
+        desc: &IndividualTypeDescription,
+        typedefs_needed: &mut BTreeSet<String>,
+    ) {
+        let (pkg, msg_type, name) = split_type_name(&desc.type_name);
+
+        // Collect typedefs for fixed-size arrays in this struct
+        let mut local_typedefs = Vec::new();
+        for field in &desc.fields {
+            let (base_id, kind) = decompose_type_id(field.field_type.type_id);
+            if kind == 'a' {
+                let idl_base = if base_id == FIELD_TYPE_NESTED_TYPE {
+                    type_name_to_idl_qualified(&field.field_type.nested_type_name)
+                } else {
+                    base_type_to_idl(base_id).to_string()
+                };
+                let cap = field.field_type.capacity;
+                let typedef_name = format!(
+                    "{}__{}",
+                    idl_base.replace("::", "__").replace(' ', "_"),
+                    cap
+                );
+                if typedefs_needed.insert(typedef_name.clone()) {
+                    local_typedefs.push((idl_base, typedef_name, cap));
+                }
+            }
+        }
+
+        // Open modules
+        if !pkg.is_empty() {
+            let _ = writeln!(output, "module {pkg} {{");
+            let _ = writeln!(output, "  module {msg_type} {{");
+        }
+
+        let indent = if pkg.is_empty() { "" } else { "    " };
+
+        // Emit typedefs
+        for (base, alias, cap) in &local_typedefs {
+            let _ = writeln!(output, "{indent}typedef {base} {alias}[{cap}];");
+        }
+        if !local_typedefs.is_empty() {
+            output.push('\n');
+        }
+
+        // Emit struct
+        let _ = writeln!(output, "{indent}struct {name} {{");
+        for field in &desc.fields {
+            let idl_type = Self::field_type_to_idl(&field.field_type, typedefs_needed);
+            let _ = writeln!(output, "{indent}  {idl_type} {name_};", name_ = field.name);
+        }
+        let _ = writeln!(output, "{indent}}};");
+
+        // Close modules
+        if !pkg.is_empty() {
+            let _ = writeln!(output, "  }};");
+            let _ = writeln!(output, "}};");
+        }
+    }
+
+    fn field_type_to_idl(ft: &FieldType, typedefs_needed: &mut BTreeSet<String>) -> String {
+        let (base_id, kind) = decompose_type_id(ft.type_id);
+
+        let base_name = if base_id == FIELD_TYPE_NESTED_TYPE {
+            type_name_to_idl_qualified(&ft.nested_type_name)
+        } else {
+            let prim = base_type_to_idl(base_id);
+            // Handle string capacity on base type
+            if ft.string_capacity > 0
+                && matches!(
+                    base_id,
+                    FIELD_TYPE_STRING
+                        | FIELD_TYPE_WSTRING
+                        | FIELD_TYPE_BOUNDED_STRING
+                        | FIELD_TYPE_BOUNDED_WSTRING
+                        | FIELD_TYPE_FIXED_STRING
+                        | FIELD_TYPE_FIXED_WSTRING
+                )
+            {
+                format!("{prim}<{}>", ft.string_capacity)
+            } else {
+                prim.to_string()
+            }
+        };
+
+        match kind {
+            'a' => {
+                // Fixed-size array — use typedef name
+                let typedef_name = format!(
+                    "{}__{}",
+                    base_name.replace("::", "__").replace(' ', "_"),
+                    ft.capacity
+                );
+                typedefs_needed.insert(typedef_name.clone());
+                typedef_name
+            }
+            'b' => {
+                // Bounded sequence
+                format!("sequence<{base_name}, {}>", ft.capacity)
+            }
+            'u' => {
+                // Unbounded sequence
+                format!("sequence<{base_name}>")
+            }
+            _ => base_name,
+        }
+    }
+
+    /// Generate a `.msg` format definition of this type description.
+    ///
+    /// Referenced types are appended after a `===` separator line (Foxglove convention),
+    /// making this suitable for MCAP schema data with `schema_encoding = "ros2msg"`.
+    pub fn to_msg_definition(&self) -> String {
+        let mut output = String::new();
+
+        // Main type definition
+        Self::emit_msg_struct(&mut output, &self.type_description);
+
+        // Referenced types separated by ===
+        for ref_type in &self.referenced_type_descriptions {
+            let _ = writeln!(
+                output,
+                "\n================================================================================"
+            );
+            let _ = writeln!(output, "MSG: {}", ref_type.type_name);
+            Self::emit_msg_struct(&mut output, ref_type);
+        }
+
+        output
+    }
+
+    fn emit_msg_struct(output: &mut String, desc: &IndividualTypeDescription) {
+        for field in &desc.fields {
+            let msg_type = Self::field_type_to_msg(&field.field_type);
+            let _ = writeln!(output, "{msg_type} {}", field.name);
+        }
+    }
+
+    fn field_type_to_msg(ft: &FieldType) -> String {
+        let (base_id, kind) = decompose_type_id(ft.type_id);
+
+        let base_name = if base_id == FIELD_TYPE_NESTED_TYPE {
+            // For nested types in .msg format, use the fqn as-is (e.g., "std_msgs/Header")
+            // Remove the middle segment if it's "msg" to match .msg convention
+            let (pkg, _msg_type, name) = split_type_name(&ft.nested_type_name);
+            if pkg.is_empty() {
+                name.to_string()
+            } else {
+                format!("{pkg}/{name}")
+            }
+        } else {
+            let prim = base_type_to_msg(base_id);
+            // Handle bounded strings
+            if ft.string_capacity > 0
+                && matches!(
+                    base_id,
+                    FIELD_TYPE_BOUNDED_STRING | FIELD_TYPE_BOUNDED_WSTRING
+                )
+            {
+                format!("{prim}<={}>", ft.string_capacity)
+            } else {
+                prim.to_string()
+            }
+        };
+
+        match kind {
+            'a' => {
+                // Fixed-size array
+                format!("{base_name}[{}]", ft.capacity)
+            }
+            'b' => {
+                // Bounded sequence
+                format!("{base_name}[<={}]", ft.capacity)
+            }
+            'u' => {
+                // Unbounded sequence
+                format!("{base_name}[]")
+            }
+            _ => base_name,
+        }
+    }
+}

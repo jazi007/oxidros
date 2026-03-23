@@ -410,6 +410,27 @@ impl<T: TypeSupport> Subscriber<T> {
         }
         .await
     }
+
+    /// Receive raw CDR-serialized bytes asynchronously without exposing typed data.
+    ///
+    /// For the RCL backend this takes the typed message and re-serializes it,
+    /// since `rcl_take_serialized_message` is not currently exposed.
+    pub async fn recv_raw(&mut self) -> Result<(Vec<u8>, MessageInfo)> {
+        let msg = self.recv().await?;
+        let bytes = msg.sample.to_bytes()?;
+        Ok((bytes, msg.info))
+    }
+
+    /// Try to receive raw CDR-serialized bytes without blocking.
+    pub fn try_recv_raw(&self) -> Result<Option<(Vec<u8>, MessageInfo)>> {
+        match self.try_recv()? {
+            Some(msg) => {
+                let bytes = msg.sample.to_bytes()?;
+                Ok(Some((bytes, msg.info)))
+            }
+            None => Ok(None),
+        }
+    }
 }
 
 /// Asynchronous receiver of subscribers.
