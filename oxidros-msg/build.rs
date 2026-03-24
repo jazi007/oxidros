@@ -4,24 +4,54 @@
 //!
 //! # Generation Strategy
 //!
-//! - **ROS2 Sourced/Installed**: Regenerates message files into `src/generated/`
-//! - **No ROS2**: Uses pre-committed files in `src/generated/` (no generation)
+//! All generated output goes into `OUT_DIR/generated/` (never into the source tree).
+//! This prevents race conditions when multiple concurrent cargo processes build the
+//! same crate from the crates.io registry cache.
 //!
-//! This allows the crate to be built without a ROS2 installation by using
-//! pre-generated message definitions committed to the repository.
+//! - **ROS2 Sourced/Installed**: Generates fresh message files into `OUT_DIR/generated/`
+//! - **No ROS2**: Copies pre-committed `src/generated/` files into `OUT_DIR/generated/`
+//!
+//! To update the pre-committed files, set `OXIDROS_REGENERATE_SRC=1` with ROS2 sourced.
 
 use std::env;
 use std::path::{Path, PathBuf};
 
 use oxidros_build::msg::{Config, RosAvailability, detect_ros_availability, get_base_generator};
 
+/// Recursively copy a directory tree.
+fn copy_dir_recursive(src: &Path, dst: &Path) {
+    std::fs::create_dir_all(dst)
+        .unwrap_or_else(|e| panic!("Failed to create directory {}: {}", dst.display(), e));
+    for entry in std::fs::read_dir(src)
+        .unwrap_or_else(|e| panic!("Failed to read directory {}: {}", src.display(), e))
+    {
+        let entry = entry.unwrap();
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if src_path.is_dir() {
+            copy_dir_recursive(&src_path, &dst_path);
+        } else {
+            std::fs::copy(&src_path, &dst_path).unwrap_or_else(|e| {
+                panic!(
+                    "Failed to copy {} -> {}: {}",
+                    src_path.display(),
+                    dst_path.display(),
+                    e
+                )
+            });
+        }
+    }
+}
+
 fn main() {
     let out_dir = env::var("OUT_DIR").unwrap();
     let out_path = Path::new(&out_dir);
 
-    // Get the crate's source directory for generating into src/generated/
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let src_generated = PathBuf::from(&manifest_dir).join("src").join("generated");
+
+    // Generated output always goes into OUT_DIR (isolated per crate build)
+    let out_generated = out_path.join("generated");
 
     oxidros_build::ros2_env_var_changed();
 
@@ -59,61 +89,49 @@ fn main() {
     let config = Config::builder().build();
     let availability = detect_ros_availability(&config);
 
+    // Optionally also update the committed src/generated/ tree (developer workflow)
+    let regenerate_src = env::var("OXIDROS_REGENERATE_SRC").is_ok();
+
     match &availability {
         RosAvailability::Sourced { .. } | RosAvailability::CommonInstall { .. } => {
-            println!("cargo:info=ROS2 detected, regenerating message files to src/generated/");
+            println!("cargo:rerun-if-env-changed=OXIDROS_REGENERATE_SRC");
+            println!("cargo:info=ROS2 detected, generating message files into OUT_DIR");
 
-            // Create the generated directory structure
-            std::fs::create_dir_all(&src_generated).unwrap();
+            std::fs::create_dir_all(&out_generated).unwrap();
 
-            // Generate common_interfaces
-            let common_interfaces_dir = src_generated.join("common_interfaces");
-            std::fs::create_dir_all(&common_interfaces_dir).unwrap();
-            let config = Config::builder()
-                .packages(&common_interfaces_deps)
-                .uuid_path("crate::ros2msg")
-                .primitive_path("crate")
-                .build();
-            if let Some(generator) = get_base_generator(&config) {
-                generator
-                    .output_dir(&common_interfaces_dir)
-                    .generate()
-                    .expect("Failed to generate common_interfaces");
-            }
+            // Helper: generate a package group into an output subdirectory,
+            // and optionally mirror it to src/generated/ for committing.
+            let generate_group = |subdir: &str, packages: &[&str]| {
+                let out_subdir = out_generated.join(subdir);
+                std::fs::create_dir_all(&out_subdir).unwrap();
+                let config = Config::builder()
+                    .packages(packages)
+                    .uuid_path("crate::ros2msg")
+                    .primitive_path("crate")
+                    .build();
+                if let Some(generator) = get_base_generator(&config) {
+                    generator
+                        .output_dir(&out_subdir)
+                        .generate()
+                        .unwrap_or_else(|e| panic!("Failed to generate {}: {}", subdir, e));
+                }
 
-            // Generate interfaces
-            let interfaces_dir = src_generated.join("interfaces");
-            std::fs::create_dir_all(&interfaces_dir).unwrap();
-            let config = Config::builder()
-                .packages(&interface_deps)
-                .uuid_path("crate::ros2msg")
-                .primitive_path("crate")
-                .build();
-            if let Some(generator) = get_base_generator(&config) {
-                generator
-                    .output_dir(&interfaces_dir)
-                    .generate()
-                    .expect("Failed to generate interfaces");
-            }
+                if regenerate_src {
+                    let src_subdir = src_generated.join(subdir);
+                    if src_subdir.exists() {
+                        std::fs::remove_dir_all(&src_subdir).ok();
+                    }
+                    copy_dir_recursive(&out_subdir, &src_subdir);
+                }
+            };
 
-            // Generate ros2msg
-            let ros2msg_dir = src_generated.join("ros2msg");
-            std::fs::create_dir_all(&ros2msg_dir).unwrap();
-            let config = Config::builder()
-                .packages(&ros2msg_deps)
-                .uuid_path("crate::ros2msg")
-                .primitive_path("crate")
-                .build();
-            if let Some(generator) = get_base_generator(&config) {
-                generator
-                    .output_dir(&ros2msg_dir)
-                    .generate()
-                    .expect("Failed to generate ros2msg");
-            }
+            generate_group("common_interfaces", &common_interfaces_deps);
+            generate_group("interfaces", &interface_deps);
+            generate_group("ros2msg", &ros2msg_deps);
         }
         RosAvailability::NotAvailable => {
             println!("cargo:warning=No ROS2 installation detected");
-            println!("cargo:warning=Using pre-generated message files from src/generated/");
+            println!("cargo:warning=Copying pre-generated message files to OUT_DIR");
 
             // Verify that pre-generated files exist
             if !src_generated
@@ -127,6 +145,9 @@ fn main() {
                     src_generated.display()
                 );
             }
+
+            // Copy pre-committed files into OUT_DIR so lib.rs can include from there
+            copy_dir_recursive(&src_generated, &out_generated);
         }
     }
 
