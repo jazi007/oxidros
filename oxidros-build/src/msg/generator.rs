@@ -364,6 +364,20 @@ pub fn get_base_generator(config: &Config) -> Option<Generator> {
         return None;
     }
 
+    // Warn if requested packages were not found in the ROS2 installation
+    if !packages_filter.is_empty() {
+        let missing: Vec<_> = packages_filter
+            .iter()
+            .filter(|p| !packages_found.iter().any(|found| found == *p))
+            .collect();
+        if !missing.is_empty() {
+            println!(
+                "cargo:warning=ROS2 installation is missing requested packages: {:?}",
+                missing,
+            );
+        }
+    }
+
     println!(
         "cargo:info=Found {} interface files from {} packages",
         all_files.len(),
