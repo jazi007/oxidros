@@ -1,50 +1,50 @@
-//! Build utilities for the oxidros ROS2 Rust ecosystem.
+//! Build utilities for generating Rust types from ROS2 message definitions.
 //!
-//! This crate provides build script helpers for generating ROS2 FFI bindings
-//! and linking against ROS2 libraries. It is designed to be used in `build.rs`
-//! files of crates that need to interface with ROS2.
+//! This crate provides `build.rs` helpers for generating Rust types from
+//! `.msg`, `.srv`, `.action`, and `.idl` files. No ROS2 installation is
+//! required — you can point directly to cloned message definition repositories.
 //!
-//! # Overview
-//!
-//! The crate provides functionality for:
-//!
-//! - **RCL Bindings Generation**: Generate Rust FFI bindings for the ROS2 RCL (ROS Client Library)
-//! - **Message Bindings Generation**: Generate Rust FFI bindings for ROS2 message types
-//! - **Library Linking**: Set up cargo link directives for ROS2 shared libraries
-//! - **Environment Detection**: Handle ROS2 environment variables (`AMENT_PREFIX_PATH`, `ROS_DISTRO`, etc.)
-//! - **Distro Detection**: Automatically detect ROS2 distribution from environment
-//!
-//! # Requirements
-//!
-//! - A sourced ROS2 installation (e.g., `source /opt/ros/jazzy/setup.bash`)
-//! - `AMENT_PREFIX_PATH` environment variable must be set
-//! - `ROS_DISTRO` environment variable must be set
-//!
-//! # Example Usage
-//!
-//! In your `build.rs`:
+//! # Quick Start
 //!
 //! ```rust,ignore
-//! use oxidros_build::{ros2_env_var_changed, generate_rcl_bindings, link_rcl_ros2_libs};
-//! use std::path::PathBuf;
-//!
+//! // build.rs
 //! fn main() {
-//!     // Signal cargo to rebuild if ROS2 environment changes
-//!     ros2_env_var_changed();
+//!     oxidros_build::ros2_env_var_changed();
 //!
-//!     // Generate RCL bindings
-//!     let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
-//!     generate_rcl_bindings(&out_dir);
+//!     let config = oxidros_build::msg::Config::builder()
+//!         .packages(&["my_custom_msgs"])
+//!         .build();
 //!
-//!     // Link ROS2 libraries
-//!     link_rcl_ros2_libs();
+//!     oxidros_build::msg::generate_msgs_with_config(&config);
 //! }
 //! ```
 //!
+//! Then include the generated code in your `lib.rs`:
+//!
+//! ```rust,ignore
+//! include!(concat!(env!("OUT_DIR"), "/generated/mod.rs"));
+//! ```
+//!
+//! # Without a ROS2 Installation
+//!
+//! Clone the message repos and use `extra_search_path()`:
+//!
+//! ```rust,ignore
+//! let config = oxidros_build::msg::Config::builder()
+//!     .packages(&["my_custom_msgs", "std_msgs"])
+//!     .extra_search_path("/path/to/cloned/common_interfaces")
+//!     .extra_search_path("/path/to/my/custom_msgs")
+//!     .build();
+//! ```
+//!
+//! # Features
+//!
+//! - **[`msg`] module** — Generate Rust types from message definitions
+//! - **RCL bindings** — (Advanced) FFI bindings for the ROS2 C client library (requires sourced ROS2)
+//!
 //! # Platform Support
 //!
-//! The crate supports both Linux/Unix and Windows platforms, with platform-specific
-//! handling for library paths and linking.
+//! Supports Linux/Unix and Windows.
 
 use std::{
     env::{self, VarError},

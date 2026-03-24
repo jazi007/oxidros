@@ -421,7 +421,7 @@ pub fn get_base_generator(config: &Config) -> Option<Generator> {
 /// Generates Rust types from ROS2 interface files for the specified packages.
 ///
 /// This is a convenience function that uses default configuration. For more
-/// control, use [`Config::builder()`] and [`get_base_generator()`].
+/// control, use [`Config::builder()`] and [`generate_msgs_with_config()`].
 ///
 /// # Arguments
 ///
@@ -430,38 +430,26 @@ pub fn get_base_generator(config: &Config) -> Option<Generator> {
 ///
 /// # Generated Output
 ///
-/// The function creates a `generated/` directory inside `OUT_DIR` containing
-/// Rust modules for each package with interface files. Each generated type has:
+/// Creates a `generated/` directory inside `OUT_DIR` containing Rust modules
+/// for each package. Include them in your `lib.rs` with:
 ///
-/// - The `#[ros2(package = "...", interface_type = "...")]` attribute
-/// - The `Ros2Msg` derive macro for type support generation
-/// - Debug trait derivation
-///
-/// # Cargo Directives
-///
-/// For each package with interface files, the function emits:
-/// - `cargo:rustc-link-lib=<pkg>__rosidl_typesupport_c`
-/// - `cargo:rustc-link-lib=<pkg>__rosidl_generator_c`
-/// - `cargo:rerun-if-env-changed=AMENT_PREFIX_PATH`
-/// - `cargo:rerun-if-env-changed=ROS_DISTRO`
+/// ```rust,ignore
+/// include!(concat!(env!("OUT_DIR"), "/generated/mod.rs"));
+/// ```
 ///
 /// # Example
 ///
 /// ```rust,ignore
-/// // Generate types for specific packages
-/// oxidros_build::msg::generate_msgs(&["std_msgs", "geometry_msgs"]);
-///
-/// // Generate types for ALL packages (useful for comprehensive testing)
-/// oxidros_build::msg::generate_msgs(&[]);
-///
-/// // In your lib.rs, include the generated code:
-/// // include!(concat!(env!("OUT_DIR"), "/generated/mod.rs"));
+/// // build.rs
+/// fn main() {
+///     oxidros_build::ros2_env_var_changed();
+///     oxidros_build::msg::generate_msgs(&["my_custom_msgs"]);
+/// }
 /// ```
 ///
 /// # Notes
 ///
-/// - Packages starting with `ament_`, `ros2`, or named `cmake` or `colcon-core`
-///   are automatically skipped.
+/// - No sourced ROS2 environment required — common install paths are detected automatically.
 /// - When both `.idl` and native interface files exist, native files take priority.
 /// - If no ROS2 installation is found, a warning is emitted and no code is generated.
 pub fn generate_msgs(packages: &[&str]) {
@@ -481,15 +469,27 @@ pub fn generate_msgs(packages: &[&str]) {
 /// # Example
 ///
 /// ```rust,ignore
-/// use oxidros_build::msg::{Config, generate_msgs_with_config};
+/// // build.rs
+/// fn main() {
+///     oxidros_build::ros2_env_var_changed();
 ///
-/// let config = Config::builder()
-///     .packages(&["std_msgs", "geometry_msgs"])
-///     .uuid_path("my_crate::unique_identifier_msgs")
-///     .extra_search_path("/custom/ros2/share")
+///     let config = oxidros_build::msg::Config::builder()
+///         .packages(&["my_custom_msgs"])
+///         .build();
+///
+///     oxidros_build::msg::generate_msgs_with_config(&config);
+/// }
+/// ```
+///
+/// For packages in non-standard locations:
+///
+/// ```rust,ignore
+/// let config = oxidros_build::msg::Config::builder()
+///     .packages(&["my_custom_msgs"])
+///     .extra_search_path("/path/to/my/workspace/install/share")
 ///     .build();
 ///
-/// generate_msgs_with_config(&config);
+/// oxidros_build::msg::generate_msgs_with_config(&config);
 /// ```
 pub fn generate_msgs_with_config(config: &Config) {
     let Some(generator) = get_base_generator(config) else {
