@@ -1,77 +1,72 @@
-//! ROS2 message code generation utilities.
+//! Message code generation utilities.
 //!
-//! This module provides functionality for generating Rust types from ROS2 interface
-//! definition files (`.msg`, `.srv`, `.action`, `.idl`). It uses the [`ros2msg`] crate
-//! for parsing and code generation, combined with [`ros2_types`] derive macros for
-//! generating type support code.
+//! This module generates Rust types from ROS2 interface definition files
+//! (`.msg`, `.srv`, `.action`, `.idl`). No ROS2 installation is required —
+//! you can point directly to directories containing message definitions.
 //!
-//! # Overview
-//!
-//! The module provides several ways to generate ROS2 message types:
-//!
-//! - [`generate_msgs`] - Simple API for generating types from specific packages
-//! - [`generate_msgs_with_config`] - Full control via [`Config`] struct
-//! - [`get_base_generator`] - Low-level access to the generator for customization
-//! - [`detect_ros_availability`] - Check if ROS2 is available and how
-//!
-//! # ROS2 Detection
-//!
-//! The module uses [`RosAvailability`] to represent three possible states:
-//!
-//! - **Sourced**: `AMENT_PREFIX_PATH` is set (full functionality with linking)
-//! - **CommonInstall**: ROS2 found at common paths but not sourced (generation only)
-//! - **NotAvailable**: No ROS2 installation (use pre-generated files)
-//!
-//! # Configuration
-//!
-//! Use [`Config`] and [`ConfigBuilder`] to customize the generation process:
+//! # Quick Start
 //!
 //! ```rust,ignore
-//! use oxidros_build::msg::{Config, generate_msgs_with_config};
-//!
-//! let config = Config::builder()
-//!     .packages(&["std_msgs", "geometry_msgs"])
-//!     .uuid_path("my_crate::unique_identifier_msgs")
-//!     .primitive_path("oxidros_msg")
-//!     .extra_search_path("/custom/ros2/share")
-//!     .build();
-//!
-//! generate_msgs_with_config(&config);
-//! ```
-//!
-//! # Path Resolution
-//!
-//! The module automatically finds ROS2 packages using this priority:
-//!
-//! 1. **AMENT_PREFIX_PATH** - If set (standard sourced ROS2 environment)
-//! 2. **Common installation paths** - Falls back to standard locations:
-//!    - Linux: `/opt/ros/{humble,jazzy,kilted}`
-//!    - Windows: `C:\pixi_ws\ros2-windows`, `C:\dev\ros2_{distro}`, etc.
-//! 3. **Extra paths** - User-provided paths via [`ConfigBuilder::extra_search_path`]
-//!
-//! # Example
-//!
-//! ```rust,ignore
-//! // In build.rs
-//! use oxidros_build::msg::{detect_ros_availability, Config, RosAvailability};
-//!
+//! // build.rs
 //! fn main() {
-//!     let config = Config::builder()
-//!         .packages(&["std_msgs", "geometry_msgs"])
+//!     oxidros_build::ros2_env_var_changed();
+//!
+//!     let config = oxidros_build::msg::Config::builder()
+//!         .packages(&["my_custom_msgs"])
 //!         .build();
 //!
-//!     match detect_ros_availability(&config) {
-//!         RosAvailability::Sourced { .. } | RosAvailability::CommonInstall { .. } => {
-//!             // Generate messages
-//!             oxidros_build::msg::generate_msgs_with_config(&config);
-//!         }
-//!         RosAvailability::NotAvailable => {
-//!             // Use pre-committed generated files
-//!             println!("cargo:warning=Using pre-generated message files");
-//!         }
-//!     }
+//!     oxidros_build::msg::generate_msgs_with_config(&config);
 //! }
 //! ```
+//!
+//! Then in `lib.rs`:
+//!
+//! ```rust,ignore
+//! include!(concat!(env!("OUT_DIR"), "/generated/mod.rs"));
+//! ```
+//!
+//! # Without a ROS2 Installation
+//!
+//! Clone your message repos and use `extra_search_path()`:
+//!
+//! ```rust,ignore
+//! let config = oxidros_build::msg::Config::builder()
+//!     .packages(&["my_custom_msgs", "std_msgs"])
+//!     .extra_search_path("/path/to/cloned/common_interfaces")
+//!     .extra_search_path("/path/to/my/custom_msgs")
+//!     .build();
+//!
+//! oxidros_build::msg::generate_msgs_with_config(&config);
+//! ```
+//!
+//! The directory layout should follow the standard ROS2 convention:
+//!
+//! ```text
+//! my_custom_msgs/
+//! ├── msg/
+//! │   ├── MyMessage.msg
+//! │   └── AnotherMessage.msg
+//! └── srv/
+//!     └── MyService.srv
+//! ```
+//!
+//! # API Levels
+//!
+//! - [`generate_msgs`] — Simple: just pass package names
+//! - [`generate_msgs_with_config`] — Full control via [`Config`]
+//! - [`get_base_generator`] — Low-level: returns a [`ros2msg::Generator`] for customization
+//! - [`detect_ros_availability`] — Check if/how ROS2 is available
+//!
+//! # Package Discovery
+//!
+//! Packages are searched for in this order:
+//!
+//! 1. **`AMENT_PREFIX_PATH`** — If set (sourced ROS2 environment)
+//! 2. **Common paths** — `/opt/ros/{humble,jazzy,kilted}` (Linux), `C:\dev\ros2_*` (Windows)
+//! 3. **Extra paths** — Via [`ConfigBuilder::extra_search_path`]
+//!
+//! For Zenoh-based or non-RCL projects, just use `extra_search_path()` to
+//! point directly to your message definitions — no ROS2 install needed.
 //!
 //! # Generated Output
 //!

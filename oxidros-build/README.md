@@ -1,39 +1,98 @@
 # oxidros-build
 
-Build utilities for oxidros ROS2 message generation and FFI bindings.
+Build utilities for generating Rust types from ROS2 message definitions.
 
 ## Overview
 
 This crate provides `build.rs` helpers for:
 
-- **RCL Bindings Generation** — Generate Rust FFI bindings for the ROS2 C client library
-- **Message Bindings Generation** — Generate Rust FFI bindings for ROS2 message types
-- **Library Linking** — Set up cargo link directives for ROS2 shared libraries
-- **Environment Detection** — Handle ROS2 environment variables (`AMENT_PREFIX_PATH`, `ROS_DISTRO`, etc.)
-- **Distro Detection** — Automatically detect the ROS2 distribution from the environment
+- **Custom Message Generation** — Generate Rust types from `.msg`, `.srv`, `.action`, or `.idl` files
+- **No ROS2 installation required** — Just point to a directory containing message definitions
+- **RCL Bindings Generation** — (Advanced) Generate FFI bindings for the ROS2 C client library
 
-## Requirements
+## Quick Start
 
-- A sourced ROS2 installation (e.g., `source /opt/ros/jazzy/setup.bash`)
-- `AMENT_PREFIX_PATH` and `ROS_DISTRO` environment variables must be set
+Add `oxidros-build` to your `build-dependencies` in `Cargo.toml`:
 
-## Usage
+```toml
+[build-dependencies]
+oxidros-build = "0.5"
+```
 
-In your `build.rs`:
+Create a `build.rs`:
 
 ```rust
-use oxidros_build::{ros2_env_var_changed, generate_rcl_bindings, link_rcl_ros2_libs};
+fn main() {
+    oxidros_build::ros2_env_var_changed();
+
+    let config = oxidros_build::msg::Config::builder()
+        .packages(&["my_custom_msgs"])
+        .build();
+
+    oxidros_build::msg::generate_msgs_with_config(&config);
+}
+```
+
+Then in your `lib.rs`:
+
+```rust
+include!(concat!(env!("OUT_DIR"), "/generated/mod.rs"));
+```
+
+## Without a ROS2 Installation
+
+You don't need a full ROS2 installation. Clone the message definition
+repositories and point the generator to them:
+
+```rust
+fn main() {
+    oxidros_build::ros2_env_var_changed();
+
+    let config = oxidros_build::msg::Config::builder()
+        .packages(&["my_custom_msgs", "std_msgs"])
+        .extra_search_path("/path/to/cloned/common_interfaces")
+        .extra_search_path("/path/to/my/custom_msgs")
+        .build();
+
+    oxidros_build::msg::generate_msgs_with_config(&config);
+}
+```
+
+The directory layout should follow the standard ROS2 convention:
+
+```
+my_custom_msgs/
+├── msg/
+│   ├── MyMessage.msg
+│   └── AnotherMessage.msg
+└── srv/
+    └── MyService.srv
+```
+
+## Package Discovery
+
+The generator searches for message packages in this order:
+
+1. **`AMENT_PREFIX_PATH`** — If set (sourced ROS2 environment)
+2. **Common paths** — `/opt/ros/jazzy`, `/opt/ros/humble` (Linux); `C:\dev\ros2_*` (Windows)
+3. **Extra paths** — User-provided via `extra_search_path()`
+
+For Zenoh-based or non-RCL projects, options 1 and 2 are irrelevant — just
+use `extra_search_path()` to point to your message definitions directly.
+
+## Advanced — RCL FFI Bindings
+
+For crates that need direct FFI access to the ROS2 C client library
+(requires a fully sourced ROS2 environment):
+
+```rust
 use std::path::PathBuf;
 
 fn main() {
-    // Signal cargo to rebuild if ROS2 environment changes
-    ros2_env_var_changed();
+    oxidros_build::ros2_env_var_changed();
 
-    // Generate RCL bindings
     let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
-    generate_rcl_bindings(&out_dir);
-
-    // Link ROS2 libraries
-    link_rcl_ros2_libs();
+    oxidros_build::generate_rcl_bindings(&out_dir);
+    oxidros_build::link_rcl_ros2_libs();
 }
 ```
