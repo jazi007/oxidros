@@ -21,7 +21,7 @@ thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = { workspace = true, optional = true }
 tracing-log = { workspace = true, optional = true }
-ros2-types = { version = "0.5.1", path = "../ros2-types" }
+ros2-types = { version = "0.5", path = "../ros2-types" }
 yaml-rust2 = { workspace = true, optional = true }
 
 [lib]

@@ -33,4 +33,4 @@ rcl = []
 [dev-dependencies]
 ros2-types-derive = { version = "0.5", path = "../ros2-types-derive" }
 serde_json.workspace = true
-ros2msg = { version = "0.5.1", path = "../ros2msg", features = ["serde"] }
+ros2msg = { version = "0.5", path = "../ros2msg", features = ["serde"] }

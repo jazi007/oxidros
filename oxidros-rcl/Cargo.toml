@@ -11,10 +11,10 @@ edition.workspace = true
 authors.workspace = true
 
 [dependencies]
-oxidros-core = { version = "0.5.0", path = "../oxidros-core", features = [
+oxidros-core = { version = "0.5", path = "../oxidros-core", features = [
     "logging",
 ] }
-oxidros-msg = { version = "0.5.1", path = "../oxidros-msg" }
+oxidros-msg = { version = "0.5", path = "../oxidros-msg" }
 crossbeam-channel = "0.5"
 libc = "0.2"
 num-traits.workspace = true

@@ -8,13 +8,13 @@ repository.workspace = true
 license-file.workspace = true
 
 [dependencies]
-oxidros-core = { version = "0.5.0", path = "../oxidros-core", features = [
+oxidros-core = { version = "0.5", path = "../oxidros-core", features = [
     "yaml",
     "logging",
 ] }
-oxidros-msg = { version = "0.5.1", path = "../oxidros-msg" }
-oxidros-wrapper = { version = "0.5.0", path = "../oxidros-wrapper", optional = true }
-oxidros-zenoh = { version = "0.5.1", path = "../oxidros-zenoh", optional = true }
+oxidros-msg = { version = "0.5", path = "../oxidros-msg" }
+oxidros-wrapper = { version = "0.5", path = "../oxidros-wrapper", optional = true }
+oxidros-zenoh = { version = "0.5", path = "../oxidros-zenoh", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }

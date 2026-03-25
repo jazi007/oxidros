@@ -13,9 +13,9 @@ default = []
 [dependencies]
 futures-core = "0.3"
 log = { version = "0.4", features = ["std"] }
-oxidros-core = { version = "0.5.0", path = "../oxidros-core" }
-oxidros-rcl = { version = "0.5.0", path = "../oxidros-rcl", features = ["rcl"] }
-oxidros-msg = { version = "0.5.1", path = "../oxidros-msg", features = ["rcl"] }
+oxidros-core = { version = "0.5", path = "../oxidros-core" }
+oxidros-rcl = { version = "0.5", path = "../oxidros-rcl", features = ["rcl"] }
+oxidros-msg = { version = "0.5", path = "../oxidros-msg", features = ["rcl"] }
 tokio = { version = "1", features = ["time"] }
 tokio-util = "0.7"
 futures-util.workspace = true

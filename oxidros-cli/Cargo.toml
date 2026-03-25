@@ -40,8 +40,8 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 
 [build-dependencies]
-oxidros-build = { version = "0.5.2", path = "../oxidros-build" }
-ros2msg = { version = "0.5.3", path = "../ros2msg" }
+oxidros-build = { version = "0.5", path = "../oxidros-build" }
+ros2msg = { version = "0.5", path = "../ros2msg" }
 serde_json = { workspace = true }
 serde = { workspace = true }
 phf_codegen = "0.13"

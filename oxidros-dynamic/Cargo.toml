@@ -11,7 +11,7 @@ categories = ["encoding", "parser-implementations"]
 publish = false
 
 [dependencies]
-ros2-types = { version = "0.5.1", path = "../ros2-types" }
+ros2-types = { version = "0.5", path = "../ros2-types" }
 serde_json = { workspace = true }
 byteorder = "1.5"
 thiserror = "2"
