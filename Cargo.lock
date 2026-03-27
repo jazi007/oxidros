@@ -1859,7 +1859,7 @@ checksum = "c1b04fb49957986fdce4d6ee7a65027d55d4b6d2265e5848bbb507b58ccfdb6f"
 
 [[package]]
 name = "oxidros"
-version = "0.5.6"
+version = "0.5.7"
 dependencies = [
  "oxidros-build",
  "oxidros-core",
@@ -1871,7 +1871,7 @@ dependencies = [
 
 [[package]]
 name = "oxidros-build"
-version = "0.5.3"
+version = "0.5.7"
 dependencies = [
  "bindgen",
  "ros2-types",
@@ -1904,7 +1904,7 @@ dependencies = [
 
 [[package]]
 name = "oxidros-core"
-version = "0.5.6"
+version = "0.5.7"
 dependencies = [
  "futures-core",
  "num-traits",
@@ -1930,7 +1930,7 @@ dependencies = [
 
 [[package]]
 name = "oxidros-msg"
-version = "0.5.1"
+version = "0.5.7"
 dependencies = [
  "log",
  "oxidros-build",
@@ -1944,7 +1944,7 @@ dependencies = [
 
 [[package]]
 name = "oxidros-rcl"
-version = "0.5.5"
+version = "0.5.7"
 dependencies = [
  "crossbeam-channel",
  "futures-util",
@@ -1969,7 +1969,7 @@ dependencies = [
 
 [[package]]
 name = "oxidros-wrapper"
-version = "0.5.5"
+version = "0.5.7"
 dependencies = [
  "futures-core",
  "futures-util",
@@ -1984,7 +1984,7 @@ dependencies = [
 
 [[package]]
 name = "oxidros-zenoh"
-version = "0.5.6"
+version = "0.5.7"
 dependencies = [
  "flume 0.12.0",
  "futures-core",
@@ -2549,7 +2549,7 @@ dependencies = [
 
 [[package]]
 name = "ros2-types"
-version = "0.5.3"
+version = "0.5.7"
 dependencies = [
  "byteorder",
  "cdr-encoding",
@@ -2564,7 +2564,7 @@ dependencies = [
 
 [[package]]
 name = "ros2-types-derive"
-version = "0.5.3"
+version = "0.5.7"
 dependencies = [
  "darling 0.23.0",
  "proc-macro2",

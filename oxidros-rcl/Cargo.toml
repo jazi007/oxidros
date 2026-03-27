@@ -1,6 +1,6 @@
 [package]
 name = "oxidros-rcl"
-version = "0.5.5"
+version = "0.5.7"
 description = "Oxidros: Formally Specified Rust Bindings for ROS2"
 license-file = "LICENSE"
 readme = "README.md"
