@@ -1,6 +1,6 @@
 [package]
 name = "oxidros-msg"
-version = "0.5.7"
+version = "0.5.8"
 description = "Generated ROS2 message types for oxidros"
 license-file = "../LICENSE"
 readme = "README.md"

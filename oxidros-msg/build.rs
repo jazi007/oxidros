@@ -92,29 +92,33 @@ fn main() {
     // Optionally also update the committed src/generated/ tree (developer workflow)
     let regenerate_src = env::var("OXIDROS_REGENERATE_SRC").is_ok();
 
-    match &availability {
-        RosAvailability::Sourced { .. } | RosAvailability::CommonInstall { .. } => {
-            println!("cargo:rerun-if-env-changed=OXIDROS_REGENERATE_SRC");
-            println!("cargo:info=ROS2 detected, generating message files into OUT_DIR");
+    // Try generation if ROS2 is detected, then verify output.
+    // Fall back to pre-committed files if generation produced nothing
+    // (e.g. a directory matches common ROS2 paths but has no message packages).
+    let mut generated = false;
 
-            std::fs::create_dir_all(&out_generated).unwrap();
+    if matches!(
+        &availability,
+        RosAvailability::Sourced { .. } | RosAvailability::CommonInstall { .. }
+    ) {
+        println!("cargo:rerun-if-env-changed=OXIDROS_REGENERATE_SRC");
+        println!("cargo:info=ROS2 detected, attempting message generation into OUT_DIR");
 
-            // Helper: generate a package group into an output subdirectory,
-            // and optionally mirror it to src/generated/ for committing.
-            let generate_group = |subdir: &str, packages: &[&str]| {
-                let out_subdir = out_generated.join(subdir);
-                std::fs::create_dir_all(&out_subdir).unwrap();
-                let config = Config::builder()
-                    .packages(packages)
-                    .uuid_path("crate::ros2msg")
-                    .primitive_path("crate")
-                    .build();
-                if let Some(generator) = get_base_generator(&config) {
-                    generator
-                        .output_dir(&out_subdir)
-                        .generate()
-                        .unwrap_or_else(|e| panic!("Failed to generate {}: {}", subdir, e));
-                }
+        std::fs::create_dir_all(&out_generated).unwrap();
+
+        let generate_group = |subdir: &str, packages: &[&str]| -> bool {
+            let out_subdir = out_generated.join(subdir);
+            std::fs::create_dir_all(&out_subdir).unwrap();
+            let config = Config::builder()
+                .packages(packages)
+                .uuid_path("crate::ros2msg")
+                .primitive_path("crate")
+                .build();
+            if let Some(generator) = get_base_generator(&config) {
+                generator
+                    .output_dir(&out_subdir)
+                    .generate()
+                    .unwrap_or_else(|e| panic!("Failed to generate {}: {}", subdir, e));
 
                 if regenerate_src {
                     let src_subdir = src_generated.join(subdir);
@@ -123,32 +127,54 @@ fn main() {
                     }
                     copy_dir_recursive(&out_subdir, &src_subdir);
                 }
-            };
-
-            generate_group("common_interfaces", &common_interfaces_deps);
-            generate_group("interfaces", &interface_deps);
-            generate_group("ros2msg", &ros2msg_deps);
-        }
-        RosAvailability::NotAvailable => {
-            println!("cargo:warning=No ROS2 installation detected");
-            println!("cargo:warning=Copying pre-generated message files to OUT_DIR");
-
-            // Verify that pre-generated files exist
-            if !src_generated
-                .join("common_interfaces")
-                .join("mod.rs")
-                .exists()
-            {
-                panic!(
-                    "Pre-generated message files not found in {}. \
-                     Either install ROS2 and regenerate, or ensure the generated files are committed.",
-                    src_generated.display()
-                );
+                true
+            } else {
+                false
             }
+        };
 
-            // Copy pre-committed files into OUT_DIR so lib.rs can include from there
-            copy_dir_recursive(&src_generated, &out_generated);
+        let ok_common = generate_group("common_interfaces", &common_interfaces_deps);
+        let ok_ifaces = generate_group("interfaces", &interface_deps);
+        let ok_ros2msg = generate_group("ros2msg", &ros2msg_deps);
+
+        generated = ok_common && ok_ifaces && ok_ros2msg;
+
+        if !generated {
+            println!(
+                "cargo:warning=ROS2 path detected but message packages not found, \
+                 falling back to pre-generated files"
+            );
+            // Clean up partial output
+            if out_generated.exists() {
+                std::fs::remove_dir_all(&out_generated).ok();
+            }
         }
+    }
+
+    if !generated {
+        if !matches!(
+            &availability,
+            RosAvailability::Sourced { .. } | RosAvailability::CommonInstall { .. }
+        ) {
+            println!("cargo:warning=No ROS2 installation detected");
+        }
+        println!("cargo:warning=Copying pre-generated message files to OUT_DIR");
+
+        // Verify that pre-generated files exist
+        if !src_generated
+            .join("common_interfaces")
+            .join("mod.rs")
+            .exists()
+        {
+            panic!(
+                "Pre-generated message files not found in {}. \
+                 Either install ROS2 and regenerate, or ensure the generated files are committed.",
+                src_generated.display()
+            );
+        }
+
+        // Copy pre-committed files into OUT_DIR so lib.rs can include from there
+        copy_dir_recursive(&src_generated, &out_generated);
     }
 
     // Generate runtime_c.rs using bindgen (only when ROS2 is sourced for rcl feature)
