@@ -181,7 +181,7 @@ async fn record(
                         .unwrap_or_else(|| dds_type.clone());
 
                     let schema_data =
-                        match crate::type_resolve::resolve(&dds_type, &type_hash, ctx, &graph).await
+                        match crate::type_resolve::resolve(&dds_type, ctx).await
                         {
                             Some(type_desc) => type_desc.to_msg_definition(),
                             None => {
@@ -265,11 +265,10 @@ async fn record(
 /// Extract timestamp from a Zenoh sample's attachment (bytes 8..16 as i64 LE).
 /// Falls back to current time if no attachment.
 fn extract_timestamp(sample: &zenoh::sample::Sample) -> i64 {
-    if let Some(att) = sample.attachment() {
-        let bytes = att.to_bytes();
-        if bytes.len() >= 16 {
-            return i64::from_le_bytes(bytes[8..16].try_into().unwrap_or([0; 8]));
-        }
+    if let Some(att) = sample.attachment()
+        && let Ok(parsed) = oxidros_zenoh::Attachment::from_bytes(&att.to_bytes())
+    {
+        return parsed.timestamp_ns;
     }
     // Fallback: current time
     std::time::SystemTime::now()
@@ -394,10 +393,7 @@ async fn play(
                 .await
                 .map_err(|e| format!("Failed to create publisher for {topic}: {e}"))?;
 
-            let gid: [u8; 16] = std::array::from_fn(|i| {
-                // Deterministic but unique per channel
-                ((channel.id as u8).wrapping_add(i as u8)).wrapping_mul(37)
-            });
+            let gid = oxidros_zenoh::generate_gid();
 
             let ros_type = channel
                 .schema
@@ -469,18 +465,18 @@ async fn play(
             let seq = sequences.get_mut(&ch_id).unwrap();
             let gid = gids[&ch_id];
 
-            let mut attachment = [0u8; 33];
-            attachment[0..8].copy_from_slice(&seq.to_le_bytes());
-            attachment[8..16].copy_from_slice(&(msg.publish_time as i64).to_le_bytes());
-            attachment[16] = 16;
-            attachment[17..33].copy_from_slice(&gid);
+            let attachment = oxidros_zenoh::Attachment {
+                sequence_number: *seq,
+                timestamp_ns: msg.publish_time as i64,
+                gid,
+            };
             *seq += 1;
 
             // Publish
             let publisher = &publishers[&ch_id];
             publisher
                 .put(msg.data.as_ref())
-                .attachment(zenoh::bytes::ZBytes::from(attachment.to_vec()))
+                .attachment(zenoh::bytes::ZBytes::from(attachment.to_bytes().to_vec()))
                 .await
                 .map_err(|e| format!("publish failed: {e}"))?;
 

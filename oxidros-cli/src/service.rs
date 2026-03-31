@@ -100,10 +100,10 @@ pub(crate) async fn raw_call(
     let request_dds = service_dds_subtype(&dds_type, "Request");
     let response_dds = service_dds_subtype(&dds_type, "Response");
 
-    let request_desc = crate::type_resolve::resolve(&request_dds, &type_hash, ctx, graph)
+    let request_desc = crate::type_resolve::resolve(&request_dds, ctx)
         .await
         .ok_or_else(|| format!("Cannot resolve request type for '{request_dds}'"))?;
-    let response_desc = crate::type_resolve::resolve(&response_dds, &type_hash, ctx, graph)
+    let response_desc = crate::type_resolve::resolve(&response_dds, ctx)
         .await
         .ok_or_else(|| format!("Cannot resolve response type for '{response_dds}'"))?;
 
@@ -119,13 +119,15 @@ pub(crate) async fn raw_call(
         type_hash,
     );
 
-    let attachment = crate::type_resolve::build_attachment();
+    let gid = oxidros_zenoh::generate_gid();
+    let attachment = oxidros_zenoh::Attachment::new(0, gid);
+    let attachment_bytes = attachment.to_bytes();
 
     let replies = ctx
         .session()
         .get(&key_expr)
         .payload(ZBytes::from(cdr_bytes))
-        .attachment(ZBytes::from(attachment.to_vec()))
+        .attachment(ZBytes::from(attachment_bytes.to_vec()))
         .target(QueryTarget::All)
         .timeout(Duration::from_secs(10))
         .await

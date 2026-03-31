@@ -10,10 +10,12 @@ use crate::{
     keyexpr::{EntityKind, liveliness_node_keyexpr},
     service::{client::Client, server::Server},
     topic::{publisher::Publisher, subscriber::Subscriber},
+    type_description::TypeRegistry,
 };
 use oxidros_core::{TypeSupport, qos::Profile, targets};
 use parking_lot::Mutex;
 use ros2args::names::NameKind;
+use std::collections::HashMap;
 use std::sync::{
     Arc,
     atomic::{AtomicU32, Ordering},
@@ -39,6 +41,10 @@ struct NodeInner {
     next_entity_id: AtomicU32,
     /// Liveliness token for this node.
     _liveliness_token: Mutex<Option<LivelinessToken>>,
+    /// Type descriptions registered by publishers/subscribers/services.
+    type_registry: TypeRegistry,
+    /// Queryable for z_get_type_description (kept alive).
+    _type_desc_queryable: zenoh::query::Queryable<()>,
 }
 
 /// ROS2 Node.
@@ -141,6 +147,23 @@ impl Node {
             .declare_token(&token_key)
             .wait()?;
 
+        // Set up z_get_type_description service (raw Zenoh queryable)
+        let type_registry: TypeRegistry = Arc::new(Mutex::new(HashMap::new()));
+        let node_fqn = ros2args::names::build_node_fqn(
+            if effective_namespace.is_empty() {
+                "/"
+            } else {
+                &effective_namespace
+            },
+            &effective_name,
+        );
+        let type_desc_queryable = crate::type_description::setup_queryable(
+            context.session(),
+            context.domain_id(),
+            &node_fqn,
+            type_registry.clone(),
+        )?;
+
         let inner = Arc::new(NodeInner {
             context,
             node_id,
@@ -150,6 +173,8 @@ impl Node {
             gid,
             next_entity_id: AtomicU32::new(10), // Start at 10 to match rmw_zenoh
             _liveliness_token: Mutex::new(Some(token)),
+            type_registry,
+            _type_desc_queryable: type_desc_queryable,
         });
 
         tracing::debug!(
@@ -223,6 +248,13 @@ impl Node {
     /// Allocate a new entity ID.
     pub(crate) fn allocate_entity_id(&self) -> u32 {
         self.inner.next_entity_id.fetch_add(1, Ordering::SeqCst)
+    }
+
+    /// Register a type description so it can be served via `get_type_description`.
+    fn register_type_description<T: oxidros_core::TypeDescription>(&self) {
+        let desc = T::type_description();
+        let key = desc.type_description.type_name.clone();
+        self.inner.type_registry.lock().entry(key).or_insert(desc);
     }
 
     /// Expand a topic/service name to its fully qualified form and apply remapping rules.
@@ -339,11 +371,12 @@ impl Node {
     /// - Relative names are prefixed with the node's namespace
     /// - Private names (starting with `~`) are prefixed with the node's FQN
     /// - Remapping rules from command-line arguments are applied
-    pub fn z_create_publisher<T: TypeSupport>(
+    pub fn z_create_publisher<T: TypeSupport + oxidros_core::TypeDescription>(
         self: &Arc<Self>,
         topic_name: &str,
         qos: Option<Profile>,
     ) -> Result<Publisher<T>> {
+        self.register_type_description::<T>();
         // Expand and remap the topic name
         let fq_topic_name = self.expand_and_remap_name(topic_name, NameKind::Topic)?;
 
@@ -370,11 +403,12 @@ impl Node {
     /// # Name Resolution
     ///
     /// The topic name is expanded and remapped (see `create_publisher`).
-    pub fn z_create_subscriber<T: TypeSupport>(
+    pub fn z_create_subscriber<T: TypeSupport + oxidros_core::TypeDescription>(
         self: &Arc<Self>,
         topic_name: &str,
         qos: Option<Profile>,
     ) -> Result<Subscriber<T>> {
+        self.register_type_description::<T>();
         // Expand and remap the topic name
         let fq_topic_name = self.expand_and_remap_name(topic_name, NameKind::Topic)?;
 
@@ -407,9 +441,11 @@ impl Node {
         qos: Option<Profile>,
     ) -> Result<Client<T>>
     where
-        T::Request: TypeSupport,
-        T::Response: TypeSupport,
+        T::Request: TypeSupport + oxidros_core::TypeDescription,
+        T::Response: TypeSupport + oxidros_core::TypeDescription,
     {
+        self.register_type_description::<T::Request>();
+        self.register_type_description::<T::Response>();
         // Expand and remap the service name (services use Topic naming rules)
         let fq_service_name = self.expand_and_remap_name(service_name, NameKind::Topic)?;
 
@@ -441,9 +477,11 @@ impl Node {
         qos: Option<Profile>,
     ) -> Result<Server<T>>
     where
-        T::Request: TypeSupport,
-        T::Response: TypeSupport,
+        T::Request: TypeSupport + oxidros_core::TypeDescription,
+        T::Response: TypeSupport + oxidros_core::TypeDescription,
     {
+        self.register_type_description::<T::Request>();
+        self.register_type_description::<T::Response>();
         // Expand and remap the service name (services use Topic naming rules)
         let fq_service_name = self.expand_and_remap_name(service_name, NameKind::Topic)?;
 
@@ -498,7 +536,7 @@ impl oxidros_core::api::RosNode for Node {
         self.z_fully_qualified_name()
     }
 
-    fn create_publisher<T: TypeSupport>(
+    fn create_publisher<T: TypeSupport + oxidros_core::TypeDescription>(
         self: &Arc<Self>,
         topic_name: &str,
         qos: Option<Profile>,
@@ -506,7 +544,7 @@ impl oxidros_core::api::RosNode for Node {
         self.z_create_publisher(topic_name, qos)
     }
 
-    fn create_subscriber<T: TypeSupport>(
+    fn create_subscriber<T: TypeSupport + oxidros_core::TypeDescription>(
         self: &Arc<Self>,
         topic_name: &str,
         qos: Option<Profile>,
@@ -519,7 +557,13 @@ impl oxidros_core::api::RosNode for Node {
         service_name: &str,
         qos: Option<Profile>,
     ) -> Result<Self::Client<T>> {
-        self.z_create_client(service_name, qos)
+        let fq_service_name = self.expand_and_remap_name(service_name, NameKind::Topic)?;
+        Client::new(
+            self.clone(),
+            service_name,
+            &fq_service_name,
+            qos.unwrap_or_else(Profile::services_default),
+        )
     }
 
     fn create_server<T: oxidros_core::ServiceMsg>(
@@ -527,7 +571,13 @@ impl oxidros_core::api::RosNode for Node {
         service_name: &str,
         qos: Option<Profile>,
     ) -> Result<Self::Server<T>> {
-        self.z_create_server(service_name, qos)
+        let fq_service_name = self.expand_and_remap_name(service_name, NameKind::Topic)?;
+        Server::new(
+            self.clone(),
+            service_name,
+            &fq_service_name,
+            qos.unwrap_or_else(Profile::services_default),
+        )
     }
 }
 
