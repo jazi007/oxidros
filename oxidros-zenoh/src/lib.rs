@@ -40,6 +40,7 @@ mod keyexpr;
 mod node;
 mod qos;
 mod selector;
+mod type_description;
 
 pub mod clock;
 pub mod logger;
@@ -49,6 +50,7 @@ pub mod topic;
 pub mod parameter;
 
 // Re-exports
+pub use attachment::{Attachment, generate_gid};
 pub use context::Context;
 pub use error::{Error, Result};
 pub use graph_cache::{EntityInfo, GraphCache};

@@ -191,7 +191,7 @@ async fn echo(
         .ok_or_else(|| format!("Topic '{topic}' not found or has no type information"))?;
 
     // Resolve the type description (registry or service call fallback)
-    let type_desc = crate::type_resolve::resolve(&dds_type, &type_hash, ctx, graph)
+    let type_desc = crate::type_resolve::resolve(&dds_type, ctx)
         .await
         .ok_or_else(|| format!("Cannot resolve type description for '{dds_type}'"))?;
 

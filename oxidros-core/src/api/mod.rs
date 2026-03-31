@@ -25,7 +25,9 @@
 //! }
 //! ```
 
-use crate::{ActionMsg, Result, ServiceMsg, TypeSupport, message::Message, qos::Profile};
+use crate::{
+    ActionMsg, Result, ServiceMsg, TypeDescription, TypeSupport, message::Message, qos::Profile,
+};
 use futures_core::Stream;
 use std::{borrow::Cow, pin::Pin, sync::Arc, time::Duration};
 
@@ -118,7 +120,7 @@ pub trait RosNode: Send + Sync + Sized {
     ///
     /// * `topic_name` - Topic name (can be relative or absolute)
     /// * `qos` - Optional QoS profile (uses default if None)
-    fn create_publisher<T: TypeSupport>(
+    fn create_publisher<T: TypeSupport + TypeDescription>(
         self: &Arc<Self>,
         topic_name: &str,
         qos: Option<Profile>,
@@ -130,7 +132,7 @@ pub trait RosNode: Send + Sync + Sized {
     ///
     /// * `topic_name` - Topic name (can be relative or absolute)
     /// * `qos` - Optional QoS profile (uses default if None)
-    fn create_subscriber<T: TypeSupport>(
+    fn create_subscriber<T: TypeSupport + TypeDescription>(
         self: &Arc<Self>,
         topic_name: &str,
         qos: Option<Profile>,
