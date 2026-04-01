@@ -152,9 +152,11 @@ fn run_python_parser(idl_path: &Path, python_script: Option<&Path>) -> Result<Va
     } else {
         let possible_paths = vec![
             PathBuf::from("idl_to_json_python.py"),
-            PathBuf::from("../../idl_to_json_python.py"),
-            PathBuf::from("../../../idl_to_json_python.py"),
+            PathBuf::from("scripts/idl_to_json_python.py"),
+            PathBuf::from("../../scripts/idl_to_json_python.py"),
+            PathBuf::from("../../../scripts/idl_to_json_python.py"),
             env::current_dir()?.join("idl_to_json_python.py"),
+            env::current_dir()?.join("scripts/idl_to_json_python.py"),
         ];
 
         possible_paths.into_iter().find(|p| p.exists()).ok_or(

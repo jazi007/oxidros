@@ -113,15 +113,15 @@ show_progress() {
 # Run tests
 for i in "${!IDL_FILES[@]}"; do
     f="${IDL_FILES[$i]}"
-    
+
     # Show progress
     if [[ "$VERBOSE" != "1" ]]; then
         show_progress $((i + 1)) "$TOTAL"
     fi
-    
+
     # Run conformance test
     result=$("$CONFORMANCE_TOOL" "$f" --generate-reference 2>&1) || true
-    
+
     if echo "$result" | grep -q "No differences found"; then
         PASSED=$((PASSED + 1))
         if [[ "$VERBOSE" == "1" ]]; then
