@@ -1,6 +1,6 @@
 [package]
 name = "oxidros-zenoh"
-version = "0.5.7"
+version = "0.5.8"
 edition.workspace = true
 authors.workspace = true
 license-file.workspace = true

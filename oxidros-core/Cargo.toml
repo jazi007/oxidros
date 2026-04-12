@@ -1,6 +1,6 @@
 [package]
 name = "oxidros-core"
-version = "0.5.7"
+version = "0.5.8"
 description = "Core traits and types for oxidros ROS2 client library"
 keywords = ["ros2", "robotics"]
 edition.workspace = true

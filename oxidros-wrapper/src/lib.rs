@@ -559,7 +559,7 @@ impl<T: ServiceMsg> RosClient<T> for Client<T> {
                 Ok(Ok(response)) => return Ok(response),
                 Ok(Err(e)) => return Err(e),
                 Err(_) => {
-                    tracing::warn!("Service call timeout, retrying...");
+                    tracing::warn!("Service {} call timeout, retrying...", T::type_name());
                 }
             }
         }
