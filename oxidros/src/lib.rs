@@ -4,7 +4,7 @@
 //! with multiple backend implementations:
 //!
 //! - **RCL Backend** (`rcl` feature): FFI bindings to the official ROS2 C library.
-//!   Requires a ROS2 installation (Humble, Jazzy, or Kilted).
+//!   Requires a ROS2 installation (Humble, Jazzy, Kilted, or Lyrical).
 //!
 //! - **Zenoh Backend** (`zenoh` feature): Pure Rust implementation using Zenoh middleware.
 //!   Compatible with `rmw_zenoh_cpp`. No ROS2 installation required at runtime.
@@ -19,6 +19,7 @@
 //! | `humble` | RCL | ROS2 Humble installation |
 //! | `jazzy` | RCL | ROS2 Jazzy installation |
 //! | `kilted` | RCL | ROS2 Kilted installation |
+//! | `lyrical` | RCL | ROS2 Lyrical installation |
 //!
 //! # Quick Start
 //!
@@ -30,7 +31,7 @@
 //! oxidros = { version = "0.1", features = ["zenoh"] }
 //!
 //! # For RCL backend (requires ROS2 installation):
-//! oxidros = { version = "0.1", features = ["jazzy"] }  # or "humble", "kilted"
+//! oxidros = { version = "0.1", features = ["jazzy"] }  // or "humble", "kilted", "lyrical"
 //! tokio = { version = "1", features = ["full"] }
 //! ```
 //!

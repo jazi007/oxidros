@@ -67,6 +67,8 @@ pub enum RosDistro {
     Jazzy,
     /// ROS2 Kilted Kaiju
     Kilted,
+    /// ROS2 Lyrical Lizard
+    Lyrical,
 }
 
 impl RosDistro {
@@ -76,6 +78,7 @@ impl RosDistro {
             RosDistro::Humble => "humble",
             RosDistro::Jazzy => "jazzy",
             RosDistro::Kilted => "kilted",
+            RosDistro::Lyrical => "lyrical",
         }
     }
 }
@@ -98,6 +101,7 @@ pub fn detect_distro() -> Option<RosDistro> {
             "humble" => return Some(RosDistro::Humble),
             "jazzy" => return Some(RosDistro::Jazzy),
             "kilted" => return Some(RosDistro::Kilted),
+            "lyrical" => return Some(RosDistro::Lyrical),
             _ => {}
         }
     }
@@ -128,6 +132,9 @@ fn detect_distro_from_path(path: &str) -> Option<RosDistro> {
             }
             if path_str.contains("kilted") {
                 return Some(RosDistro::Kilted);
+            }
+            if path_str.contains("lyrical") {
+                return Some(RosDistro::Lyrical);
             }
         }
     }
@@ -684,8 +691,12 @@ pub fn link_msg_ros2_libs() {
     println!("cargo:rustc-link-lib=rosidl_runtime_c");
 
     if !cfg!(target_os = "windows") {
-        println!("cargo:rustc-link-lib=actionlib_msgs__rosidl_typesupport_c");
-        println!("cargo:rustc-link-lib=actionlib_msgs__rosidl_generator_c");
+        // actionlib_msgs was removed in Jazzy; only present in Humble
+        let distro_for_link = env::var("ROS_DISTRO").unwrap_or_default();
+        if distro_for_link == "humble" {
+            println!("cargo:rustc-link-lib=actionlib_msgs__rosidl_typesupport_c");
+            println!("cargo:rustc-link-lib=actionlib_msgs__rosidl_generator_c");
+        }
         println!("cargo:rustc-link-lib=action_msgs__rosidl_typesupport_c");
         println!("cargo:rustc-link-lib=action_msgs__rosidl_generator_c");
         println!("cargo:rustc-link-lib=builtin_interfaces__rosidl_typesupport_c");
@@ -718,7 +729,7 @@ pub fn link_msg_ros2_libs() {
         // Distro-specific message libraries
         let distro = env::var("ROS_DISTRO").unwrap_or_default();
         match distro.as_str() {
-            "jazzy" | "iron" => {
+            "jazzy" | "iron" | "kilted" | "lyrical" => {
                 println!("cargo:rustc-link-lib=service_msgs__rosidl_typesupport_c");
                 println!("cargo:rustc-link-lib=service_msgs__rosidl_generator_c");
                 println!("cargo:rustc-link-lib=type_description_interfaces__rosidl_typesupport_c");

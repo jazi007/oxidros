@@ -59,7 +59,7 @@ impl From<super::rmw_qos_reliability_policy_t> for oxidros_core::ReliabilityPoli
             RMW_QOS_POLICY_RELIABILITY_RELIABLE => Self::Reliable,
             RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT => Self::BestEffort,
             RMW_QOS_POLICY_RELIABILITY_UNKNOWN => Self::Unknown,
-            #[cfg(any(ros_distro_jazzy, ros_distro_kilted))]
+            #[cfg(any(ros_distro_jazzy, ros_distro_kilted, ros_distro_lyrical))]
             RMW_QOS_POLICY_RELIABILITY_BEST_AVAILABLE => Self::BestAvailable,
         }
     }
@@ -73,7 +73,7 @@ impl From<super::rmw_qos_durability_policy_t> for oxidros_core::DurabilityPolicy
             RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL => Self::TransientLocal,
             RMW_QOS_POLICY_DURABILITY_VOLATILE => Self::Volatile,
             RMW_QOS_POLICY_DURABILITY_UNKNOWN => Self::Unknown,
-            #[cfg(any(ros_distro_jazzy, ros_distro_kilted))]
+            #[cfg(any(ros_distro_jazzy, ros_distro_kilted, ros_distro_lyrical))]
             RMW_QOS_POLICY_DURABILITY_BEST_AVAILABLE => Self::Unknown,
         }
     }
@@ -85,10 +85,11 @@ impl From<super::rmw_qos_liveliness_policy_t> for oxidros_core::LivelinessPolicy
         match value {
             RMW_QOS_POLICY_LIVELINESS_SYSTEM_DEFAULT => Self::SystemDefault,
             RMW_QOS_POLICY_LIVELINESS_AUTOMATIC => Self::Automatic,
-            RMW_QOS_POLICY_LIVELINESS_MANUAL_BY_NODE
-            | RMW_QOS_POLICY_LIVELINESS_MANUAL_BY_TOPIC => Self::ManualByTopic,
+            #[cfg(ros_distro_humble)]
+            RMW_QOS_POLICY_LIVELINESS_MANUAL_BY_NODE => Self::ManualByTopic,
+            RMW_QOS_POLICY_LIVELINESS_MANUAL_BY_TOPIC => Self::ManualByTopic,
             RMW_QOS_POLICY_LIVELINESS_UNKNOWN => Self::Unknown,
-            #[cfg(any(ros_distro_jazzy, ros_distro_kilted))]
+            #[cfg(any(ros_distro_jazzy, ros_distro_kilted, ros_distro_lyrical))]
             RMW_QOS_POLICY_LIVELINESS_BEST_AVAILABLE => Self::Unknown,
         }
     }
@@ -115,9 +116,9 @@ impl From<oxidros_core::ReliabilityPolicy> for super::rmw_qos_reliability_policy
             SystemDefault => Self::RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT,
             Reliable => Self::RMW_QOS_POLICY_RELIABILITY_RELIABLE,
             BestEffort => Self::RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT,
-            #[cfg(any(ros_distro_jazzy, ros_distro_kilted))]
+            #[cfg(any(ros_distro_jazzy, ros_distro_kilted, ros_distro_lyrical))]
             BestAvailable => Self::RMW_QOS_POLICY_RELIABILITY_BEST_AVAILABLE,
-            #[cfg(not(any(ros_distro_jazzy, ros_distro_kilted)))]
+            #[cfg(not(any(ros_distro_jazzy, ros_distro_kilted, ros_distro_lyrical)))]
             BestAvailable => Self::RMW_QOS_POLICY_RELIABILITY_UNKNOWN,
             Unknown => Self::RMW_QOS_POLICY_RELIABILITY_UNKNOWN,
         }
@@ -131,9 +132,9 @@ impl From<oxidros_core::DurabilityPolicy> for super::rmw_qos_durability_policy_t
             SystemDefault => Self::RMW_QOS_POLICY_DURABILITY_SYSTEM_DEFAULT,
             TransientLocal => Self::RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL,
             Volatile => Self::RMW_QOS_POLICY_DURABILITY_VOLATILE,
-            #[cfg(any(ros_distro_jazzy, ros_distro_kilted))]
+            #[cfg(any(ros_distro_jazzy, ros_distro_kilted, ros_distro_lyrical))]
             BestAvailable => Self::RMW_QOS_POLICY_DURABILITY_BEST_AVAILABLE,
-            #[cfg(not(any(ros_distro_jazzy, ros_distro_kilted)))]
+            #[cfg(not(any(ros_distro_jazzy, ros_distro_kilted, ros_distro_lyrical)))]
             BestAvailable => Self::RMW_QOS_POLICY_DURABILITY_UNKNOWN,
             Unknown => Self::RMW_QOS_POLICY_DURABILITY_UNKNOWN,
         }
@@ -147,9 +148,9 @@ impl From<oxidros_core::LivelinessPolicy> for super::rmw_qos_liveliness_policy_t
             SystemDefault => Self::RMW_QOS_POLICY_LIVELINESS_SYSTEM_DEFAULT,
             Automatic => Self::RMW_QOS_POLICY_LIVELINESS_AUTOMATIC,
             ManualByTopic => Self::RMW_QOS_POLICY_LIVELINESS_MANUAL_BY_TOPIC,
-            #[cfg(any(ros_distro_jazzy, ros_distro_kilted))]
+            #[cfg(any(ros_distro_jazzy, ros_distro_kilted, ros_distro_lyrical))]
             BestAvailable => Self::RMW_QOS_POLICY_LIVELINESS_BEST_AVAILABLE,
-            #[cfg(not(any(ros_distro_jazzy, ros_distro_kilted)))]
+            #[cfg(not(any(ros_distro_jazzy, ros_distro_kilted, ros_distro_lyrical)))]
             BestAvailable => Self::RMW_QOS_POLICY_LIVELINESS_UNKNOWN,
             Unknown => Self::RMW_QOS_POLICY_LIVELINESS_UNKNOWN,
         }

@@ -55,9 +55,9 @@ fn main() {
 
     oxidros_build::ros2_env_var_changed();
 
-    // Define ROS2 package groups
-    let common_interfaces_deps = [
-        "actionlib_msgs",
+    // actionlib_msgs was removed from ROS2 in Jazzy; only present in Humble
+    let ros_distro = env::var("ROS_DISTRO").unwrap_or_default();
+    let mut common_interfaces_deps_vec = vec![
         "diagnostic_msgs",
         "example_interfaces",
         "geometry_msgs",
@@ -70,6 +70,10 @@ fn main() {
         "trajectory_msgs",
         "visualization_msgs",
     ];
+    if ros_distro == "humble" {
+        common_interfaces_deps_vec.insert(0, "actionlib_msgs");
+    }
+    let common_interfaces_deps: Vec<&str> = common_interfaces_deps_vec;
 
     let interface_deps = [
         "action_msgs",

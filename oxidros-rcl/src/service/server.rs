@@ -87,7 +87,7 @@
 //! // rt.block_on(server_task(server)); // Spawn an asynchronous task.
 //! ```
 
-#[cfg(ros_distro_jazzy)]
+#[cfg(any(ros_distro_jazzy, ros_distro_lyrical))]
 use crate::msg::interfaces::rosgraph_msgs::msg::Clock;
 use crate::{
     PhantomUnsync,
@@ -121,14 +121,14 @@ impl Drop for ServerData {
     }
 }
 
-#[cfg(any(ros_distro_jazzy, ros_distro_kilted))]
+#[cfg(any(ros_distro_jazzy, ros_distro_kilted, ros_distro_lyrical))]
 pub enum RCLServiceIntrospection {
     RCLServiceIntrospectionOff,
     RCLServiceIntrospectionMetadata,
     RCLServiceIntrospectionContents,
 }
 
-#[cfg(any(ros_distro_jazzy, ros_distro_kilted))]
+#[cfg(any(ros_distro_jazzy, ros_distro_kilted, ros_distro_lyrical))]
 impl From<rcl::rcl_service_introspection_state_t> for RCLServiceIntrospection {
     fn from(value: rcl::rcl_service_introspection_state_t) -> Self {
         use rcl::rcl_service_introspection_state_t::*;
@@ -139,7 +139,7 @@ impl From<rcl::rcl_service_introspection_state_t> for RCLServiceIntrospection {
         }
     }
 }
-#[cfg(any(ros_distro_jazzy, ros_distro_kilted))]
+#[cfg(any(ros_distro_jazzy, ros_distro_kilted, ros_distro_lyrical))]
 impl From<RCLServiceIntrospection> for rcl::rcl_service_introspection_state_t {
     fn from(value: RCLServiceIntrospection) -> Self {
         use RCLServiceIntrospection::*;
@@ -191,7 +191,7 @@ impl<T: ServiceMsg> Server<T> {
         })
     }
 
-    #[cfg(ros_distro_jazzy)]
+    #[cfg(any(ros_distro_jazzy, ros_distro_lyrical))]
     pub fn configure_introspection(
         &mut self,
         clock: &mut Clock,

@@ -293,7 +293,7 @@ impl<'a, T: msg::ServiceMsg> ST<ClientRecv<'a, T>> {
     }
 }
 
-#[cfg(any(ros_distro_humble, ros_distro_jazzy, ros_distro_kilted))]
+#[cfg(any(ros_distro_humble, ros_distro_jazzy, ros_distro_kilted, ros_distro_lyrical))]
 type RcutilsAllocator = rcl::rcutils_allocator_s;
 
 #[cfg(feature = "custom_alloc")]
