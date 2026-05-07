@@ -10,6 +10,7 @@ fn main() {
     println!("cargo::rustc-check-cfg=cfg(ros_distro_humble)");
     println!("cargo::rustc-check-cfg=cfg(ros_distro_jazzy)");
     println!("cargo::rustc-check-cfg=cfg(ros_distro_kilted)");
+    println!("cargo::rustc-check-cfg=cfg(ros_distro_lyrical)");
 
     // Emit ros_distro_xxx cfg based on ROS_DISTRO env
     if let Some(distro) = oxidros_build::detect_distro() {

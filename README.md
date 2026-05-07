@@ -20,7 +20,7 @@ Both backends share a unified API through the `oxidros` crate, making it easy to
 
 - **Unified API**: Write code once, run with either backend
 - **Explicit backend selection**: Choose `rcl` or `zenoh` via Cargo features
-- **Automatic distro detection**: ROS2 distribution (jazzy/humble/kilted) detected from `ROS_DISTRO` env
+- **Automatic distro detection**: ROS2 distribution (jazzy/humble/kilted/lyrical) detected from `ROS_DISTRO` env
 - **Standard Rust tooling**: Works with `cargo` - no custom build tools required
 - **Build-time message generation**: Message types generated at compile time via `build.rs`
 - **Async/await support**: First-class async support with tokio
@@ -44,7 +44,7 @@ tokio = { version = "1", features = ["full"] }
 
 **Important**: When using `rcl`, source your ROS2 installation first:
 ```bash
-source /opt/ros/jazzy/setup.bash  # or humble/kilted
+source /opt/ros/jazzy/setup.bash  # or humble/kilted/lyrical
 cargo build --features rcl
 ```
 
@@ -58,17 +58,17 @@ use oxidros::msg::common_interfaces::std_msgs::msg::String;
 async fn main() -> oxidros::error::Result<()> {
     let ctx = Context::new()?;
     let node = ctx.create_node("my_node", None)?;
-    
+
     // Publisher
     let publisher = node.create_publisher::<String>("chatter", None)?;
-    
+
     // Subscriber
     let mut subscriber = node.create_subscriber::<String>("chatter", None)?;
-    
+
     // Async receive
     let msg = subscriber.recv().await?;
     println!("Received: {}", msg.sample.data.get_string());
-    
+
     Ok(())
 }
 ```
@@ -83,20 +83,20 @@ use oxidros::msg::common_interfaces::example_interfaces::srv::AddTwoInts;
 async fn main() -> oxidros::error::Result<()> {
     let ctx = Context::new()?;
     let node = ctx.create_node("my_node", None)?;
-    
+
     // Client
     let mut client = node.create_client::<AddTwoInts>("add_two_ints", None)?;
-    
+
     // Wait for service
     while !client.is_service_available() {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     }
-    
+
     // Call service
     let request = AddTwoInts_Request { a: 1, b: 2 };
     let response = client.call(&request).await?;
     println!("Sum: {}", response.sample.sum);
-    
+
     Ok(())
 }
 ```
@@ -111,20 +111,20 @@ use std::time::Duration;
 fn main() -> oxidros::error::Result<()> {
     let ctx = Context::new()?;
     let node = ctx.create_node("my_node", None)?;
-    
+
     let mut selector = ctx.create_selector()?;
-    
+
     // Add subscriber with callback
     let subscriber = node.create_subscriber::<String>("chatter", None)?;
     selector.add_subscriber(subscriber, Box::new(|msg| {
         println!("Received: {}", msg.sample.data.get_string());
     }));
-    
+
     // Add timer
     selector.add_wall_timer("timer", Duration::from_secs(1), Box::new(|| {
         println!("Timer fired!");
     }));
-    
+
     // Event loop
     loop {
         selector.wait()?;
@@ -166,7 +166,7 @@ Run examples:
 
 ```bash
 # Source ROS2 first (sets ROS_DISTRO for automatic detection)
-source /opt/ros/jazzy/setup.bash
+source /opt/ros/jazzy/setup.bash  # or lyrical
 
 # Run publisher
 cargo run -p simple --features rcl --bin publisher
@@ -181,7 +181,7 @@ The `justfile` automatically detects the backend from `ROS_DISTRO`:
 
 ```bash
 # With ROS2 sourced → uses rcl backend
-source /opt/ros/jazzy/setup.bash
+source /opt/ros/jazzy/setup.bash  # or lyrical
 just check  # runs fmt, clippy, test with --features rcl
 
 # Without ROS2 → uses zenoh backend

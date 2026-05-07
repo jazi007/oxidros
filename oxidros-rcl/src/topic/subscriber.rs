@@ -505,14 +505,14 @@ impl Options {
             allocator: get_allocator(),
             rmw_subscription_options: rcl::MTSafeFn::rmw_get_default_subscription_options(),
 
-            #[cfg(any(ros_distro_jazzy, ros_distro_kilted))]
+            #[cfg(any(ros_distro_jazzy, ros_distro_kilted, ros_distro_lyrical))]
             disable_loaned_message: false,
         };
         Options { options }
     }
 
     fn disable_loaned_message(&mut self) {
-        #[cfg(any(ros_distro_jazzy, ros_distro_kilted))]
+        #[cfg(any(ros_distro_jazzy, ros_distro_kilted, ros_distro_lyrical))]
         {
             self.options.disable_loaned_message = true;
         }
