@@ -13,6 +13,21 @@ NC='\033[0m' # No Color
 
 # Default values
 ROS_DISTRO="${ROS_DISTRO:-jazzy}"
+
+# In a Nix dev shell (IN_NIX_SHELL is set by mkShell), ROS packages are provided
+# via AMENT_PREFIX_PATH rather than /opt/ros.  Derive ROS_PATH from it when not
+# explicitly set by the caller.
+if [[ -n "${IN_NIX_SHELL:-}" && -z "${ROS_PATH:-}" && -n "${AMENT_PREFIX_PATH:-}" ]]; then
+    IFS=: read -ra _ament_prefixes <<< "$AMENT_PREFIX_PATH"
+    for _p in "${_ament_prefixes[@]}"; do
+        if [[ -n "$_p" && -d "$_p/share" ]]; then
+            ROS_PATH="$_p"
+            break
+        fi
+    done
+    unset _ament_prefixes _p
+fi
+
 ROS_PATH="${ROS_PATH:-/opt/ros/$ROS_DISTRO}"
 BUILD_MODE="${BUILD_MODE:-release}"
 
@@ -35,12 +50,17 @@ usage() {
     echo "Environment variables:"
     echo "  ROS_DISTRO        ROS distribution name (default: jazzy)"
     echo "  ROS_PATH          ROS installation path (default: /opt/ros/\$ROS_DISTRO)"
+    echo "                    Auto-derived from AMENT_PREFIX_PATH inside a Nix dev shell."
     echo "  BUILD_MODE        Build mode: release or debug (default: release)"
     echo ""
     echo "Examples:"
     echo "  $0                          # Run validation against Jazzy"
     echo "  $0 --clean                  # Clean build and run"
     echo "  ROS_DISTRO=humble $0        # Run against Humble"
+    echo ""
+    echo "Nix dev shell:"
+    echo "  nix develop .#ros-jazzy-full -- $0"
+    echo "  nix develop .#ros-humble-full        # then: $0"
     echo ""
 }
 
@@ -74,20 +94,28 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Check ROS2 installation
-if [[ ! -d "$ROS_PATH" ]]; then
-    echo -e "${RED}Error: ROS2 installation not found at $ROS_PATH${NC}"
-    echo "Set ROS_PATH environment variable or install ROS2 $ROS_DISTRO"
-    exit 1
-fi
-
-# Source ROS2 environment
-if [[ -f "$ROS_PATH/setup.bash" ]]; then
+# Set up ROS environment
+if [[ -n "${IN_NIX_SHELL:-}" ]]; then
+    # Inside a Nix dev shell: ROS is already live via AMENT_PREFIX_PATH.
+    if [[ -z "${AMENT_PREFIX_PATH:-}" ]]; then
+        echo -e "${RED}Error: IN_NIX_SHELL is set but AMENT_PREFIX_PATH is empty.${NC}"
+        echo "Enter a ROS shell first:  nix develop .#ros-${ROS_DISTRO}-full"
+        exit 1
+    fi
+elif [[ -f "$ROS_PATH/setup.bash" ]]; then
+    # Classic /opt/ros installation.
     # shellcheck source=/dev/null
     source "$ROS_PATH/setup.bash"
 elif [[ -f "$ROS_PATH/local_setup.bash" ]]; then
     # shellcheck source=/dev/null
     source "$ROS_PATH/local_setup.bash"
+elif [[ ! -d "$ROS_PATH" ]]; then
+    echo -e "${RED}Error: ROS2 installation not found at $ROS_PATH${NC}"
+    echo "Options:"
+    echo "  - Install ROS2 ${ROS_DISTRO} and source its setup.bash"
+    echo "  - Set ROS_PATH to an existing ROS installation"
+    echo "  - Use a Nix dev shell: nix develop .#ros-${ROS_DISTRO}-full"
+    exit 1
 else
     echo -e "${YELLOW}Warning: Could not find ROS2 setup script at $ROS_PATH${NC}"
 fi

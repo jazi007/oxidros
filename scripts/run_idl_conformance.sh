@@ -12,6 +12,21 @@ NC='\033[0m' # No Color
 
 # Default values
 ROS_DISTRO="${ROS_DISTRO:-jazzy}"
+
+# In a Nix dev shell (IN_NIX_SHELL is set by mkShell), ROS packages are provided
+# via AMENT_PREFIX_PATH rather than /opt/ros.  Derive ROS_PATH from it when not
+# explicitly set by the caller.
+if [[ -n "${IN_NIX_SHELL:-}" && -z "${ROS_PATH:-}" && -n "${AMENT_PREFIX_PATH:-}" ]]; then
+    IFS=: read -ra _ament_prefixes <<< "$AMENT_PREFIX_PATH"
+    for _p in "${_ament_prefixes[@]}"; do
+        if [[ -n "$_p" && -d "$_p/share" ]]; then
+            ROS_PATH="$_p"
+            break
+        fi
+    done
+    unset _ament_prefixes _p
+fi
+
 ROS_PATH="${ROS_PATH:-/opt/ros/$ROS_DISTRO}"
 IDL_PATH="${1:-$ROS_PATH/share}"
 VERBOSE="${VERBOSE:-0}"
@@ -42,6 +57,7 @@ usage() {
     echo "Environment variables:"
     echo "  ROS_DISTRO        ROS distribution name (default: jazzy)"
     echo "  ROS_PATH          ROS installation path (default: /opt/ros/\$ROS_DISTRO)"
+    echo "                    Auto-derived from AMENT_PREFIX_PATH inside a Nix dev shell."
     echo "  VERBOSE           Set to 1 for verbose output (default: 0)"
     echo "  MAX_ERRORS        Maximum number of error details to show (default: 10)"
     echo ""
@@ -49,6 +65,10 @@ usage() {
     echo "  $0                                    # Test all IDL files in ROS2 share"
     echo "  $0 /opt/ros/jazzy/share/std_msgs     # Test only std_msgs"
     echo "  VERBOSE=1 $0                         # Verbose output"
+    echo ""
+    echo "Nix dev shell:"
+    echo "  nix develop .#ros-jazzy-full -- $0   # Enter jazzy shell and run"
+    echo "  nix develop .#ros-humble-full        # then: $0"
     exit 1
 }
 
@@ -57,12 +77,25 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     usage
 fi
 
-# Source ROS setup
-if [[ -f "$ROS_PATH/setup.bash" ]]; then
+# Set up ROS environment
+if [[ -n "${IN_NIX_SHELL:-}" ]]; then
+    # Inside a Nix dev shell: ROS is already live via AMENT_PREFIX_PATH.
+    if [[ -z "${AMENT_PREFIX_PATH:-}" ]]; then
+        echo -e "${RED}Error: IN_NIX_SHELL is set but AMENT_PREFIX_PATH is empty.${NC}"
+        echo "Enter a ROS shell first:  nix develop .#ros-${ROS_DISTRO}-full"
+        exit 1
+    fi
+    echo "Nix dev shell detected (ROS ${ROS_DISTRO}, prefix: ${ROS_PATH})"
+elif [[ -f "$ROS_PATH/setup.bash" ]]; then
+    # Classic /opt/ros installation.
+    # shellcheck source=/dev/null
     source "$ROS_PATH/setup.bash"
 else
     echo -e "${RED}Error: ROS setup not found at $ROS_PATH/setup.bash${NC}"
-    echo "Make sure ROS2 $ROS_DISTRO is installed or set ROS_PATH environment variable."
+    echo "Options:"
+    echo "  - Install ROS2 ${ROS_DISTRO} and source its setup.bash"
+    echo "  - Set ROS_PATH to an existing ROS installation"
+    echo "  - Use a Nix dev shell: nix develop .#ros-${ROS_DISTRO}-full"
     exit 1
 fi
 
@@ -81,13 +114,21 @@ if [[ ! -x "$CONFORMANCE_TOOL" ]]; then
     exit 1
 fi
 
-# Find all IDL files
+# Find all IDL files.
+# -L follows symbolic links: Nix buildEnv constructs its share/ directory
+# entirely from symlinks to individual package store paths, so without -L
+# find would not descend into them and report zero IDL files.
 echo "Searching for IDL files in $IDL_PATH..."
-mapfile -t IDL_FILES < <(find "$IDL_PATH" -name "*.idl" 2>/dev/null | sort)
+mapfile -t IDL_FILES < <(find -L "$IDL_PATH" -name "*.idl" 2>/dev/null | sort)
 TOTAL=${#IDL_FILES[@]}
 
 if [[ $TOTAL -eq 0 ]]; then
     echo -e "${YELLOW}Warning: No IDL files found in $IDL_PATH${NC}"
+    if [[ -n "${IN_NIX_SHELL:-}" ]]; then
+        echo "  Nix buildEnv hint: IDL files are accessed via symlinks."
+        echo "  If the distro is brand-new (e.g. lyrical), run: nix flake update"
+        echo "  Or switch to a stable distro:  nix develop .#ros-jazzy-full"
+    fi
     exit 0
 fi
 

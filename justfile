@@ -5,7 +5,7 @@ default:
 # Detect backend feature from environment
 _backend := if env("ROS_DISTRO", "") != "" { "rcl" } else { "zenoh" }
 # Exclude RCL-only crates when building with zenoh
-_exclude := if env("ROS_DISTRO", "") != "" { "" } else { "--exclude oxidros-wrapper --exclude oxidros-rcl" }
+_exclude := if env("ROS_DISTRO", "") != "" { "--exclude oxidros-zenoh" } else { "--exclude oxidros-wrapper --exclude oxidros-rcl" }
 
 # Run all tests in workspace (backend auto-detected from ROS_DISTRO)
 test:
