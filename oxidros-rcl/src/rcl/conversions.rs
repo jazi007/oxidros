@@ -85,7 +85,7 @@ impl From<super::rmw_qos_liveliness_policy_t> for oxidros_core::LivelinessPolicy
         match value {
             RMW_QOS_POLICY_LIVELINESS_SYSTEM_DEFAULT => Self::SystemDefault,
             RMW_QOS_POLICY_LIVELINESS_AUTOMATIC => Self::Automatic,
-            #[cfg(ros_distro_humble)]
+            #[cfg(not(ros_distro_lyrical))]
             RMW_QOS_POLICY_LIVELINESS_MANUAL_BY_NODE => Self::ManualByTopic,
             RMW_QOS_POLICY_LIVELINESS_MANUAL_BY_TOPIC => Self::ManualByTopic,
             RMW_QOS_POLICY_LIVELINESS_UNKNOWN => Self::Unknown,

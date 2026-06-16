@@ -279,13 +279,7 @@ fn as_i64(v: &Value) -> i64 {
 fn as_f64(v: &Value) -> f64 {
     match v {
         Value::Number(n) => n.as_f64().unwrap_or(0.0),
-        Value::Bool(b) => {
-            if *b {
-                1.0
-            } else {
-                0.0
-            }
-        }
+        Value::Bool(b) if *b => 1.0,
         _ => 0.0,
     }
 }

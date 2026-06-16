@@ -165,6 +165,11 @@ fn init_once() -> std::result::Result<(), RclError> {
 ///
 /// The `name` parameter is used as the logger name for rcutils.
 ///
+/// Log level filtering is delegated to ROS2's rcutils logging system,
+/// which respects `--log-level` command-line arguments. The tracing
+/// filter is set to "trace" to allow rcutils to perform the actual
+/// filtering based on ROS2 configuration.
+///
 /// # Example
 ///
 /// ```ignore
@@ -176,7 +181,7 @@ fn init_once() -> std::result::Result<(), RclError> {
 /// debug!("Debug message");
 /// ```
 pub fn init_ros_logging(name: &str) {
-    with_default_layers(LoggingBuilder::new(name)).init();
+    with_default_layers(LoggingBuilder::new(name).with_filter("trace")).init();
 }
 
 /// Add the default RCL logging layers to the given builder.
