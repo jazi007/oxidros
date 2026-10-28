@@ -127,6 +127,8 @@ fn primitive_value_to_idl(_idl_type: &str, value: &PrimitiveValue) -> String {
         PrimitiveValue::String(s) => {
             format!("\"{}\"", s.replace('\\', r"\\").replace('"', r#"\""#))
         }
+        PrimitiveValue::Float32(v) => format!("{v:?}"),
+        PrimitiveValue::Float64(v) => format!("{v:?}"),
         _ => value.to_string(),
     }
 }

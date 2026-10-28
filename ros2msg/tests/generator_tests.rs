@@ -272,6 +272,103 @@ fn test_generator_with_constants() {
 }
 
 #[test]
+fn test_float_constants_from_msg_and_idl_compile() {
+    let temp_dir = TempDir::new().unwrap();
+    let output_dir = temp_dir.path().join("generated");
+    let msg_file = create_test_msg_file(
+        &temp_dir,
+        "test_msgs",
+        "FloatConstants",
+        "\
+float32 NEGATIVE=-100.0
+float32 POSITIVE=100
+float32 NEGATIVE_ZERO=-0.0
+float32 FRACTION=0.25
+float32 LARGE_32=1e20
+float64 SMALL=1e-100
+float64 LARGE_64=1e100
+float64 ZERO=0.0
+int32 INTEGER=-100
+int32 value
+",
+    );
+    let idl_file = temp_dir.path().join("test_msgs/msg/IdlConstants.idl");
+    fs::write(
+        &idl_file,
+        "\
+module test_msgs {
+  module msg {
+    module IdlConstants_Constants {
+      const float INTEGER = -100;
+      const double WHOLE = 42.0;
+      const double NEGATIVE_ZERO = -0.0;
+    };
+    struct IdlConstants { long value; };
+  };
+};
+",
+    )
+    .unwrap();
+
+    Generator::new()
+        .include(msg_file.to_str().unwrap())
+        .include(idl_file.to_str().unwrap())
+        .output_dir(output_dir.to_str().unwrap())
+        .generate()
+        .unwrap();
+
+    let msg_code = fs::read_to_string(output_dir.join("test_msgs/msg/float_constants.rs")).unwrap();
+    let idl_code = fs::read_to_string(output_dir.join("test_msgs/msg/idl_constants.rs")).unwrap();
+    assert!(msg_code.contains("pub const NEGATIVE: f32 = -100.0;"));
+    assert!(msg_code.contains("pub const INTEGER: i32 = -100;"));
+    assert!(idl_code.contains("pub const INTEGER: f32 = -100.0;"));
+
+    let source = temp_dir.path().join("verify.rs");
+    fs::write(
+        &source,
+        format!(
+            r#"
+{msg_code}
+{idl_code}
+fn main() {{
+    assert_eq!(FloatConstants::NEGATIVE, -100.0_f32);
+    assert_eq!(FloatConstants::POSITIVE, 100.0_f32);
+    assert_eq!(FloatConstants::NEGATIVE_ZERO.to_bits(), (-0.0_f32).to_bits());
+    assert_eq!(FloatConstants::FRACTION, 0.25_f32);
+    assert_eq!(FloatConstants::LARGE_32, 1e20_f32);
+    assert_eq!(FloatConstants::SMALL, 1e-100_f64);
+    assert_eq!(FloatConstants::LARGE_64, 1e100_f64);
+    assert_eq!(FloatConstants::ZERO, 0.0_f64);
+    assert_eq!(FloatConstants::INTEGER, -100_i32);
+    assert_eq!(IdlConstants::INTEGER, -100.0_f32);
+    assert_eq!(IdlConstants::WHOLE, 42.0_f64);
+    assert_eq!(IdlConstants::NEGATIVE_ZERO.to_bits(), (-0.0_f64).to_bits());
+}}
+"#
+        ),
+    )
+    .unwrap();
+    let binary = temp_dir.path().join("verify");
+    let compile = std::process::Command::new("rustc")
+        .args(["--edition=2021", "-o"])
+        .arg(&binary)
+        .arg(&source)
+        .output()
+        .unwrap();
+    assert!(
+        compile.status.success(),
+        "generated Rust did not compile:\n{}",
+        String::from_utf8_lossy(&compile.stderr)
+    );
+    let result = std::process::Command::new(binary).output().unwrap();
+    assert!(
+        result.status.success(),
+        "generated constants had incorrect values:\n{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+}
+
+#[test]
 fn test_generator_emit_rerun_if_changed() {
     let temp_dir = TempDir::new().unwrap();
     let output_dir = temp_dir.path().join("generated");

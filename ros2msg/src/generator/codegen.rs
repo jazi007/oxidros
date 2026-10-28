@@ -786,7 +786,22 @@ impl CodeGenerator {
                     self.config
                         .transform_item_name(&constant.name, package_name, interface_kind);
                 let const_type = self.map_idl_type_to_rust_for_constant(&constant.constant_type);
-                let const_value = Self::format_idl_value(&constant.value);
+                let mut const_value = Self::format_idl_value(&constant.value);
+                if matches!(const_type.as_str(), "f32" | "f64")
+                    && matches!(
+                        constant.value,
+                        crate::idl::values::IdlValue::Int8(_)
+                            | crate::idl::values::IdlValue::UInt8(_)
+                            | crate::idl::values::IdlValue::Int16(_)
+                            | crate::idl::values::IdlValue::UInt16(_)
+                            | crate::idl::values::IdlValue::Int32(_)
+                            | crate::idl::values::IdlValue::UInt32(_)
+                            | crate::idl::values::IdlValue::Int64(_)
+                            | crate::idl::values::IdlValue::UInt64(_)
+                    )
+                {
+                    const_value.push_str(".0");
+                }
                 ConstantDef::new(const_name, const_type, const_value)
             })
             .collect();
@@ -1072,7 +1087,6 @@ impl CodeGenerator {
     }
 
     /// Format an IDL value as Rust code
-    /// Format an IDL value as Rust code
     fn format_idl_value(value: &crate::idl::values::IdlValue) -> String {
         use crate::idl::values::IdlValue;
         match value {
@@ -1085,8 +1099,8 @@ impl CodeGenerator {
             IdlValue::UInt32(u) => u.to_string(),
             IdlValue::Int64(i) => i.to_string(),
             IdlValue::UInt64(u) => u.to_string(),
-            IdlValue::Float32(f) => f.to_string(),
-            IdlValue::Float64(f) => f.to_string(),
+            IdlValue::Float32(f) => format!("{f:?}"),
+            IdlValue::Float64(f) => format!("{f:?}"),
             IdlValue::String(s) => format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\"")),
             IdlValue::Char(c) => format!("'{c}'"),
             IdlValue::Array(_) => "/* array */".to_string(),
